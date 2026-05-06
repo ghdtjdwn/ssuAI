@@ -7,8 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.mockwebserver.MockResponse;
@@ -20,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import com.ssuai.domain.meal.dto.MealItem;
 import com.ssuai.domain.meal.dto.MealResponse;
+import com.ssuai.domain.meal.dto.MealRestaurant;
 import com.ssuai.global.exception.ConnectorParseException;
 import com.ssuai.global.exception.ConnectorTimeoutException;
 import com.ssuai.global.exception.ConnectorUnavailableException;
@@ -50,41 +49,42 @@ class RealMealConnectorHttpTests {
                 .setResponseCode(200)
                 .setHeader("Content-Type", "text/plain; charset=utf-8")
                 .setBody(fixture()));
-        enqueueClosedResponses(5);
-        RealMealConnector connector = connectorWithTimeout(1_000);
+        RealMealConnector connector = connectorWithTimeout(5_000);
 
-        MealResponse response = connector.fetchMeal(DATE);
+        MealResponse response = connector.fetchMeal(DATE, MealRestaurant.STUDENT);
 
-        assertThat(response.meals()).hasSize(4);
         assertThat(response.meals())
+                .hasSize(4)
                 .extracting(MealItem::restaurant)
                 .containsOnly("학생식당");
-        assertThat(response.closures())
-                .extracting(closure -> closure.reason())
-                .containsExactly(
-                        "오늘은 쉽니다.",
-                        "오늘은 쉽니다.",
-                        "오늘은 쉽니다.",
-                        "오늘은 쉽니다.",
-                        "오늘은 쉽니다."
-                );
-        assertThat(takeRequestPaths())
-                .containsExactly(
-                        "/m/m_req/m_menu.php?rcd=1&sdt=20260506",
-                        "/m/m_req/m_menu.php?rcd=2&sdt=20260506",
-                        "/m/m_req/m_menu.php?rcd=4&sdt=20260506",
-                        "/m/m_req/m_menu.php?rcd=5&sdt=20260506",
-                        "/m/m_req/m_menu.php?rcd=6&sdt=20260506",
-                        "/m/m_req/m_menu.php?rcd=7&sdt=20260506"
-                );
+        assertThat(response.closures()).isEmpty();
+
+        RecordedRequest request = server.takeRequest();
+        assertThat(request.getPath()).isEqualTo("/m/m_req/m_menu.php?rcd=1&sdt=20260506");
+        assertThat(request.getHeader("User-Agent")).isEqualTo("ssuAI/0.1 (+akftjdwn@gmail.com)");
+        assertThat(request.getHeader("Accept-Language")).isEqualTo("ko-KR,ko;q=0.9");
+    }
+
+    @Test
+    void fetchMealUsesRestaurantCodeInQueryString() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "text/plain; charset=utf-8")
+                .setBody(closedBody()));
+        RealMealConnector connector = connectorWithTimeout(5_000);
+
+        connector.fetchMeal(DATE, MealRestaurant.FACULTY_LOUNGE);
+
+        assertThat(server.takeRequest().getPath())
+                .isEqualTo("/m/m_req/m_menu.php?rcd=7&sdt=20260506");
     }
 
     @Test
     void fetchMealThrowsUnavailableForHttp503() {
         server.enqueue(new MockResponse().setResponseCode(503));
-        RealMealConnector connector = connectorWithTimeout(1_000);
+        RealMealConnector connector = connectorWithTimeout(5_000);
 
-        assertThatThrownBy(() -> connector.fetchMeal(DATE))
+        assertThatThrownBy(() -> connector.fetchMeal(DATE, MealRestaurant.STUDENT))
                 .isInstanceOf(ConnectorUnavailableException.class);
     }
 
@@ -96,49 +96,58 @@ class RealMealConnectorHttpTests {
                 .setBody(fixtureUnchecked()));
         RealMealConnector connector = connectorWithTimeout(100);
 
-        assertThatThrownBy(() -> connector.fetchMeal(DATE))
+        assertThatThrownBy(() -> connector.fetchMeal(DATE, MealRestaurant.STUDENT))
                 .isInstanceOf(ConnectorTimeoutException.class);
     }
 
     @Test
     void fetchMealThrowsParseExceptionForEmptyHtml() {
-        enqueueEmptyResponses(6);
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "text/plain; charset=utf-8")
+                .setBody("<html><body></body></html>"));
         RealMealConnector connector = connectorWithTimeout(5_000);
 
-        assertThatThrownBy(() -> connector.fetchMeal(DATE))
+        assertThatThrownBy(() -> connector.fetchMeal(DATE, MealRestaurant.STUDENT))
                 .isInstanceOf(ConnectorParseException.class);
     }
 
     @Test
-    void fetchMealReturnsClosuresWhenAllRestaurantsAreClosed() {
-        enqueueClosedResponses(6);
-        RealMealConnector connector = connectorWithTimeout(1_000);
+    void fetchMealReturnsClosureWhenRestaurantIsClosed() {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "text/plain; charset=utf-8")
+                .setBody(closedBody()));
+        RealMealConnector connector = connectorWithTimeout(5_000);
 
-        MealResponse response = connector.fetchMeal(DATE);
+        MealResponse response = connector.fetchMeal(DATE, MealRestaurant.SNACK);
 
         assertThat(response.meals()).isEmpty();
         assertThat(response.closures())
-                .hasSize(6)
-                .allSatisfy(closure -> assertThat(closure.reason()).isEqualTo("오늘은 쉽니다."));
+                .singleElement()
+                .satisfies(closure -> {
+                    assertThat(closure.restaurant()).isEqualTo("스낵코너");
+                    assertThat(closure.reason()).isEqualTo("오늘은 쉽니다.");
+                });
     }
 
     @Test
     void fetchMealReturnsClosureForHolidayNoticeInsideMenuRow() {
-        enqueueClosedResponses(1);
         server.enqueue(new MockResponse()
                 .setResponseCode(200)
                 .setHeader("Content-Type", "text/plain; charset=utf-8")
                 .setBody(dodamChildrensDayFixtureUnchecked()));
-        enqueueClosedResponses(4);
-        RealMealConnector connector = connectorWithTimeout(1_000);
+        RealMealConnector connector = connectorWithTimeout(5_000);
 
-        MealResponse response = connector.fetchMeal(DATE);
+        MealResponse response = connector.fetchMeal(DATE, MealRestaurant.DODAM);
 
         assertThat(response.meals()).isEmpty();
         assertThat(response.closures())
-                .filteredOn(closure -> closure.restaurant().equals("숭실도담식당"))
                 .singleElement()
-                .satisfies(closure -> assertThat(closure.reason()).contains("어린이날"));
+                .satisfies(closure -> {
+                    assertThat(closure.restaurant()).isEqualTo("숭실도담식당");
+                    assertThat(closure.reason()).contains("어린이날");
+                });
     }
 
     private RealMealConnector connectorWithTimeout(int timeoutMs) {
@@ -149,40 +158,13 @@ class RealMealConnectorHttpTests {
         return Files.readString(FIXTURE_PATH, StandardCharsets.UTF_8);
     }
 
-    private void enqueueEmptyResponses(int count) {
-        for (int i = 0; i < count; i++) {
-            server.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Type", "text/plain; charset=utf-8")
-                    .setBody("<html><body></body></html>"));
-        }
-    }
-
-    private void enqueueClosedResponses(int count) {
-        for (int i = 0; i < count; i++) {
-            server.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Type", "text/plain; charset=utf-8")
-                    .setBody("""
-                            <table>
-                                <tr><td colspan="2">일 월 화 수 목 금 토</td></tr>
-                                <tr><td colspan="2">오늘은 쉽니다.</td></tr>
-                            </table>
-                            """));
-        }
-    }
-
-    private List<String> takeRequestPaths() throws Exception {
-        List<String> paths = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
-            RecordedRequest request = server.takeRequest();
-            if (i == 0) {
-                assertThat(request.getHeader("User-Agent")).isEqualTo("ssuAI/0.1 (+akftjdwn@gmail.com)");
-                assertThat(request.getHeader("Accept-Language")).isEqualTo("ko-KR,ko;q=0.9");
-            }
-            paths.add(request.getPath());
-        }
-        return paths;
+    private static String closedBody() {
+        return """
+                <table>
+                    <tr><td colspan="2">일 월 화 수 목 금 토</td></tr>
+                    <tr><td colspan="2">오늘은 쉽니다.</td></tr>
+                </table>
+                """;
     }
 
     private static String fixtureUnchecked() {

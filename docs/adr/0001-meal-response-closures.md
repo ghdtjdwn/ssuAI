@@ -50,8 +50,29 @@ public record MealResponse(
   로 그 갭을 명시적으로 메웁니다.
 - MCP tool wrapping 단계에서 tool schema 에도 `closures` 가 들어가야 함
   (`docs/mcp-tools.md` 갱신 필요 — Task 04 또는 별도 ticket).
-- Service 레이어가 `closures` 를 어떻게 처리할지(병합·제외·집계) 는 본
-  ADR 범위 외. P3 분해(connector 단일 식당 단위로 축소) 시 함께 정합니다.
+
+## Update — connector 분해 후 (P3, 2026-05-07)
+
+`RealMealConnector` 가 단일 식당 단위로 축소되고 `MealService` 가 6식당
+fan-out 을 책임지게 되면서, `closures` 의 의미가 한 단계 확장됐습니다:
+
+- 기존: "외부 사이트가 보고한 휴무 사유" (예: `오늘은 쉽니다.`, `어린이날`)
+- 추가: "조회 자체에 실패한 식당" — `MealService` 가 `ConnectorException`
+  을 잡으면 해당 식당을 `MealClosure(restaurant, "조회 실패: " + ErrorCode)`
+  로 흡수해 같은 `closures` 리스트에 담음.
+
+이렇게 통합한 이유:
+- 클라이언트 입장에서는 두 경우 모두 "이 식당 메뉴를 표시할 수 없는 사유"
+  로 동일하게 처리 가능 (UX 도 같음 — "오늘은 메뉴 정보 없음").
+- 별도 `errors` 필드로 분리하면 record 모양이 또 한 번 바뀌어 client·MCP
+  schema 유지 비용이 올라감.
+
+대신 `reason` 문자열 prefix `"조회 실패: "` + `ErrorCode` 이름으로
+프로그램적 구분을 가능하게 둡니다. 향후 클라이언트가 둘을 구별해 표시
+하고 싶다면 그 prefix 를 키로 분기하면 됩니다.
+
+**전부 실패** (모든 식당이 `ConnectorException`) 케이스만은 흡수하지 않고
+마지막 예외를 그대로 throw — 운영자에게 5xx 신호가 가야 하기 때문.
 
 ## Alternatives considered
 

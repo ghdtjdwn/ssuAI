@@ -28,6 +28,7 @@ import org.springframework.stereotype.Component;
 import com.ssuai.domain.meal.dto.MealClosure;
 import com.ssuai.domain.meal.dto.MealItem;
 import com.ssuai.domain.meal.dto.MealResponse;
+import com.ssuai.domain.meal.dto.MealRestaurant;
 import com.ssuai.domain.meal.dto.MealType;
 import com.ssuai.global.exception.ConnectorException;
 import com.ssuai.global.exception.ConnectorParseException;
@@ -50,14 +51,6 @@ class RealMealConnector implements MealConnector {
     private static final Pattern HANGUL_PATTERN = Pattern.compile("[가-힣]");
     private static final long DEFAULT_MIN_INTERVAL_MS = 1_000L;
     private static final int DEFAULT_TIMEOUT_MS = 10_000;
-    private static final List<MealRestaurant> RESTAURANTS = List.of(
-            new MealRestaurant("1", "학생식당"),
-            new MealRestaurant("2", "숭실도담식당"),
-            new MealRestaurant("4", "스낵코너"),
-            new MealRestaurant("5", "푸드코트"),
-            new MealRestaurant("6", "THE KITCHEN"),
-            new MealRestaurant("7", "FACULTY LOUNGE")
-    );
 
     private final String menuUrl;
     private final long minIntervalMs;
@@ -75,56 +68,50 @@ class RealMealConnector implements MealConnector {
     }
 
     @Override
-    public MealResponse fetchMeal(LocalDate date) {
+    public MealResponse fetchMeal(LocalDate date, MealRestaurant restaurant) {
         long startedAt = System.currentTimeMillis();
-        String currentRestaurant = "?";
+        String displayName = restaurant.displayName();
 
         try {
-            List<MealItem> meals = new ArrayList<>();
-            List<MealClosure> closures = new ArrayList<>();
-            for (MealRestaurant restaurant : RESTAURANTS) {
-                currentRestaurant = restaurant.name();
-                waitForRateLimit();
+            waitForRateLimit();
 
-                Document document = Jsoup.connect(buildMenuUrl(restaurant.code(), date))
-                        .userAgent(USER_AGENT)
-                        .timeout(timeoutMs)
-                        .header("Accept-Language", ACCEPT_LANGUAGE)
-                        .get();
-                List<MealItem> restaurantMeals = parseMealItems(restaurant.name(), document, false);
-                if (restaurantMeals.isEmpty()) {
-                    parseClosure(restaurant.name(), document).ifPresent(closures::add);
-                } else {
-                    meals.addAll(restaurantMeals);
-                }
-            }
+            Document document = Jsoup.connect(buildMenuUrl(restaurant.code(), date))
+                    .userAgent(USER_AGENT)
+                    .timeout(timeoutMs)
+                    .header("Accept-Language", ACCEPT_LANGUAGE)
+                    .get();
+
+            List<MealItem> meals = parseMealItems(displayName, document, false);
+            List<MealClosure> closures = meals.isEmpty()
+                    ? parseClosure(displayName, document).map(List::of).orElse(List.of())
+                    : List.of();
 
             if (meals.isEmpty() && closures.isEmpty()) {
                 throw new ConnectorParseException();
             }
 
-            log.debug("connector=meal status=ok date={} items={} closures={} ms={}",
-                    date, meals.size(), closures.size(), elapsedMs(startedAt));
-            return new MealResponse(date, List.copyOf(meals), List.copyOf(closures));
+            log.debug("connector=meal status=ok restaurant={} date={} items={} closures={} ms={}",
+                    displayName, date, meals.size(), closures.size(), elapsedMs(startedAt));
+            return new MealResponse(date, meals, closures);
         } catch (SocketTimeoutException exception) {
-            logFailure("timeout", currentRestaurant, date, startedAt);
+            logFailure("timeout", displayName, date, startedAt);
             throw new ConnectorTimeoutException(exception);
         } catch (HttpStatusException exception) {
-            logFailure("http_" + exception.getStatusCode(), currentRestaurant, date, startedAt);
+            logFailure("http_" + exception.getStatusCode(), displayName, date, startedAt);
             throw mapHttpStatus(exception);
         } catch (SelectorParseException exception) {
-            logFailure("parse", currentRestaurant, date, startedAt);
+            logFailure("parse", displayName, date, startedAt);
             throw new ConnectorParseException(exception);
         } catch (ConnectorException exception) {
             logFailure(exception.getErrorCode().name().toLowerCase(Locale.ROOT),
-                    currentRestaurant, date, startedAt);
+                    displayName, date, startedAt);
             throw exception;
         } catch (IOException exception) {
             if (isTimeout(exception)) {
-                logFailure("timeout", currentRestaurant, date, startedAt);
+                logFailure("timeout", displayName, date, startedAt);
                 throw new ConnectorTimeoutException(exception);
             }
-            logFailure("unavailable", currentRestaurant, date, startedAt);
+            logFailure("unavailable", displayName, date, startedAt);
             throw new ConnectorUnavailableException(exception);
         }
     }
@@ -299,8 +286,8 @@ class RealMealConnector implements MealConnector {
     }
 
     private static String normalizeWhitespace(String value) {
-        return value.replace('\u00a0', ' ')
-                .replace('\u3000', ' ')
+        return value.replace(' ', ' ')
+                .replace('　', ' ')
                 .replaceAll("\\s+", " ")
                 .trim();
     }
@@ -326,8 +313,5 @@ class RealMealConnector implements MealConnector {
     private static void logFailure(String reason, String restaurant, LocalDate date, long startedAt) {
         log.warn("connector=meal status=fail restaurant={} date={} reason={} ms={}",
                 restaurant, date, reason, elapsedMs(startedAt));
-    }
-
-    private record MealRestaurant(String code, String name) {
     }
 }

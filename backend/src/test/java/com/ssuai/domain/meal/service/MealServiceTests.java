@@ -1,8 +1,11 @@
 package com.ssuai.domain.meal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,30 +17,108 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import com.ssuai.domain.meal.connector.MealConnector;
+import com.ssuai.domain.meal.dto.MealClosure;
+import com.ssuai.domain.meal.dto.MealItem;
 import com.ssuai.domain.meal.dto.MealResponse;
+import com.ssuai.domain.meal.dto.MealRestaurant;
+import com.ssuai.domain.meal.dto.MealType;
+import com.ssuai.global.exception.ConnectorParseException;
+import com.ssuai.global.exception.ConnectorUnavailableException;
 
 class MealServiceTests {
 
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalDate DATE = LocalDate.of(2026, 5, 6);
 
     private final MealConnector mealConnector = mock(MealConnector.class);
     private final MealService mealService = new MealService(mealConnector);
 
     @Test
     void getTodayMealFetchesMealForTodayInSeoulTime() {
-        MealResponse expected = new MealResponse(LocalDate.of(2026, 5, 6), List.of());
-        when(mealConnector.fetchMeal(any(LocalDate.class))).thenReturn(expected);
+        when(mealConnector.fetchMeal(any(LocalDate.class), any(MealRestaurant.class)))
+                .thenAnswer(invocation -> emptyResponse(invocation.getArgument(0)));
 
         LocalDate beforeCall = LocalDate.now(SEOUL_ZONE);
-        MealResponse actual = mealService.getTodayMeal();
+        mealService.getTodayMeal();
         LocalDate afterCall = LocalDate.now(SEOUL_ZONE);
 
         ArgumentCaptor<LocalDate> dateCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(mealConnector).fetchMeal(dateCaptor.capture());
+        verify(mealConnector, times(MealRestaurant.values().length))
+                .fetchMeal(dateCaptor.capture(), any(MealRestaurant.class));
+        assertThat(dateCaptor.getAllValues())
+                .allSatisfy(captured -> assertThat(captured)
+                        .isAfterOrEqualTo(beforeCall)
+                        .isBeforeOrEqualTo(afterCall));
+    }
 
-        assertThat(actual).isSameAs(expected);
-        assertThat(dateCaptor.getValue())
-                .isAfterOrEqualTo(beforeCall)
-                .isBeforeOrEqualTo(afterCall);
+    @Test
+    void getMealFansOutToEveryRestaurantAndAggregatesResults() {
+        when(mealConnector.fetchMeal(eq(DATE), any(MealRestaurant.class)))
+                .thenAnswer(invocation -> {
+                    MealRestaurant restaurant = invocation.getArgument(1);
+                    return new MealResponse(
+                            DATE,
+                            List.of(new MealItem(
+                                    restaurant.displayName(),
+                                    MealType.LUNCH,
+                                    "중식",
+                                    List.of("밥", "국"))));
+                });
+
+        MealResponse response = mealService.getMeal(DATE);
+
+        assertThat(response.date()).isEqualTo(DATE);
+        assertThat(response.meals())
+                .hasSize(MealRestaurant.values().length)
+                .extracting(MealItem::restaurant)
+                .containsExactlyInAnyOrder(
+                        "학생식당", "숭실도담식당", "스낵코너", "푸드코트", "THE KITCHEN", "FACULTY LOUNGE");
+        assertThat(response.closures()).isEmpty();
+        verify(mealConnector, times(MealRestaurant.values().length))
+                .fetchMeal(eq(DATE), any(MealRestaurant.class));
+    }
+
+    @Test
+    void getMealAbsorbsPartialFailureAsClosureAndReturnsRemainingMeals() {
+        when(mealConnector.fetchMeal(DATE, MealRestaurant.STUDENT))
+                .thenReturn(new MealResponse(
+                        DATE,
+                        List.of(new MealItem("학생식당", MealType.LUNCH, "중식", List.of("밥")))));
+        when(mealConnector.fetchMeal(DATE, MealRestaurant.DODAM))
+                .thenThrow(new ConnectorUnavailableException(new RuntimeException("503")));
+        when(mealConnector.fetchMeal(DATE, MealRestaurant.SNACK))
+                .thenReturn(new MealResponse(
+                        DATE,
+                        List.of(),
+                        List.of(new MealClosure("스낵코너", "오늘은 쉽니다."))));
+        for (MealRestaurant restaurant : List.of(
+                MealRestaurant.FOOD_COURT, MealRestaurant.THE_KITCHEN, MealRestaurant.FACULTY_LOUNGE)) {
+            when(mealConnector.fetchMeal(DATE, restaurant))
+                    .thenReturn(new MealResponse(DATE, List.of()));
+        }
+
+        MealResponse response = mealService.getMeal(DATE);
+
+        assertThat(response.meals())
+                .extracting(MealItem::restaurant)
+                .containsExactly("학생식당");
+        assertThat(response.closures())
+                .extracting(MealClosure::restaurant, MealClosure::reason)
+                .contains(
+                        org.assertj.core.groups.Tuple.tuple("스낵코너", "오늘은 쉽니다."),
+                        org.assertj.core.groups.Tuple.tuple("숭실도담식당", "조회 실패: CONNECTOR_UNAVAILABLE"));
+    }
+
+    @Test
+    void getMealRethrowsWhenAllRestaurantsFail() {
+        when(mealConnector.fetchMeal(eq(DATE), any(MealRestaurant.class)))
+                .thenThrow(new ConnectorParseException());
+
+        assertThatThrownBy(() -> mealService.getMeal(DATE))
+                .isInstanceOf(ConnectorParseException.class);
+    }
+
+    private static MealResponse emptyResponse(LocalDate date) {
+        return new MealResponse(date, List.of());
     }
 }

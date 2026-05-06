@@ -18,14 +18,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
 
 import com.ssuai.domain.meal.connector.MealConnector;
-import com.ssuai.domain.meal.dto.MealClosure;
 import com.ssuai.domain.meal.dto.MealItem;
 import com.ssuai.domain.meal.dto.MealResponse;
+import com.ssuai.domain.meal.dto.MealRestaurant;
 import com.ssuai.domain.meal.dto.MealType;
-import com.ssuai.domain.meal.dto.WeeklyMealResponse;
+import com.ssuai.global.exception.ConnectorUnavailableException;
 
 class WeeklyMealExportServiceTests {
 
@@ -40,38 +39,41 @@ class WeeklyMealExportServiceTests {
     private final WeeklyMealExportService exportService = new WeeklyMealExportService(mealService, objectMapper);
 
     @Test
-    void exportWeeklyMealsWritesJsonFile() throws Exception {
+    void exportWeeklyMealsWritesJsonFileForEveryRestaurantAndDay() throws Exception {
         LocalDate startDate = LocalDate.of(2026, 5, 3);
-        when(mealConnector.fetchMeal(any(LocalDate.class)))
-                .thenAnswer(invocation -> responseFor(invocation.getArgument(0)));
+        when(mealConnector.fetchMeal(any(LocalDate.class), any(MealRestaurant.class)))
+                .thenAnswer(invocation -> {
+                    LocalDate date = invocation.getArgument(0);
+                    MealRestaurant restaurant = invocation.getArgument(1);
+                    if (restaurant == MealRestaurant.SNACK) {
+                        throw new ConnectorUnavailableException(new RuntimeException("503"));
+                    }
+                    return new MealResponse(
+                            date,
+                            List.of(new MealItem(
+                                    restaurant.displayName(),
+                                    MealType.LUNCH,
+                                    "중식",
+                                    List.of("쌀밥"))));
+                });
         Path outputPath = tempDir.resolve("weekly-meals.json");
 
-        WeeklyMealResponse response = exportService.exportWeeklyMeals(startDate, outputPath);
+        exportService.exportWeeklyMeals(startDate, outputPath);
 
-        assertThat(response.days()).hasSize(7);
         assertThat(outputPath).exists();
-
         String json = Files.readString(outputPath, StandardCharsets.UTF_8);
         JsonNode root = objectMapper.readTree(json);
         assertThat(root.path("startDate").asText()).isEqualTo("2026-05-03");
         assertThat(root.path("endDate").asText()).isEqualTo("2026-05-09");
         assertThat(root.path("days")).hasSize(7);
-        assertThat(root.path("days").get(0).path("meals").get(0).path("restaurant").asText())
-                .isEqualTo("학생식당");
-        assertThat(root.path("days").get(0).path("closures").get(0).path("reason").asText())
-                .isEqualTo("오늘은 쉽니다.");
 
-        ArgumentCaptor<LocalDate> dateCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(mealConnector, times(7)).fetchMeal(dateCaptor.capture());
-        assertThat(dateCaptor.getAllValues())
-                .containsExactlyElementsOf(response.days().stream().map(MealResponse::date).toList());
-    }
+        JsonNode firstDay = root.path("days").get(0);
+        assertThat(firstDay.path("meals")).hasSize(MealRestaurant.values().length - 1);
+        assertThat(firstDay.path("closures").get(0).path("restaurant").asText()).isEqualTo("스낵코너");
+        assertThat(firstDay.path("closures").get(0).path("reason").asText())
+                .isEqualTo("조회 실패: CONNECTOR_UNAVAILABLE");
 
-    private static MealResponse responseFor(LocalDate date) {
-        return new MealResponse(
-                date,
-                List.of(new MealItem("학생식당", MealType.LUNCH, "중식1", List.of("쌀밥"))),
-                List.of(new MealClosure("스낵코너", "오늘은 쉽니다."))
-        );
+        verify(mealConnector, times(7 * MealRestaurant.values().length))
+                .fetchMeal(any(LocalDate.class), any(MealRestaurant.class));
     }
 }
