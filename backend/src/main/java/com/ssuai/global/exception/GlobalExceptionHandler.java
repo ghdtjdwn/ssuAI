@@ -117,7 +117,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<ErrorResponse>> handleConnectorTimeoutException(
             ConnectorTimeoutException exception
     ) {
-        log.warn("Connector exception occurred: exceptionType={}", exception.getClass().getName());
+        log.warn("Connector exception: code={} type={}",
+                ErrorCode.CONNECTOR_TIMEOUT.name(), exception.getClass().getSimpleName(), exception);
 
         return error(ErrorCode.CONNECTOR_TIMEOUT);
     }
@@ -126,7 +127,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<ErrorResponse>> handleConnectorUnavailableException(
             ConnectorUnavailableException exception
     ) {
-        log.warn("Connector exception occurred: exceptionType={}", exception.getClass().getName());
+        log.warn("Connector exception: code={} type={}",
+                ErrorCode.CONNECTOR_UNAVAILABLE.name(), exception.getClass().getSimpleName(), exception);
 
         return error(ErrorCode.CONNECTOR_UNAVAILABLE);
     }
@@ -135,14 +137,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<ErrorResponse>> handleConnectorParseException(
             ConnectorParseException exception
     ) {
-        log.warn("Connector exception occurred: exceptionType={}", exception.getClass().getName());
+        log.warn("Connector exception: code={} type={}",
+                ErrorCode.CONNECTOR_PARSE_ERROR.name(), exception.getClass().getSimpleName(), exception);
 
         return error(ErrorCode.CONNECTOR_PARSE_ERROR);
     }
 
     @ExceptionHandler(ConnectorException.class)
     public ResponseEntity<ApiResponse<ErrorResponse>> handleConnectorException(ConnectorException exception) {
-        log.warn("Connector exception occurred: exceptionType={}", exception.getClass().getName());
+        log.warn("Connector exception: code={} type={}",
+                ErrorCode.CONNECTOR_ERROR.name(), exception.getClass().getSimpleName(), exception);
 
         return error(ErrorCode.CONNECTOR_ERROR);
     }
