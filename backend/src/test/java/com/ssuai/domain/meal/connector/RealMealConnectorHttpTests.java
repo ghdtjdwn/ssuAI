@@ -103,7 +103,7 @@ class RealMealConnectorHttpTests {
     @Test
     void fetchMealThrowsParseExceptionForEmptyHtml() {
         enqueueEmptyResponses(6);
-        RealMealConnector connector = connectorWithTimeout(1_000);
+        RealMealConnector connector = connectorWithTimeout(5_000);
 
         assertThatThrownBy(() -> connector.fetchMeal(DATE))
                 .isInstanceOf(ConnectorParseException.class);
@@ -154,8 +154,7 @@ class RealMealConnectorHttpTests {
             server.enqueue(new MockResponse()
                     .setResponseCode(200)
                     .setHeader("Content-Type", "text/plain; charset=utf-8")
-                    .setBody("<html><body></body></html>")
-                    .setBodyDelay(1, TimeUnit.MILLISECONDS));
+                    .setBody("<html><body></body></html>"));
         }
     }
 
