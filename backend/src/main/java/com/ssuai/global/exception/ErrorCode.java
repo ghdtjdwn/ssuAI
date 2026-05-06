@@ -7,7 +7,9 @@ public enum ErrorCode {
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error"),
     CONNECTOR_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "External connector timed out"),
-    CONNECTOR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "External connector is unavailable");
+    CONNECTOR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "External connector is unavailable"),
+    NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method not allowed");
 
     private final HttpStatus status;
     private final String defaultMessage;
@@ -25,4 +27,3 @@ public enum ErrorCode {
         return defaultMessage;
     }
 }
-

@@ -9,11 +9,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.ssuai.global.response.ApiResponse;
 import com.ssuai.global.response.ErrorResponse;
@@ -72,6 +74,35 @@ public class GlobalExceptionHandler {
         return validationFailed(exception.getParameterName() + ": required request parameter is missing");
     }
 
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleNoResourceFoundException(
+            NoResourceFoundException exception
+    ) {
+        log.debug("No resource found: resourcePath={}", exception.getResourcePath());
+
+        ErrorCode errorCode = ErrorCode.NOT_FOUND;
+        ErrorResponse errorResponse = new ErrorResponse(
+                errorCode.name(),
+                "No resource for " + exception.getResourcePath()
+        );
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.error(errorResponse));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleHttpRequestMethodNotSupportedException(
+            HttpRequestMethodNotSupportedException exception
+    ) {
+        ErrorCode errorCode = ErrorCode.METHOD_NOT_ALLOWED;
+        ErrorResponse errorResponse = new ErrorResponse(errorCode.name(), exception.getMessage());
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.error(errorResponse));
+    }
+
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiResponse<ErrorResponse>> handleApiException(ApiException exception) {
         ErrorCode errorCode = exception.getErrorCode();
@@ -127,4 +158,3 @@ public class GlobalExceptionHandler {
         return name;
     }
 }
-

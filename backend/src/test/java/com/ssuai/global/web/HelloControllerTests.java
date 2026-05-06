@@ -41,4 +41,13 @@ class HelloControllerTests {
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.traceId").value(not(isEmptyOrNullString())));
     }
+
+    @Test
+    void notFoundReturnsErrorEnvelope() throws Exception {
+        mockMvc.perform(get("/api/does-not-exist"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.traceId").value(not(isEmptyOrNullString())));
+    }
 }
