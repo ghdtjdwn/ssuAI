@@ -10,5 +10,6 @@ out/
 *.key
 secrets/
 **/application-prod.yml
+!src/main/resources/application-prod.yml
 *.dump
 *.sql.gz

@@ -113,12 +113,54 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(errorResponse));
     }
 
+    @ExceptionHandler(ConnectorTimeoutException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleConnectorTimeoutException(
+            ConnectorTimeoutException exception
+    ) {
+        log.warn("Connector exception occurred: exceptionType={}", exception.getClass().getName());
+
+        return error(ErrorCode.CONNECTOR_TIMEOUT);
+    }
+
+    @ExceptionHandler(ConnectorUnavailableException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleConnectorUnavailableException(
+            ConnectorUnavailableException exception
+    ) {
+        log.warn("Connector exception occurred: exceptionType={}", exception.getClass().getName());
+
+        return error(ErrorCode.CONNECTOR_UNAVAILABLE);
+    }
+
+    @ExceptionHandler(ConnectorParseException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleConnectorParseException(
+            ConnectorParseException exception
+    ) {
+        log.warn("Connector exception occurred: exceptionType={}", exception.getClass().getName());
+
+        return error(ErrorCode.CONNECTOR_PARSE_ERROR);
+    }
+
+    @ExceptionHandler(ConnectorException.class)
+    public ResponseEntity<ApiResponse<ErrorResponse>> handleConnectorException(ConnectorException exception) {
+        log.warn("Connector exception occurred: exceptionType={}", exception.getClass().getName());
+
+        return error(ErrorCode.CONNECTOR_ERROR);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<ErrorResponse>> handleException(Exception exception) {
         log.error("Unhandled exception occurred: exceptionType={}", exception.getClass().getName(), exception);
 
         ErrorCode errorCode = ErrorCode.INTERNAL_ERROR;
         ErrorResponse errorResponse = new ErrorResponse(errorCode.name(), "Internal server error");
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.error(errorResponse));
+    }
+
+    private ResponseEntity<ApiResponse<ErrorResponse>> error(ErrorCode errorCode) {
+        ErrorResponse errorResponse = new ErrorResponse(errorCode.name(), errorCode.getDefaultMessage());
 
         return ResponseEntity
                 .status(errorCode.getStatus())

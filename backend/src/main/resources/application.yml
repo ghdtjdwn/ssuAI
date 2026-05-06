@@ -13,3 +13,6 @@ management:
     health:
       show-details: never
 
+ssuai:
+  connector:
+    meal: mock # mock | real (real implemented in Task 03)
