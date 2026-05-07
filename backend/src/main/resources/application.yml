@@ -3,6 +3,12 @@ spring:
     name: ssuai
   profiles:
     default: dev
+  ai:
+    mcp:
+      server:
+        name: ssuai-mcp
+        version: 0.0.1
+        type: SYNC
 
 management:
   endpoints:
@@ -13,3 +19,7 @@ management:
     health:
       show-details: never
 
+ssuai:
+  connector:
+    meal: mock # mock | real
+    dorm-meal: mock # mock | real
