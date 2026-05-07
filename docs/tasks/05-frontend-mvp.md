@@ -392,7 +392,14 @@ mega-commit.
    - Two cards, factor the shared inner strip if it's clean.
 6. `feat(frontend): FacilitySearchCard with debounced query`
    - Last card. Dashboard now full.
-7. `docs: add ADR 0006 frontend stack + dev-log entry for Task 05`
+7. `chore(ci): re-enable frontend job in CI workflow`
+   - 이 task 이전에 `.github/workflows/ci.yml` 은 backend-only 로 simplified
+     되어 있음 (frontend job 의 `if: hashFiles(...)` + missing
+     `cache-dependency-path` 가 workflow validation 을 깨뜨려서). 이 시점엔
+     `frontend/package.json` + `frontend/pnpm-lock.yaml` 이 실재하므로
+     unconditional 한 frontend job 을 추가: pnpm 9 + Node 20, lint /
+     typecheck / test / build. 가드 사용 금지.
+8. `docs: add ADR 0006 frontend stack + dev-log entry for Task 05`
    - ADR captures Next.js + Tailwind + shadcn + TanStack Query choice
      with the alternatives considered (Vite SPA, SWR). One dev-log line.
 
