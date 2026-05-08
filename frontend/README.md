@@ -27,6 +27,9 @@ pnpm test
 pnpm build
 ```
 
+`pnpm test` runs Vitest + React Testing Library component tests in jsdom.
+Use `pnpm test --watch` while developing frontend components.
+
 From the repository root:
 
 ```powershell
