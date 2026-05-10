@@ -26,7 +26,7 @@ export function FacilitySearchCard() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const normalizedQuery = normalizeSearchQuery(debouncedQuery);
-  const { data, error, isFetching, refetch } = useFacilitySearch(debouncedQuery);
+  const { data, error, isFetching, refetch } = useFacilitySearch(normalizedQuery);
   const errorState = getErrorStateDetails(error);
 
   useEffect(() => {
