@@ -8,7 +8,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -54,6 +53,9 @@ class RealDormMealConnector implements DormMealConnector {
     private static final int DEFAULT_TIMEOUT_MS = 10_000;
 
     private static final Pattern DATE_PATTERN = Pattern.compile("(\\d{4}-\\d{2}-\\d{2})");
+    private static final Pattern BR_PATTERN = Pattern.compile("(?i)<br\\s*/?>");
+    private static final Pattern LINE_SPLIT_PATTERN = Pattern.compile("\\R+");
+    private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.KOREAN);
 
     private static final List<ColumnSpec> COLUMNS = List.of(
@@ -187,14 +189,14 @@ class RealDormMealConnector implements DormMealConnector {
     }
 
     private static String cellText(Element cell) {
-        String html = cell.html().replaceAll("(?i)<br\\s*/?>", "\n");
+        String html = BR_PATTERN.matcher(cell.html()).replaceAll("\n");
         Element fragment = Jsoup.parseBodyFragment(html).body();
         return fragment.wholeText().trim();
     }
 
     private static List<String> splitMenu(String text) {
-        return Arrays.stream(text.split("\\R+"))
-                .map(line -> line.replace(' ', ' ').replace('　', ' ').replaceAll("\\s+", " ").trim())
+        return LINE_SPLIT_PATTERN.splitAsStream(text)
+                .map(RealDormMealConnector::normalizeWhitespace)
                 .filter(line -> !line.isBlank())
                 .toList();
     }
@@ -209,7 +211,7 @@ class RealDormMealConnector implements DormMealConnector {
     }
 
     private static String cleanClosureReason(String text) {
-        return text.replace(' ', ' ').replace('　', ' ').replaceAll("\\s+", " ").trim();
+        return normalizeWhitespace(text);
     }
 
     private static LocalDate parseDate(String headerText) {
@@ -258,6 +260,10 @@ class RealDormMealConnector implements DormMealConnector {
 
     private static void logFailure(String reason, long startedAt) {
         log.warn("connector=dorm-meal status=fail reason={} ms={}", reason, elapsedMs(startedAt));
+    }
+
+    private static String normalizeWhitespace(String text) {
+        return WHITESPACE_PATTERN.matcher(text.replace(' ', ' ').replace('　', ' ')).replaceAll(" ").trim();
     }
 
     private record ColumnSpec(int index, MealType mealType, String cornerName) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Utensils } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -30,7 +30,16 @@ export function WeeklyMealStrip({ days, emptyTitle, emptyDescription }: WeeklyMe
     [days, today],
   );
   const [selectedDate, setSelectedDate] = useState(defaultDate);
-  const selectedDay = days.find((day) => day.date === (selectedDate || defaultDate));
+  const selectedDateExists = days.some((day) => day.date === selectedDate);
+  const activeDate = selectedDateExists ? selectedDate : defaultDate;
+  const selectedDay = days.find((day) => day.date === activeDate);
+  const selectedMeals = selectedDay ? sortMeals(selectedDay) : [];
+
+  useEffect(() => {
+    if (!selectedDateExists) {
+      setSelectedDate(defaultDate);
+    }
+  }, [defaultDate, selectedDateExists]);
 
   if (days.length === 0) {
     return (
@@ -47,6 +56,7 @@ export function WeeklyMealStrip({ days, emptyTitle, emptyDescription }: WeeklyMe
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
         {days.map((day) => {
           const active = day.date === selectedDay?.date;
+          const sortedMeals = sortMeals(day);
           return (
             <Button
               key={day.date}
@@ -62,8 +72,8 @@ export function WeeklyMealStrip({ days, emptyTitle, emptyDescription }: WeeklyMe
             >
               <span className="text-sm font-semibold">{formatShortKoreanDate(day.date)}</span>
               <span className="flex flex-wrap gap-1 pt-2">
-                {sortMeals(day).length > 0 ? (
-                  sortMeals(day).map((meal) => (
+                {sortedMeals.length > 0 ? (
+                  sortedMeals.map((meal) => (
                     <span
                       key={`${day.date}-${meal.restaurant}-${meal.type}-${meal.corner}`}
                       className={cn(
@@ -87,7 +97,7 @@ export function WeeklyMealStrip({ days, emptyTitle, emptyDescription }: WeeklyMe
         })}
       </div>
 
-      {selectedDay && selectedDay.meals.length > 0 ? (
+      {selectedDay && selectedMeals.length > 0 ? (
         <div className="rounded-md border border-border p-4">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <h4 className="text-sm font-semibold text-foreground">
@@ -100,7 +110,7 @@ export function WeeklyMealStrip({ days, emptyTitle, emptyDescription }: WeeklyMe
             ))}
           </div>
           <div className="space-y-4">
-            {sortMeals(selectedDay).map((meal) => (
+            {selectedMeals.map((meal) => (
               <section key={`${meal.restaurant}-${meal.type}-${meal.corner}`} className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">{mealTypeLabel(meal.type)}</Badge>

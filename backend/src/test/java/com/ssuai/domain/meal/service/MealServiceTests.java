@@ -12,6 +12,11 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -32,7 +37,7 @@ class MealServiceTests {
     private static final LocalDate DATE = LocalDate.of(2026, 5, 6);
 
     private final MealConnector mealConnector = mock(MealConnector.class);
-    private final MealService mealService = new MealService(mealConnector);
+    private final MealService mealService = new MealService(mealConnector, Runnable::run);
 
     @Test
     void getTodayMealFetchesMealForTodayInSeoulTime() {
@@ -80,14 +85,19 @@ class MealServiceTests {
     }
 
     @Test
-    void getMealFetchesRestaurantsInParallel() {
+    void getMealFetchesRestaurantsInParallel() throws Exception {
         AtomicInteger activeCalls = new AtomicInteger();
         AtomicInteger maxActiveCalls = new AtomicInteger();
+        CountDownLatch firstTwoCallsStarted = new CountDownLatch(2);
+        CountDownLatch releaseCalls = new CountDownLatch(1);
         MealConnector slowConnector = (date, restaurant) -> {
             int currentActiveCalls = activeCalls.incrementAndGet();
             maxActiveCalls.accumulateAndGet(currentActiveCalls, Math::max);
             try {
-                Thread.sleep(75);
+                firstTwoCallsStarted.countDown();
+                if (!releaseCalls.await(1, TimeUnit.SECONDS)) {
+                    throw new ConnectorUnavailableException();
+                }
                 return new MealResponse(
                         date,
                         List.of(new MealItem(
@@ -102,11 +112,24 @@ class MealServiceTests {
                 activeCalls.decrementAndGet();
             }
         };
+        ExecutorService executor = Executors.newFixedThreadPool(MealRestaurant.values().length);
+        ExecutorService callerExecutor = Executors.newSingleThreadExecutor();
 
-        MealResponse response = new MealService(slowConnector).getMeal(DATE);
+        try {
+            Future<MealResponse> responseFuture = callerExecutor
+                    .submit(() -> new MealService(slowConnector, executor).getMeal(DATE));
 
-        assertThat(response.meals()).hasSize(MealRestaurant.values().length);
-        assertThat(maxActiveCalls.get()).isGreaterThan(1);
+            assertThat(firstTwoCallsStarted.await(1, TimeUnit.SECONDS)).isTrue();
+            assertThat(maxActiveCalls.get()).isGreaterThan(1);
+            releaseCalls.countDown();
+
+            MealResponse response = responseFuture.get(1, TimeUnit.SECONDS);
+            assertThat(response.meals()).hasSize(MealRestaurant.values().length);
+        } finally {
+            releaseCalls.countDown();
+            callerExecutor.shutdownNow();
+            executor.shutdownNow();
+        }
     }
 
     @Test
