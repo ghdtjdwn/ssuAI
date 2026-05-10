@@ -34,12 +34,33 @@ describe("fetchJson", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8080/api/meals/today",
       expect.objectContaining({
-        headers: expect.objectContaining({
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        }),
+        headers: expect.any(Headers),
       }),
     );
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get("Accept")).toBe("application/json");
+    expect(headers.has("Content-Type")).toBe(false);
+  });
+
+  it("sets Content-Type only when a request body is present", async () => {
+    const { fetchJson } = await importClient();
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        data: { ok: true },
+        error: null,
+        traceId: "trace-1",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchJson<{ ok: boolean }>("/api/meals/today", {
+      method: "POST",
+      body: JSON.stringify({ ok: true }),
+    });
+
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get("Accept")).toBe("application/json");
+    expect(headers.get("Content-Type")).toBe("application/json");
   });
 
   it("throws ApiError when a 200 envelope contains an error", async () => {
