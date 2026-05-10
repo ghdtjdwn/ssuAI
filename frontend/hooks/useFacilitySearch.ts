@@ -3,13 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { searchFacilities } from "@/lib/api/facility";
-import { normalizeSearchQuery } from "@/lib/utils";
 
 const FIVE_MINUTES = 5 * 60 * 1000;
 
-export function useFacilitySearch(query: string) {
-  const normalizedQuery = normalizeSearchQuery(query);
-
+export function useFacilitySearch(normalizedQuery: string) {
   return useQuery({
     queryKey: ["facility", "search", normalizedQuery],
     queryFn: () => searchFacilities(normalizedQuery),

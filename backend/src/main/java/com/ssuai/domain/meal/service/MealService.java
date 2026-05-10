@@ -5,9 +5,12 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import com.ssuai.domain.meal.connector.MealConnector;
@@ -24,9 +27,14 @@ public class MealService {
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     private final MealConnector mealConnector;
+    private final Executor mealFanOutExecutor;
 
-    public MealService(MealConnector mealConnector) {
+    public MealService(
+            MealConnector mealConnector,
+            @Qualifier("mealFanOutExecutor") Executor mealFanOutExecutor
+    ) {
         this.mealConnector = mealConnector;
+        this.mealFanOutExecutor = mealFanOutExecutor;
     }
 
     public MealResponse getTodayMeal() {
@@ -34,9 +42,13 @@ public class MealService {
     }
 
     public MealResponse getMeal(LocalDate date) {
-        List<FetchOutcome> outcomes = Arrays.stream(MealRestaurant.values())
-                .parallel()
-                .map(restaurant -> fetchMeal(date, restaurant))
+        List<CompletableFuture<FetchOutcome>> futures = Arrays.stream(MealRestaurant.values())
+                .map(restaurant -> CompletableFuture.supplyAsync(
+                        () -> fetchMeal(date, restaurant),
+                        mealFanOutExecutor))
+                .toList();
+        List<FetchOutcome> outcomes = futures.stream()
+                .map(CompletableFuture::join)
                 .toList();
 
         List<MealItem> meals = new ArrayList<>();

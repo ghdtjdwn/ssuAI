@@ -2,6 +2,7 @@ package com.ssuai.domain.campus.service;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
@@ -281,6 +282,10 @@ public class CampusFacilityService {
             )
     );
 
+    private static final List<SearchableFacility> SEARCH_INDEX = FACILITIES.stream()
+            .map(facility -> new SearchableFacility(facility, normalizedSearchText(facility)))
+            .toList();
+
     public CampusFacilityListResponse getFacilities() {
         return new CampusFacilityListResponse(FACILITIES);
     }
@@ -291,16 +296,17 @@ public class CampusFacilityService {
             return getFacilities();
         }
 
-        List<CampusFacilityResponse> filtered = FACILITIES.stream()
-                .filter(facility -> matches(facility, normalizedQuery))
+        List<CampusFacilityResponse> filtered = SEARCH_INDEX.stream()
+                .filter(indexed -> indexed.normalizedSearchText().contains(normalizedQuery))
+                .map(SearchableFacility::facility)
                 .toList();
         return new CampusFacilityListResponse(filtered);
     }
 
-    private static boolean matches(CampusFacilityResponse facility, String normalizedQuery) {
+    private static String normalizedSearchText(CampusFacilityResponse facility) {
         return searchableValues(facility)
                 .map(CampusFacilityService::normalize)
-                .anyMatch(value -> value.contains(normalizedQuery));
+                .collect(Collectors.joining("\n"));
     }
 
     private static Stream<String> searchableValues(CampusFacilityResponse facility) {
@@ -358,5 +364,8 @@ public class CampusFacilityService {
                 notes,
                 aliases
         );
+    }
+
+    private record SearchableFacility(CampusFacilityResponse facility, String normalizedSearchText) {
     }
 }

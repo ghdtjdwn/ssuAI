@@ -47,13 +47,15 @@ export async function fetchJson<T>(path: string, init: RequestInit = {}): Promis
     throw new Error(`API path must start with /api/: ${path}`);
   }
 
+  const headers = new Headers(init.headers);
+  headers.set("Accept", "application/json");
+  if (init.body !== undefined && init.body !== null && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...init.headers,
-    },
+    headers,
   });
   const envelope = await parseEnvelope(response);
 

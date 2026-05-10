@@ -5,14 +5,29 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const seoulDatePartsFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const koreanLongDateFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+});
+
+const koreanShortDateFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  month: "numeric",
+  day: "numeric",
+  weekday: "short",
+});
+
 export function millisecondsUntilNextSeoulMidnight(now = new Date()) {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = formatter.formatToParts(now);
+  const parts = seoulDatePartsFormatter.formatToParts(now);
   const year = Number(parts.find((part) => part.type === "year")?.value);
   const month = Number(parts.find((part) => part.type === "month")?.value);
   const day = Number(parts.find((part) => part.type === "day")?.value);
@@ -22,30 +37,15 @@ export function millisecondsUntilNextSeoulMidnight(now = new Date()) {
 }
 
 export function formatKoreanDate(date: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(new Date(`${date}T00:00:00+09:00`));
+  return koreanLongDateFormatter.format(new Date(`${date}T00:00:00+09:00`));
 }
 
 export function formatShortKoreanDate(date: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "numeric",
-    day: "numeric",
-    weekday: "short",
-  }).format(new Date(`${date}T00:00:00+09:00`));
+  return koreanShortDateFormatter.format(new Date(`${date}T00:00:00+09:00`));
 }
 
 export function getSeoulDateString(now = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+  return seoulDatePartsFormatter.format(now);
 }
 
 export function normalizeSearchQuery(query: string) {

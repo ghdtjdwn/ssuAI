@@ -24,7 +24,7 @@ import com.ssuai.global.exception.ConnectorUnavailableException;
 class WeeklyMealExportServiceTests {
 
     private final MealConnector mealConnector = mock(MealConnector.class);
-    private final MealService mealService = new MealService(mealConnector);
+    private final MealService mealService = new MealService(mealConnector, Runnable::run);
     private final WeeklyMealExportService exportService = new WeeklyMealExportService(mealService);
 
     @Test

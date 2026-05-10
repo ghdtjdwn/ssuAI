@@ -49,8 +49,14 @@ class RealMealConnector implements MealConnector {
     private static final String MENU_NAME_SELECTOR = "td.menu_nm";
     private static final String MENU_LIST_SELECTOR = "td.menu_list";
     private static final DateTimeFormatter MENU_DATE_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
+    private static final Pattern COMMA_SPLIT_PATTERN = Pattern.compile("\\s*,\\s*");
+    private static final Pattern LINE_SPLIT_PATTERN = Pattern.compile("\\R+");
     private static final Pattern PRICE_SUFFIX_PATTERN = Pattern.compile("\\s*-\\s*\\d+(?:\\.\\d+)?\\s*$");
+    private static final Pattern STAR_PREFIX_PATTERN = Pattern.compile("^★\\s*");
+    private static final Pattern TRAILING_DASH_PATTERN = Pattern.compile("\\s*-\\s*$");
     private static final Pattern HANGUL_PATTERN = Pattern.compile("[가-힣]");
+    private static final List<String> METADATA_MARKERS = List.of(
+            "*알러지유발식품", "알러지유발식품", "*원산지", "원산지");
     private static final long DEFAULT_MIN_INTERVAL_MS = 1_000L;
     private static final int DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -211,7 +217,7 @@ class RealMealConnector implements MealConnector {
 
     private static void addMenuTokens(Set<String> items, String rawText) {
         String text = stripMetadata(rawText);
-        for (String rawToken : text.split("\\R+")) {
+        for (String rawToken : LINE_SPLIT_PATTERN.split(text)) {
             String token = cleanMenuToken(rawToken);
             for (String splitToken : splitMenuToken(token)) {
                 if (shouldKeepMenuToken(splitToken)) {
@@ -225,8 +231,7 @@ class RealMealConnector implements MealConnector {
         if (!token.contains(",")) {
             return List.of(token);
         }
-        return Pattern.compile("\\s*,\\s*")
-                .splitAsStream(token)
+        return COMMA_SPLIT_PATTERN.splitAsStream(token)
                 .map(RealMealConnector::normalizeWhitespace)
                 .filter(value -> !value.isBlank())
                 .toList();
@@ -234,7 +239,7 @@ class RealMealConnector implements MealConnector {
 
     private static String stripMetadata(String text) {
         int metadataIndex = -1;
-        for (String marker : List.of("*알러지유발식품", "알러지유발식품", "*원산지", "원산지")) {
+        for (String marker : METADATA_MARKERS) {
             int index = text.indexOf(marker);
             if (index >= 0 && (metadataIndex < 0 || index < metadataIndex)) {
                 metadataIndex = index;
@@ -247,10 +252,9 @@ class RealMealConnector implements MealConnector {
     }
 
     private static String cleanMenuToken(String rawToken) {
-        String token = normalizeWhitespace(rawToken)
-                .replaceFirst("^★\\s*", "");
+        String token = STAR_PREFIX_PATTERN.matcher(normalizeWhitespace(rawToken)).replaceFirst("");
         token = PRICE_SUFFIX_PATTERN.matcher(token).replaceFirst("");
-        token = token.replaceFirst("\\s*-\\s*$", "");
+        token = TRAILING_DASH_PATTERN.matcher(token).replaceFirst("");
         return normalizeWhitespace(token);
     }
 
@@ -264,10 +268,7 @@ class RealMealConnector implements MealConnector {
     }
 
     private static boolean containsMetadataMarker(String text) {
-        return text.contains("*알러지유발식품")
-                || text.contains("알러지유발식품")
-                || text.contains("*원산지")
-                || text.contains("원산지");
+        return METADATA_MARKERS.stream().anyMatch(text::contains);
     }
 
     private static boolean isClosureReason(String text) {
