@@ -43,7 +43,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<ErrorResponse>> handleHandlerMethodValidationException(
             HandlerMethodValidationException exception
     ) {
-        String message = exception.getAllValidationResults()
+        String message = exception.getParameterValidationResults()
                 .stream()
                 .flatMap(result -> result.getResolvableErrors()
                         .stream()
