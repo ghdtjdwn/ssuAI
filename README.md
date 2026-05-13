@@ -6,11 +6,22 @@
 
 [![CI](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml)
 
+## Demo
+
+<!-- 사용자가 docs/images/chatbot-demo.gif 또는 .png 를 직접 추가하면
+     아래 줄의 주석을 풀어서 사용. 파일 없을 때는 주석 그대로 둠. -->
+<!-- ![ssuAI chatbot demo](docs/images/chatbot-demo.gif) -->
+
+> 챗봇 시연 자료 준비 중 — 아래 `Run the chatbot locally` 섹션 명령으로
+> 직접 재현 가능 (LIVE deploy 의 chat path 가 갱신될 때까지 로컬 시연
+> 권장).
+
 **Status:** MVP live. 4 read-only REST endpoints, the MCP server, and the
 Next.js dashboard are deployed over public HTTPS. The chatbot slice is in
 review on `feat/chatbot-slice`.
 
 Live endpoints:
+
 - **Demo:** <https://ssuai.vercel.app/>
 - **Chat:** <https://ssuai.vercel.app/chat>
 - **Backend:** <https://ssumcp.duckdns.org>
@@ -20,12 +31,16 @@ Live endpoints:
 
 ## What it does today
 
+<!-- markdownlint-disable MD013 MD060 -->
+
 | Surface | What you can do |
 |---|---|
 | **REST API** | `GET /api/meals/today`, `GET /api/meals/weekly`, `GET /api/dorm/meals/this-week`, `GET /api/campus/facilities?query=…` — all return the standard `ApiResponse<T>` envelope with `data` / `error` / `traceId`. |
 | **Web dashboard** | Next.js 16 App Router with 4 cards (today's cafeteria, weekly cafeteria, dorm weekly, facility search). Per-card loading / error / empty states. |
 | **Chatbot** | `/chat` page plus `POST /api/chat`. Default local/test/prod manifest mode is deterministic mock; production can explicitly enable bounded multi-provider LLM fallback for public campus questions only. In LLM mode the chatbot calls the local MCP server over SSE via Spring AI's MCP client — self-dogfooding the protocol on every turn. |
 | **MCP server** | 4 tools (`get_today_meal`, `get_meal_by_date`, `get_dorm_weekly_meal`, `search_campus_facilities`) over SSE. Same Spring Boot process; usable from Claude Desktop, Claude Code, Cursor. See [`docs/mcp-tools.md`](docs/mcp-tools.md). |
+
+<!-- markdownlint-enable MD013 MD060 -->
 
 No login, no PII, no personalization yet — the MVP is intentionally
 read-only and public-data-only. See [`docs/product.md`](docs/product.md)
@@ -156,6 +171,8 @@ curl -X POST http://localhost:8080/api/chat \
 
 ## Project status
 
+<!-- markdownlint-disable MD060 -->
+
 | Task | What | Status |
 |---|---|---|
 | 01 | Backend skeleton | ✅ done |
@@ -170,6 +187,8 @@ curl -X POST http://localhost:8080/api/chat \
 | 10 | Frontend test infrastructure | done |
 | 11 | Dependabot | done |
 | chat | Chatbot slice (POST /api/chat + /chat page) | done |
+
+<!-- markdownlint-enable MD060 -->
 
 Specs live in [`docs/tasks/`](docs/tasks/). Per-task narrative is
 appended to [`docs/dev-log.md`](docs/dev-log.md) and load-bearing
