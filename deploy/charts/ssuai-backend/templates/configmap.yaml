@@ -15,6 +15,8 @@ data:
   SSUAI_CONNECTOR_DORM_MEAL: {{ .Values.env.connectorDormMeal | quote }}
   SSUAI_CONNECTOR_CHAT: {{ .Values.env.connectorChat | quote }}
   SSUAI_MISTRAL_TRAINING_OPT_OUT_CONFIRMED: {{ .Values.env.mistralTrainingOptOutConfirmed | quote }}
+  SSUAI_LLM_MAX_TOKENS: {{ .Values.env.llmMaxTokens | quote }}
   SSUAI_LLM_AVAILABILITY_VERIFICATION_PASSES: {{ .Values.env.llmAvailabilityVerificationPasses | quote }}
   SSUAI_LLM_MAX_PROVIDER_ATTEMPTS: {{ .Values.env.llmMaxProviderAttempts | quote }}
   SSUAI_LLM_MAX_MODELS_PER_PROVIDER: {{ .Values.env.llmMaxModelsPerProvider | quote }}
+  SSUAI_LLM_MAX_TOOL_CALLS: {{ .Values.env.llmMaxToolCalls | quote }}

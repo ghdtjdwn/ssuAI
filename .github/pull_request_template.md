@@ -8,7 +8,7 @@
 <!-- Non-obvious choices, alternatives considered, and why this approach was chosen. -->
 
 ## Troubleshooting log
-<!-- One or two issues encountered and how they were resolved. Use "None" if not applicable. -->
+<!-- TROUBLESHOOTING.md: Added / Not needed. If not needed, give one short reason. Portfolio-worthy incidents only. -->
 
 ## Test plan
 - [ ] ...
