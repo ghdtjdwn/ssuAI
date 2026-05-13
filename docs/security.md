@@ -207,6 +207,10 @@ not MVP work, but the rules need to be settled before any code is written.
 
 The MVP exposes **read-only** endpoints and tools, so this section is
 forward-looking — but the rule is set now so it isn't relitigated later.
+The **flagship action tool** that drives this entire policy is
+`reserve_library_seat` (the library seat agent — see
+[`docs/vision.md`](vision.md) §3.4). Every rule below must hold before
+that tool is allowed to ship.
 
 ### Consent for read access
 

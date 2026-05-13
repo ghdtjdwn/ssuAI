@@ -508,18 +508,29 @@ outside the CI test suite.
 Each deferred feature already has a home in this architecture. Knowing
 *where* it lands is what lets us defer it without painting into a corner.
 
+<!-- markdownlint-disable MD013 MD060 -->
+
 | Future feature              | Where it lives                                                                 |
 |-----------------------------|--------------------------------------------------------------------------------|
+| Library read tools          | New `domain.library` package, with `LibraryConnector` (Jsoup or HTTP), service-layer real-time seat cache (TTL ≤ 30s), `@Tool` methods `search_library_book`, `get_library_book_status`, `get_library_seat_status`. |
 | User auth for ssuAI itself  | `domain.user` + `global.security` (Spring Security, JWT or session).           |
+| Encrypted credential store  | `domain.user.entity.SchoolCredential` + AES-GCM via `SSUAI_CREDENTIAL_ENCRYPTION_KEY`. Library credentials live here too. |
 | LMS read-only integration   | New `domain.lms` package, with `LmsConnector` (Playwright-based).              |
 | u-SAINT read-only           | New `domain.usaint` package, same pattern as LMS.                              |
-| Encrypted credential store  | `domain.user.entity.SchoolCredential` + AES-GCM via `SSUAI_CREDENTIAL_ENCRYPTION_KEY`. |
+| **Library seat agent (flagship)** | `reserve_library_seat` `@Tool` in `domain.mcp.tool` + new `domain.library.agent` for the per-user reservation flow. Uses `LibraryConnector`'s authenticated write path with the user's encrypted credentials. **Action policy infrastructure** below is its prerequisite. |
+| Action MCP tools (general)  | New `@Tool` methods in `domain.mcp.tool`, each requiring user confirmation, audit log row, and a dry-run mode. Backed by `action_audit` table + Redis distributed lock to block same-user concurrent execution. |
 | Notifications               | New `domain.notification` package; Redis for delivery state, web push first.   |
-| Action MCP tools            | New `@Tool` methods in `domain.mcp.tool`, each requiring user confirmation, audit log row, and a dry-run mode. |
 | Mobile app                  | Separate Expo project; reuses the existing REST API. No backend changes.       |
+
+<!-- markdownlint-enable MD013 MD060 -->
 
 The architecture's job through the MVP is to make sure none of these
 require rewriting the Service or Connector layers — only adding to them.
+The **library seat agent is the flagship deliverable** the architecture is
+designed to support: every layer above (auth, credential storage, action
+policy, audit log, distributed lock) is a prerequisite for it shipping
+safely. See [`docs/vision.md`](vision.md) §3.4 for the user-facing flow
+and [`docs/security.md`](security.md) §6 for the action policy.
 
 ---
 
