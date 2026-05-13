@@ -67,6 +67,7 @@ public class LlmChatService implements ChatService {
             "비밀번호, 학번, 쿠키, 세션, API key 같은 비밀 정보는 입력하지 말아주세요. 지금은 학식, 기숙사 식단, 캠퍼스 시설만 도와줄 수 있어요.";
 
     private static final int MAX_CHAT_TOOL_FACILITY_RESULTS = 6;
+    private static final List<OpenAiChatCompletionRequest.Tool> CHAT_TOOLS = createTools();
 
     private final LlmChatProperties properties;
     private final Map<String, LlmProvider> providersByName;
@@ -133,7 +134,7 @@ public class LlmChatService implements ChatService {
         LlmCompletionResult firstResult = completeAcrossProviders(new LlmCompletionRequest(
                 privacyMode,
                 baseMessages,
-                tools(),
+                CHAT_TOOLS,
                 "auto"
         ));
         OpenAiChatCompletionResponse.Message firstMessage = firstResult.message();
@@ -152,7 +153,10 @@ public class LlmChatService implements ChatService {
             String toolCallId = toolCall.id() == null || toolCall.id().isBlank()
                     ? "call_" + index
                     : toolCall.id();
-            messages.add(OpenAiChatCompletionRequest.toolResultMessage(toolCallId, executeToolCall(toolCall)));
+            String content = index < maxToolCalls()
+                    ? executeToolCall(toolCall)
+                    : toolError("한 번에 처리할 수 있는 도구 호출 수를 초과했습니다. 한두 가지씩 나눠서 물어봐 주세요.");
+            messages.add(OpenAiChatCompletionRequest.toolResultMessage(toolCallId, content));
         }
 
         LlmCompletionResult finalResult = completeAcrossProviders(new LlmCompletionRequest(
@@ -164,6 +168,10 @@ public class LlmChatService implements ChatService {
         log.info("chat provider selected: conversationId={} provider={} model={} toolCalls={}",
                 conversationId, finalResult.providerName(), finalResult.model(), toolCalls.size());
         return new ChatResponse(conversationId, requireContent(finalResult.message().content()));
+    }
+
+    private int maxToolCalls() {
+        return Math.max(1, properties.getMaxToolCalls());
     }
 
     private LlmCompletionResult completeAcrossProviders(LlmCompletionRequest request) {
@@ -251,7 +259,7 @@ public class LlmChatService implements ChatService {
     ) {
     }
 
-    private List<OpenAiChatCompletionRequest.Tool> tools() {
+    private static List<OpenAiChatCompletionRequest.Tool> createTools() {
         return List.of(
                 tool(
                         "get_today_meal",
@@ -275,7 +283,7 @@ public class LlmChatService implements ChatService {
                         "search_campus_facilities",
                         "숭실대학교 캠퍼스 시설을 검색합니다. 식당, 카페, 편의점, 복사/출력 시설 등을 찾습니다.",
                         objectParameters(
-                                Map.<String, Object>of("query", property("string", "검색어. 비우면 전체 시설 목록.")),
+                                Map.<String, Object>of("query", property("string", "검색어. 비워두지 마세요.")),
                                 List.of("query")
                         )
                 )

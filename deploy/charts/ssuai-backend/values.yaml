@@ -18,9 +18,11 @@ env:
   connectorDormMeal: real
   connectorChat: mock
   mistralTrainingOptOutConfirmed: "false"
+  llmMaxTokens: "400"
   llmAvailabilityVerificationPasses: "0"
   llmMaxProviderAttempts: "6"
   llmMaxModelsPerProvider: "2"
+  llmMaxToolCalls: "2"
 
 secretRef:
   enabled: true
