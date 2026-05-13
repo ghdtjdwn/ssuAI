@@ -5,7 +5,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/ghdtjdwn/ssuai-backend
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 nameOverride: ""
 fullnameOverride: ""
@@ -16,7 +16,7 @@ env:
   javaOpts: "-XX:+UseG1GC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
   connectorMeal: real
   connectorDormMeal: real
-  connectorChat: mock
+  connectorChat: llm
   mistralTrainingOptOutConfirmed: "false"
   llmMaxTokens: "400"
   llmAvailabilityVerificationPasses: "0"
