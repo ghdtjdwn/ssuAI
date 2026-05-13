@@ -19,6 +19,27 @@ MCP server 는 별도 프로세스가 아니라 기존 ssuAI Spring Boot backend
 
 학식 데이터는 `WeeklyMealCache` 가 애플리케이션 시작 시점과 매주 월요일 06:00 KST 에 일괄 적재하므로, `get_today_meal` / `get_meal_by_date` 호출은 일반적으로 캐시 히트로 응답한다. 캐시 miss 가 발생하면 그 자리에서 connector 를 호출해 채워 넣는다.
 
+### 예정된 도구 (다음 phase)
+
+<!-- markdownlint-disable MD013 MD060 -->
+
+| Phase | tool name | 종류 | 설명 |
+| --- | --- | --- | --- |
+| Phase 2 | `search_library_book` | read | 도서관 도서 검색 |
+| Phase 2 | `get_library_book_status` | read | 책 보유/대출 상태 |
+| Phase 2 | `get_library_seat_status` | read | 도서관 좌석 실시간 잔여 (층/구역 필터) |
+| Phase 3 | `get_my_schedule` | read (auth 필요) | 내 시간표 |
+| Phase 3 | `get_my_grades` | read (auth 필요) | 내 성적 |
+| Phase 3 | `get_my_assignments` | read (auth 필요) | 내 LMS 과제 |
+| Phase 3 | `get_my_library_loans` | read (auth 필요) | 내 도서관 대출 현황 |
+| **Phase 4** | **`reserve_library_seat`** | **write (flagship)** | **도서관 사이트에 좌석 예약 POST 자동 수행** |
+| Phase 4 | `cancel_library_seat_reservation` | write | 본인이 잡은 좌석 취소 |
+| Phase 4 | `extend_library_seat` | write | 사용 시간 연장 |
+
+<!-- markdownlint-enable MD013 MD060 -->
+
+`reserve_library_seat` 는 ssuAI 의 flagship deliverable 이다. write tool 의 confirmation / dry-run / audit log / 분산 lock 정책은 §8 참고.
+
 Tool 구현은 `com.ssuai.domain.mcp.tool` 아래의 `MealMcpTools`, `DormMcpTools`, `CampusMcpTools` 에 있다. 각 tool 은 Connector 를 직접 호출하지 않고 도메인 Service 에만 위임한다. REST 와 MCP 가 같은 business logic 을 공유하게 하기 위한 규칙이다.
 
 `/api/chat` 의 LLM mode 도 같은 tool bean 을 재사용한다. 다만 chat 내부에서는
@@ -281,13 +302,37 @@ search_campus_facilities
 
 이 tool 들은 공개 캠퍼스 정보 조회만 수행하며, 학교 시스템 상태를 변경하지 않는다. u-SAINT, LMS, 도서관 좌석 예약 같은 write 성격 기능도 현재 MCP tool 로 노출하지 않는다.
 
+### Phase 4 flagship — 도서관 좌석 자동 예약
+
+ssuAI 의 가장 중요한 write tool 은 **`reserve_library_seat`** 이다.
+숭실대 도서관 사이트의 층별 좌석 예약 인터랙션을 자동화한다. 이 한
+도구가 ssuAI 를 단순 정보 챗봇에서 실제 동작하는 AI 에이전트로
+바꾼다. 자세한 사용자 시나리오와 4-layer 안에서의 위치는
+[`docs/vision.md`](vision.md) §3.4 참고.
+
+예정 도구:
+
+<!-- markdownlint-disable MD013 MD060 -->
+
+| tool name | 설명 | 인자 |
+| --- | --- | --- |
+| `get_library_seat_status` | 도서관 사이트에서 실시간 좌석 잔여 상태를 스크랩 (read) | `floor` (선택), `zone` (선택) |
+| `reserve_library_seat` | **flagship.** 사용자 credential 로 인증 후 도서관 사이트에 좌석 예약 POST 를 수행 (write) | `seat_id`, `duration` (선택) |
+| `cancel_library_seat_reservation` | 본인이 잡은 좌석 취소 (write) | `reservation_id` |
+| `extend_library_seat` | 사용 시간 연장 (write) | `reservation_id`, `additional_duration` |
+
+<!-- markdownlint-enable MD013 MD060 -->
+
+### Write tool 공통 정책
+
 향후 예약, 제출, 설정 변경처럼 실제 학교 시스템 상태를 바꾸는 tool 을 추가할 때는 다음 원칙을 적용한다.
 
-- 사용자 명시 confirmation 을 반드시 받는다.
-- 실행 전 dry-run 결과를 먼저 보여준다.
-- 실행 요청과 결과를 audit log row 로 남긴다.
-- 실패, 부분 성공, 취소를 사용자에게 명확히 반환한다.
-- `docs/security.md` 의 logging 정책을 지킨다.
+- 사용자 명시 confirmation 을 반드시 받는다. 한 번 받은 confirmation 을 다른 액션에 재사용하지 않는다.
+- 실행 전 dry-run 결과를 먼저 보여준다. (예: "412번 좌석을 16:00–20:00 예약합니다.")
+- 실행 요청과 결과를 `action_audit` 테이블에 row 로 남긴다.
+- 실패, 부분 성공, 취소, race condition (다른 학생이 직전 선점) 등 모든 상태를 사용자에게 명확히 반환한다.
+- 같은 사용자의 같은 액션 동시 실행은 Redis 분산 lock 으로 차단한다.
+- `docs/security.md` §5 의 credential 정책과 §6 의 action confirmation 정책을 지킨다.
 - 비밀번호, session cookie, token, 학생 개인정보를 log 에 남기지 않는다.
 - `docs/architecture.md` 의 MCP 안전 정책과 Service layer 위임 규칙을 유지한다.
 
