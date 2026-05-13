@@ -7,6 +7,11 @@
 
 - Codex와 Claude 모두 의미 있는 문제를 발견하거나 해결하면 이 파일에
   한국어로 누적합니다.
+- commit, PR, dev-log 를 만들 때마다 의무적으로 쓰지 않습니다. 포트폴리오
+  면접에서 설명할 가치가 있는 문제, 원인 분석, 설계 전환, 검증 실패/해결만
+  남깁니다.
+- Codex 작업 결과에는 `.codex/last-result.md`의 `Troubleshooting decision`
+  섹션으로 "추가함/추가하지 않음 + 이유"를 남겨 누락을 줄입니다.
 - 문제가 생긴 직후, 기억이 선명할 때 증상, 원인, 해결, 검증, 배운 점을
   짧게 남깁니다.
 - secret, token, private key, cookie, 학생 ID, 실명, 인증된 학교 페이지의
@@ -28,6 +33,24 @@
 ```
 
 ---
+
+## 2026-05-12 — chatbot tool-call fan-out과 출력 토큰 budget 보강
+
+- 맥락: 코드/파일 전체 정리 중 LLM 호출 비용과 latency가 커질 수 있는 경로를 점검했습니다.
+- 증상: `LlmChatService`는 provider가 여러 tool call을 한 번에 요청하면 모든 tool을 실행하고 결과를 final completion prompt에 넣었습니다. 또한 `max-tokens`가 600으로 고정되어 있어 운영 환경에서 출력 토큰 예산을 env로 조정하기 어려웠습니다.
+- 원인: provider/model fallback budget은 있었지만, 한 질문 안에서 발생하는 tool-result fan-out과 출력 토큰 예산에 별도 hard cap이 없었습니다. `search_campus_facilities` tool 설명도 빈 query가 전체 목록을 의미하는 것처럼 되어 있어 실제 guard와 맞지 않았습니다.
+- 해결: `SSUAI_LLM_MAX_TOKENS` 기본값을 400으로 낮추고 env/Helm 값으로 노출했습니다. `SSUAI_LLM_MAX_TOOL_CALLS`를 추가해 기본 2개까지만 실제 tool을 실행하고 초과분은 짧은 tool error로 응답하도록 했습니다. Tool schema는 static으로 재사용하고, 시설 검색 tool 설명을 빈 query 금지로 맞췄습니다.
+- 검증: `backend/gradlew.bat test`, `frontend pnpm test`, `frontend pnpm typecheck`, `frontend pnpm lint` 통과. Helm lint는 로컬 Windows 환경에 `helm`이 없어 실행하지 못했습니다.
+- 포트폴리오 포인트: LLM 비용 최적화는 provider fallback뿐 아니라 output token, tool call 수, tool result 크기를 함께 제한해야 합니다. 모델이 과하게 tool을 호출해도 backend가 request-level budget을 강제하는 구조로 바꾼 사례입니다.
+
+## 2026-05-12 — Claude/Codex hand-off가 비어 있으면 작업 루프가 멈춤
+
+- 맥락: 프로젝트는 Claude가 작업을 설계하고 Codex가 구현한 뒤 Claude가 검증하는 2-agent workflow를 사용합니다.
+- 증상: `.codex/current-task.md`에 active task가 없으면 Codex가 구현을 시작할 수 없고, 사용자는 다음에 무엇을 해야 하는지 다시 물어봐야 했습니다. 작은 작업에서도 문서 재탐색과 검증 기준 확인이 반복되어 시간과 토큰 비용이 커질 수 있었습니다.
+- 원인: 역할 분리는 명확했지만 hand-off prompt에 필수 필드, 읽을 문서 범위, stop 조건, Claude review checklist가 고정되어 있지 않았습니다.
+- 해결: `AGENTS.md`와 `CLAUDE.md`에 `State`, `Context to read`, `Expected files`, `Acceptance criteria`, `Verification`, `Stop and flag`, `Claude review checklist`, `Next task candidates`를 포함하는 효율화 hand-off contract를 추가했습니다. 이후 Codex가 `.codex/last-result.md`를 남기고 Claude가 이를 검증하도록 result hand-off도 추가했습니다.
+- 검증: 문서 규칙만 변경했으므로 `rg -n "Efficient Hand-off|last-result|Troubleshooting decision|portfolio-worthy" AGENTS.md CLAUDE.md TROUBLESHOOTING.md .github/pull_request_template.md`로 새 규칙이 양쪽 역할 문서와 로그에 반영된 것을 확인합니다.
+- 포트폴리오 포인트: AI 협업 workflow도 interface contract처럼 관리해야 합니다. 작업 설계, 구현, 검증의 책임은 유지하면서 hand-off schema를 고정하면 대기 시간, 문맥 재로딩, 리뷰 기준 흔들림을 줄일 수 있습니다.
 
 ## 2026-05-12 — ArgoCD Image Updater helmvalues 경로와 CRD dry-run 한계
 
