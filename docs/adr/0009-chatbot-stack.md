@@ -29,9 +29,11 @@ Use a custom OpenAI-compatible provider layer over Spring `RestClient`.
 - Provider order is config-driven.
 - Providers without API keys are skipped before any request is attempted.
 - Fallback is bounded by:
+  - `SSUAI_LLM_MAX_TOKENS`
   - `SSUAI_LLM_AVAILABILITY_VERIFICATION_PASSES`
   - `SSUAI_LLM_MAX_PROVIDER_ATTEMPTS`
   - `SSUAI_LLM_MAX_MODELS_PER_PROVIDER`
+  - `SSUAI_LLM_MAX_TOOL_CALLS`
 - Existing `MealMcpTools`, `DormMcpTools`, and `CampusMcpTools` beans are
   called directly from the chat service.
 - Tool results are compacted before being sent back to the LLM.
@@ -45,7 +47,7 @@ Good:
 - Provider failures are isolated and observable without logging message bodies
   or secrets.
 - Request-level caps prevent one user question from causing unbounded
-  provider/model fallback.
+  output tokens, provider/model fallback, or tool-result fan-out.
 - The chatbot and MCP server still share the same service-backed tool beans.
 
 Tradeoffs:

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import com.ssuai.domain.chat.config.LlmChatProperties;
 import com.ssuai.domain.chat.dto.ChatResponse;
+import com.ssuai.domain.chat.dto.OpenAiChatCompletionRequest;
 import com.ssuai.domain.chat.dto.OpenAiChatCompletionResponse;
 import com.ssuai.domain.chat.dto.OpenAiToolCall;
 import com.ssuai.domain.chat.service.llm.LlmCompletionRequest;
@@ -78,7 +79,7 @@ class LlmChatServiceTests {
                 0
         );
 
-        ChatResponse response = chatService.reply("c-test", "?ㅻ뒛 ?숈떇 萸먯빞?");
+        ChatResponse response = chatService.reply("c-test", "오늘 학식 뭐야?");
 
         assertThat(response.reply()).isEqualTo("private fallback reply");
         assertThat(publicProvider.callCount()).isEqualTo(1);
@@ -100,7 +101,7 @@ class LlmChatServiceTests {
                 1
         );
 
-        ChatResponse response = chatService.reply("c-test", "?ㅻ뒛 ?숈떇 萸먯빞?");
+        ChatResponse response = chatService.reply("c-test", "오늘 학식 뭐야?");
 
         assertThat(response.reply()).isEqualTo("recovered reply");
         assertThat(gemini.callCount()).isEqualTo(2);
@@ -217,6 +218,41 @@ class LlmChatServiceTests {
     }
 
     @Test
+    void limitsExecutedToolCallsBeforeFinalCompletion() {
+        when(campusMcpTools.searchCampusFacilities("카페"))
+                .thenReturn(new CampusFacilityListResponse(List.of()));
+        FakeProvider provider = new FakeProvider("gemini")
+                .toolCalls("gemini-model", List.of(
+                        new OpenAiToolCall(
+                                "call-1",
+                                "function",
+                                new OpenAiToolCall.FunctionCall("search_campus_facilities", "{\"query\":\"카페\"}")
+                        ),
+                        new OpenAiToolCall(
+                                "call-2",
+                                "function",
+                                new OpenAiToolCall.FunctionCall("get_dorm_weekly_meal", "{}")
+                        )
+                ))
+                .reply("gemini-model", "카페 검색 결과만 먼저 확인했어요.");
+        LlmChatProperties properties = properties(List.of("gemini"), List.of(), 0);
+        properties.setMaxToolCalls(1);
+        LlmChatService chatService = chatService(List.of(provider), properties);
+
+        ChatResponse response = chatService.reply("c-test", "카페랑 기숙사 식단 알려줘");
+
+        assertThat(response.reply()).isEqualTo("카페 검색 결과만 먼저 확인했어요.");
+        verifyNoInteractions(dormMcpTools);
+        List<String> toolContents = provider.request(1).messages().stream()
+                .filter(message -> "tool".equals(message.role()))
+                .map(OpenAiChatCompletionRequest.Message::content)
+                .toList();
+        assertThat(toolContents).hasSize(2);
+        assertThat(toolContents.get(0)).contains("\"resultCount\":0");
+        assertThat(toolContents.get(1)).contains("도구 호출 수를 초과");
+    }
+
+    @Test
     void privateAcademicRequestReturnsScopeGuidanceWithoutCallingProviders() {
         FakeProvider gemini = new FakeProvider("gemini")
                 .reply("gemini-model", "should not be called");
@@ -305,10 +341,14 @@ class LlmChatServiceTests {
         }
 
         private FakeProvider toolCall(String model, OpenAiToolCall toolCall) {
+            return toolCalls(model, List.of(toolCall));
+        }
+
+        private FakeProvider toolCalls(String model, List<OpenAiToolCall> toolCalls) {
             outcomes.add(new LlmCompletionResult(
                     name,
                     model,
-                    new OpenAiChatCompletionResponse.Message("assistant", null, List.of(toolCall))
+                    new OpenAiChatCompletionResponse.Message("assistant", null, toolCalls)
             ));
             return this;
         }

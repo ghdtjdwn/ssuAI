@@ -11,11 +11,12 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "ssuai.chat.llm")
 public class LlmChatProperties {
 
-    private int maxTokens = 600;
+    private int maxTokens = 400;
     private double temperature = 0.3;
     private int availabilityVerificationPasses = 0;
     private int maxProviderAttempts = 6;
     private int maxModelsPerProvider = 2;
+    private int maxToolCalls = 2;
     private List<String> providerOrder = new ArrayList<>(
             List.of("gemini", "groq", "openrouter", "cerebras", "deepinfra", "sambanova", "nscale",
                     "fireworks", "huggingface", "mistral")
@@ -112,6 +113,14 @@ public class LlmChatProperties {
 
     public void setMaxModelsPerProvider(int maxModelsPerProvider) {
         this.maxModelsPerProvider = maxModelsPerProvider;
+    }
+
+    public int getMaxToolCalls() {
+        return maxToolCalls;
+    }
+
+    public void setMaxToolCalls(int maxToolCalls) {
+        this.maxToolCalls = maxToolCalls;
     }
 
     public List<String> getProviderOrder() {
