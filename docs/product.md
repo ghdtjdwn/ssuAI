@@ -84,22 +84,39 @@ demo-worthy.
 
 ## 4. Future expansion features
 
-After the MVP is stable, the project can grow in roughly this order:
+After the MVP is stable, the project's expansion converges on a single
+**flagship deliverable: a real-time library seat reservation agent**.
+Everything else is either a prerequisite for that agent (auth, personal
+data, library connectors) or an adjacent surface that shares the same
+infrastructure (LMS read-only, notifications, mobile app).
 
-- **User authentication** for ssuAI itself (not for u-SAINT/LMS yet)
-- **LMS integration (read-only)**: assignments, lecture list, recent notices
-- **u-SAINT integration (read-only)**: course schedule, grades, graduation
-  progress
-- **Personal chatbot context**: "내 다음 수업 뭐야?", "이번 주 과제 알려줘"
-- **Notification system**: assignment deadlines, grade updates, new notices
-  (web push first, then mobile push)
-- **Mobile app (Expo React Native)** once the web flow is stable
-- **Smarter retrieval**: school notices, FAQ, department pages
-- **Carefully controlled action tools**, each with explicit user confirmation,
-  audit logging, and dry-run support:
-  - `reserve_library_seat`
-  - LMS-related actions
-  - course-registration-related helpers (very late stage)
+Phase ordering (also see [`docs/vision.md`](vision.md) §4):
+
+1. **Library public read tools** — `search_library_book`,
+   `get_library_book_status`, `get_library_seat_status`. These enable
+   the chatbot to *answer* "is seat 412 free?" before it can *reserve*
+   it.
+2. **User authentication** for ssuAI itself + encrypted credential
+   storage (AES-GCM) so students can safely entrust their u-SAINT /
+   LMS / library logins.
+3. **Personal read tools** — `get_my_schedule`, `get_my_grades`,
+   `get_my_assignments`, `get_my_library_loans`. Same connector
+   pattern, gated on the authenticated user identity.
+4. **Action tool infrastructure** — confirmation flow, dry-run preview,
+   audit log table, distributed lock against same-user concurrent
+   actions, race-condition handling.
+5. **🏆 `reserve_library_seat` agent (flagship)** — chatbot recommends
+   live seats, agent performs the actual reservation POST against the
+   school's library site under the user's credential.
+6. **Follow-up action tools** — cancel/extend reservation, LMS
+   assignment-deadline reminders (ssuAI's own notifications, not LMS
+   state changes), library book holds.
+7. **Mobile app (Expo React Native)** — same MCP server, mobile-first
+   surface so students can check / reserve while walking to the library.
+
+Every action tool follows the same policy: explicit user confirmation,
+dry-run preview, audit log row, no plaintext credential anywhere in
+logs.
 
 ## 5. Features that should NOT be built first
 
