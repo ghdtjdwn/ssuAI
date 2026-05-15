@@ -85,6 +85,14 @@ ssuai:
       # Collection 2 = central library combined catalog (spike-confirmed).
       collection-id: 2
       timeout: 5s
+  saint:
+    # u-SAINT SSO endpoints. sToken/sIdno are one-shot tokens forwarded by
+    # SmartID; we never persist them. Override via env vars in non-default
+    # environments. Timeout is short — both phases are server-side hops to
+    # saint.ssu.ac.kr and should respond quickly or fail.
+    sso-url: ${SSUAI_SAINT_SSO_URL:https://saint.ssu.ac.kr/webSSO/sso.jsp}
+    portal-url: ${SSUAI_SAINT_PORTAL_URL:https://saint.ssu.ac.kr/irj/portal}
+    timeout: 10s
   chat:
     llm:
       max-tokens: ${SSUAI_LLM_MAX_TOKENS:400}
