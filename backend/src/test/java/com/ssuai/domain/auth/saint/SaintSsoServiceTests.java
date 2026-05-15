@@ -13,7 +13,11 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,10 +36,12 @@ class SaintSsoServiceTests {
 
     private static final String SSO_URL = "https://saint.test.local/webSSO/sso.jsp";
     private static final String PORTAL_URL = "https://saint.test.local/irj/portal";
+    private static final Instant T0 = Instant.parse("2026-05-16T10:00:00Z");
     private static final MediaType TEXT_HTML_UTF8 = MediaType.parseMediaType("text/html;charset=UTF-8");
 
     private SaintSsoProperties properties;
     private MockRestServiceServer mockServer;
+    private SaintSessionStore sessionStore;
     private SaintSsoService service;
 
     @BeforeEach
@@ -48,7 +54,14 @@ class SaintSsoServiceTests {
         RestClient.Builder builder = RestClient.builder();
         mockServer = MockRestServiceServer.bindTo(builder).build();
         RestClient restClient = builder.build();
-        service = new SaintSsoService(properties, restClient);
+
+        SaintSessionProperties sessionProps = new SaintSessionProperties();
+        sessionProps.setTtl(Duration.ofMinutes(30));
+        sessionProps.setEncryptionKey("");
+        sessionStore = new SaintSessionStore(
+                sessionProps, Clock.fixed(T0, ZoneOffset.UTC), new SecureRandom());
+
+        service = new SaintSsoService(properties, restClient, sessionStore);
     }
 
     @Test
@@ -80,6 +93,10 @@ class SaintSsoServiceTests {
         assertThat(result.name()).isEqualTo("홍길동");
         assertThat(result.major()).isEqualTo("컴퓨터학부");
         assertThat(result.enrollmentStatus()).isEqualTo("재학");
+        assertThat(sessionStore.cookies("20231234"))
+                .as("phase 1 portal cookies should be persisted to the session store")
+                .hasValueSatisfying(cookies -> assertThat(cookies.rawCookieHeader())
+                        .isEqualTo("MYSAPSSO2=portal-session-abc; JSESSIONID=jsess-xyz"));
         mockServer.verify();
     }
 
@@ -92,6 +109,9 @@ class SaintSsoServiceTests {
         assertThatThrownBy(() -> service.authenticate("bad", "20231234"))
                 .isInstanceOf(SaintAuthFailedException.class)
                 .hasMessageContaining("success marker");
+        assertThat(sessionStore.size())
+                .as("no cookies should be persisted when phase 1 fails")
+                .isZero();
     }
 
     @Test
@@ -131,6 +151,9 @@ class SaintSsoServiceTests {
         assertThatThrownBy(() -> service.authenticate("token", "20231234"))
                 .isInstanceOf(SaintPortalUnavailableException.class)
                 .hasMessageContaining("missing identity cells");
+        assertThat(sessionStore.size())
+                .as("no cookies should be persisted when portal parse fails")
+                .isZero();
     }
 
     @Test
