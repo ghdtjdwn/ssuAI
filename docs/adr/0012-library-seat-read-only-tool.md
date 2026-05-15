@@ -1,6 +1,6 @@
 # ADR 0012 - Library seat status as a read-only MCP tool with short-TTL cache
 
-- **Status**: Proposed (accepted when `feat/library-seat-mock-slice` merges)
+- **Status**: Accepted (Task 12 merged; `get_library_seat_status` live with mock connector + 30s cache. Real connector pends Task 13 session-auth landing.)
 - **Date**: 2026-05-15
 - **Scope**: `backend/src/main/java/com/ssuai/domain/library/**`,
   `backend/src/main/java/com/ssuai/domain/mcp/tool/LibrarySeatMcpTool.java`,

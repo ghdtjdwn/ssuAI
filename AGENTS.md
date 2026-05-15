@@ -8,9 +8,12 @@
 
 ## Project
 ssuAI — AI assistant for Soongsil University students.
-Full project context: `docs/product.md`, `docs/architecture.md`,
-`docs/security.md`. Read the section relevant to the current task; read the
-full document only when the task is broad or the relevant section is unclear.
+**Final goal**: `docs/vision.md` (4-layer system + flagship "도서관 좌석 자동
+예약 에이전트"). Read this first to align with the long-term direction.
+Short-term scope and current MVP state: `docs/product.md`. Architecture
+and security playbooks: `docs/architecture.md`, `docs/security.md`. Read
+only the section relevant to the current task; read the full document
+only when the task is broad or the relevant section is unclear.
 
 ## Your Role
 The developer rotates between three AI agents — **claude1, claude2, codex** —

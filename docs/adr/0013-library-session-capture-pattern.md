@@ -1,6 +1,6 @@
 # ADR 0013 — Library session capture: phantom-token adaptation to legacy proprietary auth
 
-- **Status**: Proposed (accepted when PR 13a [#80](https://github.com/ghdtjdwn/ssuAI/pull/80) merges; revisit when PR 13c lands with the chosen capture mechanism)
+- **Status**: Accepted for PR 13a (#80 merged — backend session store + 401 auth-required mapping live). **Revisit** when PR 13c lands with the chosen capture mechanism (manual paste vs extension vs bookmarklet — Task 13 spec §12).
 - **Date**: 2026-05-15 (corrected 2026-05-15 evening after auth-mechanism reverse-engineering)
 - **Scope**: `backend/src/main/java/com/ssuai/domain/library/auth/**`,
   `backend/src/main/java/com/ssuai/domain/library/service/LibrarySeatService.java`,
