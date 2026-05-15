@@ -134,39 +134,44 @@ Connector directly; a Connector never reads from the database.
 ```
 com.ssuai
 ├── global
-│   ├── config          // @Configuration classes, beans, profile wiring
-│   ├── exception       // ConnectorException, ApiException, GlobalExceptionHandler
-│   ├── response        // ApiResponse<T> envelope, ErrorResponse
-│   └── security        // (added when auth lands; empty for MVP)
+│   ├── auth            // JwtProvider, JwtProperties, JwtTokenType, JwtClaims, InvalidJwtException
+│   ├── config          // @Configuration classes, beans, profile wiring (CORS, OpenAPI, TraceId)
+│   ├── exception       // ConnectorException, ApiException, GlobalExceptionHandler, SaintAuthFailedException, SaintPortalUnavailableException, LibraryAuthRequiredException
+│   └── response        // ApiResponse<T> envelope, ErrorResponse
 └── domain
+    ├── auth
+    │   └── saint       // SaintSsoService, SaintSsoProperties, SaintSsoConfig, UsaintAuthResult (Task 14 — saint.ssu.ac.kr 2-phase SSO callback)
+    ├── campus          // controller / dto / service — 캠퍼스 시설 검색
+    ├── chat
+    │   ├── controller  // ChatController (REST chatbot endpoint)
+    │   ├── service     // ChatService impls (mock / llm) + multi-provider llm fallback
+    │   ├── memory      // ChatConversationStore
+    │   ├── dto         // ChatRequest/Response + OpenAI-compatible DTOs
+    │   └── config      // LlmChatProperties, ChatMemoryProperties
+    ├── dorm            // connector / controller / service — 기숙사 식단
+    ├── library
+    │   ├── auth        // LibrarySessionController, LibrarySessionStore, LibrarySessionProperties (Task 13)
+    │   ├── connector   // LibraryBookConnector + Real/Mock, LibrarySeatConnector + Mock
+    │   ├── controller  // LibraryBookController, LibrarySeatController
+    │   ├── dto
+    │   └── service     // LibraryBookService, LibrarySeatService + caches
+    ├── mcp
+    │   ├── tool        // @Tool methods that delegate to domain Services (6 read-only)
+    │   └── config      // MCP server registration
     ├── meal
     │   ├── controller  // MealController
-    │   ├── service     // MealService
-    │   ├── dto         // MealResponse, MealItem
+    │   ├── service     // MealService + WeeklyMealCache + (export profile) WeeklyMealExportRunner
+    │   ├── dto         // MealResponse, MealItem, MealRestaurant, MealClosure, WeeklyMealResponse, MealType
+    │   ├── config      // MealFanOutConfig
     │   └── connector   // MealConnector (interface), MockMealConnector, RealMealConnector
-    ├── library
-    │   ├── controller  // LibraryBookController, LibrarySeatController
-    │   ├── service     // LibraryBookService, LibrarySeatService
-    │   ├── dto
-    │   └── connector
-    ├── chat
-    │   ├── controller  // ChatController (basic chatbot endpoint)
-    │   ├── service     // ChatService (uses Spring AI ChatClient)
-    │   └── dto
-    ├── mcp
-    │   ├── tool        // @Tool methods that delegate to domain Services
-    │   └── config      // MCP server registration
-    └── user            // (created when auth lands; not built in MVP)
-        ├── controller
-        ├── service
-        ├── dto
-        ├── entity
-        └── repository
+    └── user
+        ├── entity      // Student (JPA)
+        ├── repository  // StudentRepository
+        └── service     // StudentService — upsertOnLogin
 ```
 
 Rule: **do not create a package before there is code that needs it.** The
-`user` package, for instance, is shown here for orientation only — it
-doesn't exist in the repo until the auth feature actually starts.
+layout above reflects the actual on-disk tree as of Phase 3 in-flight.
 
 ---
 
@@ -340,11 +345,14 @@ documented now so they're ready when the relevant features arrive:
 
 | Env var                | Used by         | When           |
 |------------------------|-----------------|----------------|
-| `SSUAI_DB_URL`         | Spring Data JPA | from day 1     |
-| `SSUAI_DB_USER` / `SSUAI_DB_PASSWORD` | Spring Data JPA | from day 1 |
-| `SSUAI_REDIS_URL`      | Cache           | from day 1     |
-| `SSUAI_OPENAI_API_KEY` (or equivalent) | Spring AI ChatClient | when chatbot lands |
-| `SSUAI_CREDENTIAL_ENCRYPTION_KEY` | (future) user credential store | when LMS/u-SAINT login lands |
+| `SSUAI_DB_URL`         | Spring Data JPA | from Task 14 — defaults to in-memory H2 in PostgreSQL mode |
+| `SSUAI_DB_USERNAME` / `SSUAI_DB_PASSWORD` | Spring Data JPA | from Task 14 |
+| `SSUAI_REDIS_URL`      | Cache           | future — current MVP uses in-memory `ConcurrentMap` |
+| `SSUAI_GEMINI_API_KEY`, `SSUAI_GROQ_API_KEY`, `SSUAI_CEREBRAS_API_KEY`, `SSUAI_DEEPINFRA_API_KEY`, `SSUAI_SAMBANOVA_API_KEY`, `SSUAI_NSCALE_API_KEY`, `SSUAI_FIREWORKS_API_KEY`, `SSUAI_HUGGINGFACE_API_KEY`, `SSUAI_MISTRAL_API_KEY`, `SSUAI_OPENROUTER_API_KEY` | 9-provider LLM fallback (`LlmProviderConfig`) | live (chat) — each provider optional; chain skips empty keys |
+| `SSUAI_JWT_SECRET`     | `JwtProperties` — HS256 access/refresh signing | from Task 14 — empty default = ephemeral random per restart (dev/test). Prod must set (≥ 32 bytes). |
+| `SSUAI_FRONTEND_ORIGIN` | `WebCorsProdConfig` allowlist | live (prod) |
+| `SSUAI_SAINT_SSO_URL` / `SSUAI_SAINT_PORTAL_URL` | `SaintSsoProperties` | from Task 14 — defaults already point at saint.ssu.ac.kr |
+| `SSUAI_CREDENTIAL_ENCRYPTION_KEY` | (future) AES-GCM library/LMS credential store | when manual paste / LMS login lands |
 
 ---
 
@@ -492,7 +500,9 @@ Layered tests mirror the layered code:
   validation, response envelope, and HTTP status mapping.
 - **Connector tests** — Jsoup connectors against **fixture HTML** stored
   under `src/test/resources/fixtures/`. HTTP-based connectors against
-  WireMock or MockWebServer. Tests must be deterministic.
+  Spring's `MockRestServiceServer` (RestClient stack) or OkHttp's
+  `MockWebServer` (when raw HTTP / streaming is needed). Tests must be
+  deterministic.
 - **Integration tests** — `@SpringBootTest` with Testcontainers for
   Postgres and Redis. Added once the data layer becomes non-trivial; not
   required for week 1.
@@ -516,7 +526,7 @@ Each deferred feature already has a home in this architecture. Knowing
 | User auth for ssuAI itself  | `domain.user` + `global.security` (Spring Security, JWT or session).           |
 | Encrypted credential store  | `domain.user.entity.SchoolCredential` + AES-GCM via `SSUAI_CREDENTIAL_ENCRYPTION_KEY`. Library credentials live here too. |
 | LMS read-only integration   | New `domain.lms` package, with `LmsConnector` (Playwright-based).              |
-| u-SAINT read-only           | New `domain.usaint` package, same pattern as LMS.                              |
+| u-SAINT read-only           | Currently `domain.auth.saint` (Task 14, identity-only). Realtime academic data tools (성적·시간표·출결) re-issue an SSO flow per call; the package may grow into `domain.usaint` once we settle on a session retention policy. |
 | **Library seat agent (flagship)** | `reserve_library_seat` `@Tool` in `domain.mcp.tool` + new `domain.library.agent` for the per-user reservation flow. Uses `LibraryConnector`'s authenticated write path with the user's encrypted credentials. **Action policy infrastructure** below is its prerequisite. |
 | Action MCP tools (general)  | New `@Tool` methods in `domain.mcp.tool`, each requiring user confirmation, audit log row, and a dry-run mode. Backed by `action_audit` table + Redis distributed lock to block same-user concurrent execution. |
 | Notifications               | New `domain.notification` package; Redis for delivery state, web push first.   |
@@ -534,19 +544,16 @@ and [`docs/security.md`](security.md) §6 for the action policy.
 
 ---
 
-## 15. Open questions
+## 15. Open questions — resolved
 
-To resolve before week-1 implementation:
+All week-1 open questions are now settled (kept here for the design log):
 
-- **Response envelope shape.** The `{ data, error, traceId }` form above is
-  a starting proposal. Worth checking if there's a Spring convention or a
-  team preference before committing.
-- **Trace ID source.** Use Spring Boot 3 + Micrometer's built-in
-  `traceId`, or add a custom `RequestIdFilter`? Built-in is the simpler
-  default.
-- **OpenAPI from day 1?** Recommended: yes — `springdoc-openapi` is cheap
-  to add, gives the frontend a typed client generator, and is visibly
-  useful in a portfolio.
-- **Do we want a `domain.common` package** for shared DTOs/enums, or keep
-  duplication low by living without it until a real shared concept appears?
-  Default: live without it.
+- **Response envelope shape** → `{ data, error, traceId }` (`ApiResponse<T>`
+  in `global.response`). Resolved at Task 01.
+- **Trace ID source** → custom `TraceIdFilter` in `global.config`. Resolved
+  at Task 01.
+- **OpenAPI from day 1** → yes, `springdoc-openapi-starter-webmvc-ui` 3.x.
+  Resolved at Task 08; Swagger UI disabled in prod.
+- **`domain.common` package** → not created; duplication has stayed low
+  enough across `meal`/`dorm`/`library`/`campus` that a shared module
+  wasn't worth the indirection.

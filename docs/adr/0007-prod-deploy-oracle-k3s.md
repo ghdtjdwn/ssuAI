@@ -1,6 +1,6 @@
 # ADR 0007 — Production deploy: k3s on Oracle Cloud Free Tier + Vercel
 
-- **Status**: Proposed (Task 06 spec; will flip to Accepted when the live demo URL is up and the deploy runbook is merged)
+- **Status**: Accepted (Task 06 merged; live at https://ssumcp.duckdns.org with Vercel frontend at https://ssuai.vercel.app)
 - **Date**: 2026-05-07
 - **Scope**: `deploy/`, `backend/.../WebCorsConfig.java`, `application-prod.yml`, `frontend/` Vercel project, `.github/workflows/ci.yml` image-build job
 
