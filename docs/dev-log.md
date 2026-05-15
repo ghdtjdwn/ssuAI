@@ -5,16 +5,43 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-15
 
-- 2026-05-15: Codex hand-off workflow 폐기. `AGENTS.md` 삭제, `CLAUDE.md`/
-  `docs/tasks/12-library-seat-status.md`/`.github/pull_request_template.md`/
-  `README.md`/`TROUBLESHOOTING.md` 정비. `.codex/`, `.tmp/`, `exports/`
-  로컬 폐기물도 제거. Claude 단독 구현자 체제로 전환. PR #76.
 - 2026-05-15: Task 12 backend mock slice. `LibraryFloor` enum, `LibrarySeatZone`/
   `LibrarySeatStatusResponse` DTO, `LibrarySeatConnector` 인터페이스 + 결정적
   `MockLibrarySeatConnector`, 30s TTL + single-flight 캐시 `LibrarySeatCache`,
   `LibrarySeatService`, `GET /api/library/seats?floor=N` 컨트롤러, MCP 도구
   `get_library_seat_status` 까지 end-to-end 완성. `RealLibrarySeatConnector`
-  는 upstream URL 확정 전까지 보류. ADR 0012 추가.
+  는 upstream URL 확정 전까지 보류. ADR 0012 추가. PR #77.
+- 2026-05-15: Codex hand-off workflow 폐기. `AGENTS.md` 삭제, `CLAUDE.md`/
+  `docs/tasks/12-library-seat-status.md`/`.github/pull_request_template.md`/
+  `README.md`/`TROUBLESHOOTING.md` 정비. `.codex/`, `.tmp/`, `exports/`
+  로컬 폐기물도 제거. Claude 단독 구현자 체제로 전환. PR #76.
+- 2026-05-15: Phase 2 시작점 task spec —
+  `docs/tasks/12-library-seat-status.md`. read-only library seat
+  status MCP tool. 인증 없는 공개 데이터만, 예약 액션은 Phase 4 별도.
+  cache TTL 30s + single-flight 로 upstream 보호. 6 개 sub-task 로
+  분해. PR #74.
+- 2026-05-15: 라이브 챗봇 3종 회귀 fix. (1) 모호한 질문에 봇이
+  되묻기만 함 ("학식 뭐?" → 6개 식당 나열하고 어느 거?) (2) 도구
+  결과에 없는 브랜드명 환각 ("학교 편의점?" → 데이터엔 쿱스켓
+  6개뿐인데 봇이 "CU 학생회관, GS25 본관" 발명) (3) "응응" 같은
+  단답 follow-up 에서 컨텍스트 완전 손실. (1)(2) 는 SYSTEM_PROMPT
+  강화 — default 가정 즉시 도구 호출, 도구 결과의 정확한 이름만
+  사용 (브랜드명 추측 금지), follow-up 짧은 긍정 답변 처리.
+  facility cap 6 → 10 으로 silent truncation 가장자리 회피. (3) 은
+  `ChatConversationStore` + `ChatMemoryProperties` 신규 추가 —
+  in-memory bounded multi-turn (TTL 30m, 12 messages cap,
+  1000 conversations LRU). 비밀 입력은 history 에 절대 저장 안 함
+  (secret 가드 케이스). frontend 는 이미 conversationId 보존 중이라
+  무수정. PR #72 + #73.
+- 2026-05-15: 배포 진단 후속 — `5be57d9` 가 `pullPolicy: Always` 우회로
+  stale backend image 문제 해결한 사실을 `docs/deploy/pipeline-diagnosis-2026-05-14.md`
+  에 Resolution 섹션으로 추가. Image Updater write-back 근본 fix 는
+  deferred. PR #71.
+- 2026-05-15: Repo 정리 — stale PR close (#65 README v2,
+  #64 demo placeholder, #41 tailwind v3→v4 major bump 빌드 실패),
+  `.codex/chatbot-openrouter-fallback-plan.md` 삭제 (ADR 0009 가
+  source of truth), `.codex/codex-work-log.md` 를 `.codex/archive/` 로
+  이동.
 
 ## 2026-05-14
 
