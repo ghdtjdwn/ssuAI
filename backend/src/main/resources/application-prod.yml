@@ -8,6 +8,11 @@
 #   SSUAI_FRONTEND_ORIGIN    — WebCorsProdConfig + SSO callback redirect target
 #   SSUAI_API_BASE_URL       — SmartID apiReturnUrl built in SaintSsoCallbackController
 #   SSUAI_JWT_SECRET         — HS256 key for ssuAI access/refresh JWTs (>= 32 bytes)
+#
+# Recommended env vars in prod (silent fallback to ephemeral per-restart values otherwise):
+#   SSUAI_CREDENTIAL_ENCRYPTION_KEY — AES-256 key for SaintSessionStore (Task 16);
+#                                     unset = stored portal cookies vanish on JVM restart,
+#                                     forcing every user to redo SSO.
 ssuai:
   connector:
     meal: real
