@@ -39,8 +39,10 @@ import com.ssuai.global.exception.SaintPortalUnavailableException;
  * <ul>
  *   <li>{@code sToken} / {@code sIdno} are method-scoped locals — never logged,
  *       persisted, or returned past this method (Task 14 spec §1, §5).
- *   <li>Phase 1 cookies are also method-scoped and discarded after phase 2.
- *       Realtime u-SAINT data tools (Task 15+) re-issue a fresh SSO flow.
+ *   <li>Phase 1 portal cookies are handed off, encrypted, to
+ *       {@link SaintSessionStore} once identity is confirmed (Task 16 PR 16a).
+ *       Realtime u-SAINT data tools read them back from the store; they
+ *       never live on a service field or in a log line.
  *   <li>Both upstream calls hit saint.ssu.ac.kr over HTTPS in prod; never
  *       echo the cookie or token values into responses or exceptions.
  * </ul>
@@ -54,12 +56,15 @@ public class SaintSsoService {
 
     private final SaintSsoProperties properties;
     private final RestClient restClient;
+    private final SaintSessionStore sessionStore;
 
     public SaintSsoService(
             SaintSsoProperties properties,
-            @Qualifier("saintSsoRestClient") RestClient restClient) {
+            @Qualifier("saintSsoRestClient") RestClient restClient,
+            SaintSessionStore sessionStore) {
         this.properties = properties;
         this.restClient = restClient;
+        this.sessionStore = sessionStore;
     }
 
     public UsaintAuthResult authenticate(String sToken, String sIdno) {
@@ -77,7 +82,9 @@ public class SaintSsoService {
         }
 
         String portalHtml = phase2FetchPortal(portalCookieHeader);
-        return parseIdentity(portalHtml);
+        UsaintAuthResult identity = parseIdentity(portalHtml);
+        sessionStore.put(identity.studentId(), new PortalCookies(portalCookieHeader));
+        return identity;
     }
 
     private ResponseEntity<String> phase1Validate(String sToken, String sIdno) {

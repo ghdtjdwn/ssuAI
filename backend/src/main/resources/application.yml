@@ -93,6 +93,18 @@ ssuai:
     sso-url: ${SSUAI_SAINT_SSO_URL:https://saint.ssu.ac.kr/webSSO/sso.jsp}
     portal-url: ${SSUAI_SAINT_PORTAL_URL:https://saint.ssu.ac.kr/irj/portal}
     timeout: 10s
+    session:
+      # Encrypted-at-rest store of post-SSO portal cookies, consumed by
+      # realtime u-SAINT data tools (Task 16). TTL kept shorter than the
+      # worst-case upstream cookie lifetime so the store never hands out a
+      # cookie saint already rejected.
+      ttl: 30m
+      max-sessions: 1000
+      # AES-256 key (>= 32 bytes, base64 recommended). Empty default →
+      # ephemeral random per JVM start (dev/test convenience; stored
+      # sessions become unreadable across restarts). Prod must set the
+      # SSUAI_CREDENTIAL_ENCRYPTION_KEY env var on the ConfigMap/secret.
+      encryption-key: ${SSUAI_CREDENTIAL_ENCRYPTION_KEY:}
   auth:
     # Public origin of THIS backend, used to build the SmartID
     # apiReturnUrl in /api/auth/saint/sso-init. In prod this MUST be
