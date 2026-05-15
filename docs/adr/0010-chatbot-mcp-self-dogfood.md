@@ -1,6 +1,6 @@
 # ADR 0010 - Chatbot self-dogfoods the MCP server
 
-- **Status**: Proposed (accepted when `feat/chatbot-mcp-dogfood` merges)
+- **Status**: Accepted (`feat/chatbot-mcp-dogfood` merged; chat path goes through MCP self-dogfood over local SSE)
 - **Date**: 2026-05-13
 - **Scope**: `backend/src/main/java/com/ssuai/domain/chat/`,
   `backend/build.gradle`, `backend/src/main/resources/application*.yml`,

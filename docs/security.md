@@ -93,11 +93,11 @@ think it is.
 
 | Env var                                | Class    | When introduced                |
 |----------------------------------------|----------|--------------------------------|
-| `SSUAI_DB_URL` / `SSUAI_DB_USER` / `SSUAI_DB_PASSWORD` | Secret   | Day 1 (Postgres connection)    |
-| `SSUAI_REDIS_URL`                      | Secret   | Day 1 (cache)                  |
-| `SSUAI_OPENAI_API_KEY` (or equivalent) | Secret   | When chatbot lands             |
-| `SSUAI_JWT_SIGNING_KEY`                | Secret   | When ssuAI auth lands          |
-| `SSUAI_CREDENTIAL_ENCRYPTION_KEY`      | Secret   | When LMS / u-SAINT login lands |
+| `SSUAI_DB_URL` / `SSUAI_DB_USERNAME` / `SSUAI_DB_PASSWORD` | Secret   | From Task 14 (Postgres; current MVP defaults to in-memory H2) |
+| `SSUAI_REDIS_URL`                      | Secret   | Future (current cache is in-process `ConcurrentMap`) |
+| Per-provider LLM keys — `SSUAI_GEMINI_API_KEY`, `SSUAI_GROQ_API_KEY`, ... (9 providers) | Secret | Live (chat). Each optional; missing keys skip the provider |
+| `SSUAI_JWT_SECRET`                     | Secret   | From Task 14. HS256 ≥ 32 bytes; empty default = ephemeral random per restart (dev/test only) |
+| `SSUAI_CREDENTIAL_ENCRYPTION_KEY`      | Secret   | When manual library-token paste / LMS login lands |
 
 ### Pre-commit guardrails
 
@@ -255,22 +255,38 @@ delete them through the API.
 
 ---
 
-## 7. Authentication & sessions (forward-looking)
+## 7. Authentication & sessions
 
-Out of MVP scope, but the design constraints:
+Implemented as of Task 14:
 
-- **Don't roll custom crypto.** Use Spring Security's password encoder
-  (`BCryptPasswordEncoder` or `Argon2PasswordEncoder`) for the ssuAI
-  account password — never store anything but the hash.
-- **Sessions vs JWTs:** for a single backend serving web + (later)
-  mobile, prefer **opaque session tokens stored in Redis** with a short
-  TTL plus refresh, not self-contained JWTs. Easier to revoke.
-- Tokens go in `HttpOnly`, `Secure`, `SameSite=Lax` cookies for the web
-  client. Mobile uses an `Authorization: Bearer` header against the same
+- **JWT chosen over opaque sessions.** Earlier drafts of this doc preferred
+  opaque Redis-backed sessions for revocability, but Task 14's u-SAINT SSO
+  flow had to ship before Redis was in the stack, and ssuAI never stores a
+  reusable school password (only one-shot SmartID tokens that we discard
+  immediately). The blast radius of a stolen access JWT is therefore
+  bounded by its 15-minute TTL, which closes most of the gap. If a
+  per-user revocation requirement appears, add a refresh-token allowlist
+  table (kept here as an explicit future TODO).
+- **Token shapes** — `JwtProvider` issues HS256 access JWTs (15-min TTL)
+  and refresh JWTs (14-day TTL). Secret comes from `SSUAI_JWT_SECRET`
+  (≥ 32 bytes); in dev/test it falls back to an ephemeral random secret
+  so restarts invalidate old tokens automatically. See
+  `backend/src/main/java/com/ssuai/global/auth/`.
+- **Where tokens live on the client** — refresh JWT in an `HttpOnly`,
+  `Secure`, `SameSite=Lax`, `Path=/api/auth` cookie. Access JWT lives in
+  frontend memory only (never localStorage / sessionStorage). Mobile
+  reuses the same `Authorization: Bearer` shape against the same
   endpoints.
-- Login rate-limiting from day one (Redis counter keyed by IP + username).
-- Password reset uses a single-use, short-lived token sent by email; the
-  token is hashed in the DB.
+- **No ssuAI-side passwords.** ssuAI does not store a user-chosen
+  password. u-SAINT SmartID handles the user's school password on its
+  own login page; we receive only the one-shot `sToken` / `sIdno` query
+  params via SSO callback, exchange them for identity inside
+  `SaintSsoService.authenticate`, and discard them. There is no
+  `BCryptPasswordEncoder` to roll.
+- **Login rate-limiting** — deferred until Phase 3 frontend (Task 14 PR
+  14c) lands. Add when the rate of SSO-callback hits becomes observable.
+- **Refresh rotation** — refresh JWTs should rotate on each
+  `/api/auth/refresh` call (planned in PR 14b-4).
 
 ---
 

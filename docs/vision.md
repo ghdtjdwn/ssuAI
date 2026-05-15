@@ -198,8 +198,8 @@ write 성격의 액션 도구는 **모두** 다음 규약을 따릅니다.
 | Phase | 내용 | 상태 |
 |---|---|---|
 | **Phase 1** | 공개 데이터 MVP — 학식·기숙사·시설 MCP 도구 + 웹 대시보드 + 챗봇 | ✅ 완료 (라이브 운영 중) |
-| **Phase 2** | 공개 도구 확장 — 도서관 도서/좌석 도구, 모바일 친화 UI | 🔜 다음 |
-| **Phase 3** | 개인 데이터 통합 — u-SAINT/LMS/도서관 인증, 개인 MCP 도구, 학생 credential 암호화 보관 | 📋 계획 중 |
+| **Phase 2** | 공개 도구 확장 — 도서관 도서/좌석 도구, 모바일 친화 UI | ✅ 도서관 도구 라이브 (Task 12 좌석 + Task 15 도서) / 모바일 CSS 잔여 |
+| **Phase 3** | 개인 데이터 통합 — u-SAINT/LMS/도서관 인증, 개인 MCP 도구, 학생 credential 암호화 보관 | 🔜 진행 중 (Task 13 라이브러리 세션 · Task 14 u-SAINT SSO) |
 | **Phase 4** | **도서관 좌석 자동 예약 AI 에이전트** (flagship) + 액션 도구 공용 인프라 | 📋 계획 중 |
 
 <!-- markdownlint-enable MD013 MD060 -->
@@ -216,23 +216,33 @@ write 성격의 액션 도구는 **모두** 다음 규약을 따릅니다.
   (Traefik + cert-manager + GHCR + Vercel)
 - ✅ GitHub Actions CI/CD + Dependabot + gitleaks
 
-### Phase 2 (다음 단기 목표)
+### Phase 2 (도서관 도구 — 라이브)
 
-- 🔜 `LibraryBookConnector` (Jsoup) + `search_library_book` /
-  `get_library_book_status` MCP 도구
-- 🔜 `LibrarySeatConnector` + `get_library_seat_status` MCP 도구 (단,
-  실시간 잔여이므로 캐시 TTL 매우 짧게)
+- ✅ `LibraryBookConnector` (Pyxis JSON, 익명 GET) + `search_library_book`
+  MCP 도구 — Task 15 (PR 15a/15b) 머지, prod `library-book: real` 적용
+- ✅ `LibrarySeatConnector` + `get_library_seat_status` MCP 도구 — Task 12
+  mock 슬라이스로 가동 (real connector 는 Task 13 라이브러리 세션 가시화
+  후 합류)
 - 🔜 모바일 친화 CSS 다듬기 (대시보드 + 챗봇)
 
-### Phase 3 (개인 데이터 통합)
+### Phase 3 (개인 데이터 통합) — 진행 중
 
 이 phase 의 가장 큰 도전은 **credential 보안**:
 
-- ssuAI 자체 사용자 시스템 (가입/로그인) — Spring Security + JWT 또는 세션
-- u-SAINT / LMS / 도서관 계정 정보를 학생이 안전하게 위탁할 수 있도록
-  AES-GCM 으로 암호화 저장 (`SSUAI_CREDENTIAL_ENCRYPTION_KEY`)
-- `domain.usaint`, `domain.lms` connector — Playwright headless 로
-  로그인 후 데이터 추출
+- ✅ ssuAI 자체 사용자 시스템 — Task 14 PR 14b-1/2 에서 `Student` JPA
+  엔티티 + JWT infra (15m access / 14d refresh, `SSUAI_JWT_SECRET` env)
+  머지 완료. 인증 방식은 JWT 채택.
+- 🔜 u-SAINT 세션 인증 — Task 14 PR 14b-3 (`SaintSsoService`, saint.ssu.ac.kr
+  2-phase) 머지 완료. PR 14b-4 (callback controller + `JwtAuthFilter`),
+  PR 14c (frontend) 잔여. 코드 위치: `domain.auth.saint`.
+- 🔜 도서관 세션 인증 — Task 13. PR 13a (백엔드 session store + 401 매핑)
+  머지, PR 13c (manual paste UI) + TTL spike 결과 의존.
+- 📋 LMS connector — Playwright headless 등, Phase 3 후반 또는 Phase 4
+  로 ride-along.
+- u-SAINT / LMS / 도서관 계정 정보 → 학생이 안전하게 위탁할 수 있도록
+  AES-GCM 으로 암호화 저장 (`SSUAI_CREDENTIAL_ENCRYPTION_KEY`). 단,
+  u-SAINT 는 비밀번호를 ssuAI 가 보지 않는 SmartID SSO 리다이렉트
+  패턴이라 `sToken`/`sIdno` one-shot 토큰만 처리 후 폐기 (Task 14 spec).
 - 개인 MCP 도구 — 사용자 인증 토큰을 MCP tool argument 로 받거나,
   ssuAI 가 발급한 API key 로 라우팅
 - 개인정보 log 정책 ([`docs/security.md`](security.md) §4)

@@ -1,6 +1,6 @@
 # ADR 0011 - Discover chat tools from the MCP server at runtime
 
-- **Status**: Proposed (accepted when `feat/chatbot-mcp-tool-discovery` merges)
+- **Status**: Accepted (`feat/chatbot-mcp-tool-discovery` merged; `LlmChatService` discovers tools from MCP at runtime, cached after first turn)
 - **Date**: 2026-05-13
 - **Scope**: `backend/src/main/java/com/ssuai/domain/chat/service/LlmChatService.java`.
 
