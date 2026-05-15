@@ -1,7 +1,6 @@
 # ADR 0008 - GitOps rollout with ArgoCD + Helm chart
 
-- **Status**: Proposed (Task 07 spec; flips to Accepted when the
-  implementation lands and the first auto-deploy completes successfully)
+- **Status**: Accepted (Task 07 merged; ArgoCD + Image Updater running against the live cluster, auto-deploy on every ghcr.io push)
 - **Date**: 2026-05-08
 - **Scope**: `deploy/charts/`, `deploy/argocd/`, removal of
   `deploy/k8s/` raw manifests, `deploy/README.md` upgrade workflow.
