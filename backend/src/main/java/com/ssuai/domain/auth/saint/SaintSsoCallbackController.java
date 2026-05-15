@@ -67,6 +67,14 @@ public class SaintSsoCallbackController {
                     "ssuai.frontend.origin (env: SSUAI_FRONTEND_ORIGIN) must be set; "
                             + "the SSO callback cannot 302 the user back to the frontend without it.");
         }
+        String apiBaseUrl = authProperties.getApiBaseUrl();
+        if (apiBaseUrl == null || apiBaseUrl.isBlank()) {
+            throw new IllegalStateException(
+                    "ssuai.auth.api-base-url (env: SSUAI_API_BASE_URL) must be set; "
+                            + "SmartID needs an absolute apiReturnUrl. A blank value yields "
+                            + "the relative path /api/auth/saint/sso-callback, which SmartID "
+                            + "resolves against its own host and the callback never reaches us.");
+        }
         this.saintSsoService = saintSsoService;
         this.studentService = studentService;
         this.jwtProvider = jwtProvider;
