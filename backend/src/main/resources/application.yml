@@ -93,6 +93,25 @@ ssuai:
     sso-url: ${SSUAI_SAINT_SSO_URL:https://saint.ssu.ac.kr/webSSO/sso.jsp}
     portal-url: ${SSUAI_SAINT_PORTAL_URL:https://saint.ssu.ac.kr/irj/portal}
     timeout: 10s
+  auth:
+    # Public origin of THIS backend, used to build the SmartID
+    # apiReturnUrl in /api/auth/saint/sso-init. In prod this MUST be
+    # the HTTPS origin SmartID is whitelisted to redirect to.
+    api-base-url: ${SSUAI_API_BASE_URL:http://localhost:8080}
+    smartid-sso-url: ${SSUAI_SMARTID_SSO_URL:https://smartid.ssu.ac.kr/Symtra_sso/smln.asp}
+    refresh-cookie:
+      name: ssuai_refresh
+      path: /api/auth
+      same-site: Lax
+      # dev/test default = false (localhost is plain HTTP). Prod overrides
+      # to true in application-prod.yml so the cookie is HTTPS-only.
+      secure: ${SSUAI_AUTH_REFRESH_COOKIE_SECURE:false}
+  frontend:
+    # Origin of the ssuAI web app — used by (1) WebCorsProdConfig in prod
+    # and (2) the saint SSO callback to 302 the user back to /auth/return.
+    # In prod application-prod.yml force-empties this so the SSUAI_FRONTEND_ORIGIN
+    # env var becomes required and the empty case fails fast at startup.
+    origin: ${SSUAI_FRONTEND_ORIGIN:http://localhost:3000}
   chat:
     llm:
       max-tokens: ${SSUAI_LLM_MAX_TOKENS:400}
