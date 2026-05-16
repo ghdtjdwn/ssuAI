@@ -63,7 +63,8 @@ GET ssuai-backend/api/auth/saint/sso-callback?sToken=…&sIdno=…
                                                                                   StudentService.upsertOnLogin(...)
                                                                                   JwtProvider.issueRefresh(student)
                               ◄──── 302 to ssuai.vercel.app/auth/return?ok=1 ──
-                                    Set-Cookie: ssuai_refresh=…; HttpOnly; Secure; SameSite=Lax; Path=/api/auth
+                                    Set-Cookie: ssuai_refresh=…; HttpOnly; Secure; SameSite=None; Path=/api/auth
+                                    (prod cross-site; dev/test override to SameSite=Lax — see "Cross-site cookie auth")
 GET /auth/return?ok=1
 [frontend POSTs /api/auth/refresh, cookie auto-attached]
 GET ssuai-backend/api/auth/refresh
@@ -150,3 +151,82 @@ once Phase 2 has read the dashboard HTML.
   session-retention policy (security cost: a stolen cookie has a TTL of
   several minutes). That decision is deferred to a separate ADR when
   the first realtime data tool actually ships.
+
+## Addendum (2026-05-16, prod-live retrospective) — Cross-site cookie auth
+
+Task 14 went prod-live on 2026-05-16 over four PRs (#112, #113, #114,
+#116). The auth design above was correct at the *capture* step
+(SSO-redirect-callback worked exactly as described) but **the
+post-callback refresh handshake hit two cross-site cookie-auth
+layers** that the original ADR did not call out. Recording here so the
+next ADR / engineer doesn't repeat the discovery.
+
+ssuAI's deployment topology is split-origin:
+
+- frontend at `https://ssuai.vercel.app` (Vercel)
+- backend at `https://ssumcp.duckdns.org` (k3s)
+
+The `/api/auth/refresh` round-trip after SSO callback is therefore
+**cross-site**, and modern Chromium-class browsers require BOTH of the
+following on every such call:
+
+1. **Cookie attribute `SameSite=None; Secure`** — without it, the
+   browser strips the refresh cookie from cross-site POSTs (or warns +
+   degrades over time per the Privacy Sandbox roadmap). The original
+   spec defaulted to `SameSite=Lax`, which silently works in dev
+   (`localhost:3000` ↔ `localhost:8080` is same-site under the
+   public-suffix definition) but **fails the moment the frontend and
+   backend live on different registrable domains**. Fixed in PR #114
+   via `application-prod.yml`:
+   `ssuai.auth.refresh-cookie.same-site: None`.
+
+2. **Response header `Access-Control-Allow-Credentials: true`** —
+   independent of cookie attributes. When `fetch(..., { credentials:
+   'include' })` is used cross-origin, the browser:
+   - sends the cookie with the request (assuming layer 1 is satisfied),
+   - stores any `Set-Cookie` in the response (assuming
+     `SameSite=None; Secure`),
+   - but **refuses to expose the response body to JavaScript** unless
+     the server explicitly opts in via this header. The fetch promise
+     rejects with a network-error TypeError, NOT a meaningful HTTP
+     status.
+
+   `CorsConfiguration.allowCredentials(true)` is the Spring-side switch
+   (PR #116, `ApiCorsDefaults.java`). It requires
+   `allowedOrigins` to be an **explicit origin list**, not `*`, which we
+   already had.
+
+The intermediate state (layer 1 fixed, layer 2 unfixed) is uniquely
+hard to debug:
+
+- DevTools Network shows `POST /api/auth/refresh` → `200 OK` with valid
+  `Set-Cookie: ssuai_refresh=…`. Looks healthy.
+- The new cookie *is* stored — the next request gets it.
+- Backend access log shows the same 200, no error.
+- But the frontend's `await response.json()` throws, so the JS catch
+  block fires and the UI displays "세션 갱신 실패".
+
+The only durable signal is the **browser Console CORS warning**:
+> Access to fetch at 'https://ssumcp.duckdns.org/api/auth/refresh'
+> from origin 'https://ssuai.vercel.app' has been blocked by CORS
+> policy: The value of the 'Access-Control-Allow-Credentials' header
+> in the response is '' which must be 'true' when the request's
+> credentials mode is 'include'.
+
+### Implications for related work
+
+- **Future split-origin features** (cross-site WebSocket auth, mobile
+  embed via WebView, Phase 4 confirmation pages, …) reuse exactly the
+  same two-layer requirement. Treat any new cookie-bearing endpoint
+  the same way.
+- **`docs/security.md` §7 / §8** were updated alongside this ADR — the
+  cookie-attribute table now reflects the prod override and the CORS
+  section explicitly enumerates the `Access-Control-Allow-Credentials`
+  requirement.
+- **Test coverage** — `WebCorsConfigTest` / `WebCorsProdConfigTest` now
+  assert `config.getAllowCredentials() == true`, so a regression that
+  flips this back to `false` fails CI rather than silently breaking
+  login on the next prod deploy.
+
+See `TROUBLESHOOTING.md` 2026-05-16 entry for the in-depth debugging
+trail.

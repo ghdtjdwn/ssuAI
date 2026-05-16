@@ -273,10 +273,18 @@ Implemented as of Task 14:
   so restarts invalidate old tokens automatically. See
   `backend/src/main/java/com/ssuai/global/auth/`.
 - **Where tokens live on the client** — refresh JWT in an `HttpOnly`,
-  `Secure`, `SameSite=Lax`, `Path=/api/auth` cookie. Access JWT lives in
-  frontend memory only (never localStorage / sessionStorage). Mobile
-  reuses the same `Authorization: Bearer` shape against the same
-  endpoints.
+  `Secure`, `Path=/api/auth` cookie. Access JWT lives in frontend
+  memory only (never localStorage / sessionStorage). Mobile reuses the
+  same `Authorization: Bearer` shape against the same endpoints.
+
+  | Environment | `SameSite` | Why |
+  |---|---|---|
+  | dev/test (`localhost:3000` ↔ `localhost:8080`) | `Lax` | Same-site under public-suffix rules; Lax avoids cross-site spillover in dev tooling. |
+  | prod (`ssuai.vercel.app` ↔ `ssumcp.duckdns.org`) | `None` | Different registrable domains → cross-site. `None` is mandatory for the cookie to flow on `/api/auth/refresh`; `Secure` is a requirement of `None`. |
+
+  The override lives in `application-prod.yml`
+  (`ssuai.auth.refresh-cookie.same-site: None`). See ADR 0014 Addendum
+  for the full cross-site cookie-auth design.
 - **No ssuAI-side passwords.** ssuAI does not store a user-chosen
   password. u-SAINT SmartID handles the user's school password on its
   own login page; we receive only the one-shot `sToken` / `sIdno` query
@@ -296,6 +304,14 @@ Implemented as of Task 14:
   Local dev may run plain HTTP.
 - HSTS header on production responses.
 - CORS allowlist is explicit (the deployed frontend origin), never `*`.
+- **`Access-Control-Allow-Credentials: true`** is required on every
+  endpoint the cross-site frontend hits with `credentials: 'include'`
+  (currently all of `/api/**`). Without it, even a 200 OK response is
+  hidden from the frontend JavaScript and the user sees a generic
+  failure with no backend-side error. `ApiCorsDefaults` sets this; a
+  regression that flips it back is caught by `WebCorsConfigTest` /
+  `WebCorsProdConfigTest`. The combination is only legal when
+  `allowedOrigins` is an explicit list (not `*`), which it is.
 - Outbound connections to school systems use HTTPS where the school site
   supports it. If a school endpoint is HTTP-only, document it and treat
   the response as untrusted (parse defensively).
