@@ -5,6 +5,12 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-17
 
+- 2026-05-17: **Task 16 §8 #6 audit log 마무리**. `dispatchPrivateSaintTool`
+  의 log line 을 `requested` / `completed` / `expired` 3종으로 정리,
+  모두 `tool={name} studentFp={SHA-256 prefix}` 형태로 response payload
+  X. logback `ListAppender` 기반 단위 테스트로 raw 성적/과목명/교수명/
+  학번 어느 log line 에도 안 들어가는지 영구 고정. Task 16 §8 security
+  checklist 8/8 ✅.
 - 2026-05-17: **Task 16 MCP tool 등록 — `get_my_schedule` + `get_my_grades`**
   (spec §9 #4 thread-local pattern). `SaintToolContext` 가 chat 스레드에
   바인딩되는 try-with-resources 스코프 + @Tool 메서드가 학번 인자 X (context

@@ -490,6 +490,73 @@ class LlmChatServiceTests {
     }
 
     @Test
+    void privateGradesAuditLogPinsToolNameAndStudentFingerprintWithoutLeakingPayload() {
+        com.ssuai.domain.saint.dto.GpaSummary summary =
+                new com.ssuai.domain.saint.dto.GpaSummary(18.0, 18.0, 63.00, 3.50, 85.00, 3.0);
+        com.ssuai.domain.saint.dto.GradesResponse stub =
+                new com.ssuai.domain.saint.dto.GradesResponse(
+                        List.of(new com.ssuai.domain.saint.dto.TermGpa(
+                                2025, "2학기", 18.0, 18.0, 3.0, 3.50, 63.00, 85.00,
+                                "50/100", "60/100", false, false, false)),
+                        summary,
+                        summary,
+                        Map.of("2025-2학기", List.of(
+                                new com.ssuai.domain.saint.dto.CourseGrade(
+                                        "95", "A0", "운영체제", "21500001", 3.0, "김교수", ""))));
+        when(gradesService.fetchGrades("20221528")).thenReturn(stub);
+        FakeProvider provider = new FakeProvider("gemini")
+                .toolCall("gemini-model", new OpenAiToolCall(
+                        "call-1",
+                        "function",
+                        new OpenAiToolCall.FunctionCall("get_my_grades", "{}")))
+                .reply("gemini-model", "성적 페이지에서 1과목 확인 가능합니다.");
+        LlmChatService chatService = chatService(List.of(provider), List.of("gemini"), List.of(), 0);
+
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger)
+                org.slf4j.LoggerFactory.getLogger(LlmChatService.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+                new ch.qos.logback.core.read.ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            chatService.reply("c-test", "내 성적 알려줘", "20221528");
+
+            String expectedFp = com.ssuai.domain.auth.saint.SaintSessionStore.fingerprint("20221528");
+            List<String> messages = appender.list.stream()
+                    .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                    .toList();
+
+            // 의도 (requested) + 완료 (completed) 둘 다 도구명 + fingerprint 만 포함
+            assertThat(messages)
+                    .anyMatch(m -> m.contains("chat private tool requested")
+                            && m.contains("get_my_grades")
+                            && m.contains(expectedFp))
+                    .anyMatch(m -> m.contains("chat private tool completed")
+                            && m.contains("get_my_grades")
+                            && m.contains(expectedFp));
+
+            // 모든 log line — raw 성적 데이터 차단 (점수/등급/과목명/학수번호/교수명/GPA/석차)
+            for (String m : messages) {
+                assertThat(m)
+                        .doesNotContain("3.50")
+                        .doesNotContain("262.50")
+                        .doesNotContain("85.00")
+                        .doesNotContain("18.0")
+                        .doesNotContain("95")
+                        .doesNotContain("A0")
+                        .doesNotContain("운영체제")
+                        .doesNotContain("21500001")
+                        .doesNotContain("김교수")
+                        .doesNotContain("50/100")
+                        .doesNotContain("20221528");
+            }
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    @Test
     void privateGradesToolReturnsExpiredSessionGuidanceWhenSessionStoreLapsed() {
         when(gradesService.fetchGrades("20221528"))
                 .thenThrow(new com.ssuai.global.exception.SaintSessionExpiredException());
