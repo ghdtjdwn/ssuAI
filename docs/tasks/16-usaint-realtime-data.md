@@ -513,6 +513,120 @@ transient ID — 매 nav 마다 바뀜. connector 는 base path (`/sap/bc/webdyn
 만 쓰고 query 는 ecc 가 자체 생성. 시간표 RealSaintScheduleConnector 와
 동일 패턴.
 
+### 3.5.2 학기별 세부 iterate — 2차 spike 결과 (2026-05-16)
+
+3.5.1 의 "PR 16c 첫 cut 은 학기별 GPA history + 학적부/증명만, 세부는
+follow-up" 가정은 **iterate 가능 확인 후 폐기**. PR 16c 첫 cut 에 학기별
+세부도 포함. 이전학기 button-press POST 한 번 spike 결과로 path
+확정됨.
+
+**Button IDs** (raw fixture 안 `<div ct="B" id="...">` element):
+
+| 버튼 | WD id | lsdata | 비고 |
+|------|-------|--------|------|
+| 이전학기 | `WD01F0` | `{0:'이전학기',2:'PREVIOUS'}` | 시간표 WDA7 와 동일 동작 — Button_Press event |
+| 다음학기 | `WD01F2` | `{0:'다음학기',2:'NEXT'}` | follow-up (현재 학기 후 학기 = 미래, PR 16c 첫 cut 에선 미사용) |
+| 조회(새로고침) | `WD0187` | `{0:'조회\x28새로고침\x29'}` | dropdown 변경 후 명시 갱신 — prev/next button-press 자체가 자동 갱신 트리거라 PR 16c connector 는 사용 안 함 |
+
+모두 `lsevents={Press:[{ResponseData:'delta',ClientAction:'submit'}]}`
+— 시간표 WDA7 와 같은 form submit 패턴. `WebDynproSapEventEncoder.encodeButtonPress`
+재사용 가능 (button id 만 인자로).
+
+**Prev 응답 shape** (raw 226KB, fixture `grades-prev-success.html` 5KB
+minimal):
+
+- `<updates><full-update><content-update><![CDATA[...]]>` wrapper —
+  첫 GET 과 동일. `WebDynproResponseUnwrapper.extractHtml()` 통과.
+- 학기별 세부 표 (`tbody[id$="-contentTBody"]`) **data row 채워짐**
+  (이번 spike 결과 = 8 row, 2025-2학기 정규학기 분량).
+- 학기별 GPA history 표 + 학적부/증명 통계 = 첫 GET 과 **동일 내용**
+  (변경 없음). 즉 connector 가 prev 응답에서 GPA history / 통계 다시
+  파싱할 필요 없음 — 첫 GET 결과 재사용.
+- `<input id="sap-wd-secure-id" value="...">` rotation — 매 prev 마다
+  새 CSRF (시간표 WDA7 와 동일).
+
+**세부 row 컬럼 매핑** (7개, cc=1..7. cc=0 은 선택 컬럼 skip):
+
+| cc | 컬럼 | 예시 (PII redacted) |
+|----|------|---------------------|
+| 1 | 성적 (점수, 0-100) | "95" / 또는 P/F 학기는 "P" |
+| 2 | 등급 | "A+" / "A0" / "A-" / "B+" / "B0" / "P" / "F" |
+| 3 | 과목명 | "[교양영역]과목A" (대괄호 prefix 가능) |
+| 4 | 상세성적 (학수번호) | "21500001" 8자리 numeric |
+| 5 | 과목학점 | "3.0", "0.5", "2.0" |
+| 6 | 교수명 | "김교수" |
+| 7 | 비고 | 대부분 빈 cell (`<div class="lsSTEmptyRow">`) |
+
+**Connector pseudo-code** (PR 16c 첫 cut, 시간표 RealSaintScheduleConnector
+의 prev iterate 패턴 그대로):
+
+```java
+GradesResponse fetchGrades(String studentId, PortalCookies cookies) {
+    // 1. 첫 GET (응답은 이미 WebDynpro full-update XML wrapper)
+    HttpResponse<String> first = httpGet(ZCMB3W0017_URL, cookies);
+    String mergedCookies = mergeSetCookies(cookies.rawCookieHeader(),
+            first.headers().allValues("Set-Cookie"));
+    String html = WebDynproResponseUnwrapper.extractHtml(first.body());
+    guardAuthOrThrow(html);  // 학기별 표 anchor 없으면 SaintSessionExpired
+
+    // 2. 학기별 GPA history + 학적부/증명 누적 통계 (전체)
+    List<TermGpa> history = GradesParser.parseTermHistory(html);
+    GpaSummary academicRecord = GradesParser.parseAcademicSummary(html);
+    GpaSummary certificate = GradesParser.parseCertificateSummary(html);
+    Optional<String> secureId = WebDynproResponseUnwrapper.extractSecureId(html);
+
+    // 3. default 학기 세부 (첫 GET 응답이 비어있을 수도 — P/F 학기 case)
+    Map<String, List<CourseGrade>> details = new LinkedHashMap<>();
+    List<CourseGrade> defaultDetails = GradesParser.parseDetailRows(html);
+    if (!defaultDetails.isEmpty()) {
+        details.put(history.get(0).termKey(), defaultDetails);
+    }
+
+    // 4. 이전학기 button-press iterate — history 의 나머지 학기들
+    int hops = 0;
+    for (int i = 1; i < history.size() && hops < MAX_PREV_HOPS; i++) {
+        if (secureId.isEmpty()) break;
+        String xml = httpPostButtonPress(mergedCookies, secureId.get(),
+                                         PREV_TERM_BUTTON_ID);  // WD01F0
+        html = WebDynproResponseUnwrapper.extractHtml(xml);
+        secureId = WebDynproResponseUnwrapper.extractSecureId(html);
+        List<CourseGrade> rows = GradesParser.parseDetailRows(html);
+        if (!rows.isEmpty()) {
+            details.put(history.get(i).termKey(), rows);
+        }
+        hops++;
+    }
+    return new GradesResponse(history, academicRecord, certificate, details);
+}
+```
+
+**MAX_PREV_HOPS** = `history.size()` 또는 안전 상한 (~20). 학기별
+GPA history 가 N 학기라면 N-1 번 prev iterate 면 전 학기 다 받음.
+시간표 multi-term iterate 의 MAX_PREV_YEAR_HOPS=10 패턴과 동일한 안전
+상한.
+
+**학기 키 (termKey)** = `"${year}-${semester}"` 형태 (예 "2025-2학기",
+"2022-여름학기"). history 의 row 가 학년도 + 학기 컬럼을 명시 보유하므로
+parser 가 그대로 추출.
+
+**세부 응답에 학기 라벨이 없는 이슈** — 응답 자체에 "이 row 들이 어느
+학기" 라는 직접 라벨이 없음 (header 부 학기 dropdown 의 selected 값을
+보면 알 수 있으나 selector 가 무겁고 fragile). connector 가 **호출
+횟수 + history 인덱스** 로 학기를 외부에서 매핑하는 게 더 robust —
+시간표의 "WDA7 N회 후 학년도 = currentYear - N" 와 같은 외부 추적
+패턴.
+
+**PR 16c 첫 cut scope (3.5.1 의 갱신)**:
+
+| 항목 | 들어감 |
+|------|--------|
+| 학기별 GPA history (전체) | ✓ |
+| 학적부 누적 통계 (6 항목) | ✓ |
+| 증명용 누적 통계 (6 항목) | ✓ |
+| 학기별 세부 성적 (모든 학기, prev iterate) | ✓ |
+| 다음학기 (NEXT) iterate | ✗ — 미래 학기 = 미수강 학기, 의미 없음 |
+| 학기 dropdown 임의 점프 (학년도/학기 listbox 변경) | ✗ — prev 만으로 전 학기 cover, 임의 점프 불필요 |
+
 ## 4. Architecture
 
 ```text
