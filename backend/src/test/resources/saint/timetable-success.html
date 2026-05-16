@@ -3,8 +3,9 @@
 <head><meta charset="utf-8"><title>개인수업시간표조회 - 숭실대학교 유세인트(u-SAINT)</title></head>
 <body>
 <!-- PII-scrubbed minimal copy of the iframe-deep timetable page served by
-     the SAP WebDynpro component zcmw9001n (개인수업시간표조회),
-     captured 2026-05-16 (Task 16 PR 16a spike).
+     the SAP WebDynpro component ZCMW2102 (개인수업시간표조회),
+     captured 2026-05-16 (Task 16 PR 16a spike), extended 2026-05-17 with
+     the 학년도/학기 dropdown anchors (multi-term nav PR).
 
      What was kept verbatim: every structural attribute the parser keys
      off — tbody[id$="-contentTBody"], <th> headerday lsdata mapping,
@@ -14,6 +15,15 @@
      <span class*="lsTextView--wrap"> for lecture cells (subject<br>
      professor<br>time<br>room).
 
+     2026-05-17 addition: the 학년도/학기 dropdown <label for>/<input id>
+     pair. Parser reads the displayed (year, term) from this pair on
+     every response so the multi-term iterate can label each hop
+     correctly. WD4A / WD9E ids are dynamic across snapshots; the parser
+     keys on the label text ("학년도" / "학기") and the input's value
+     attribute. The 학기 input carries a Korean label ("1학기" /
+     "여름학기" / "2학기" / "겨울학기") which maps to the cycle integers
+     1..4 (Task 16 spec §3.4).
+
      What was changed: every concrete subject name, professor name, and
      room number was replaced with generic placeholders. Student id and
      name never appear in the timetable response itself — those live on
@@ -22,6 +32,20 @@
      Real WD ids (WDB5, WDCD, etc.) are kept because they're stable
      enough across snapshots for parser anchors, but they are NOT
      student-identifying. -->
+
+<!-- 학년도/학기 dropdowns. Real responses carry a long listbox popup
+     below these inputs (every academic year 1954~2030, plus the four
+     terms); the parser only needs the <label for>/<input id>/value
+     triple, so the popup is omitted here. -->
+<table>
+  <tr>
+    <td><label for="WD4A">학년도</label></td>
+    <td><input id="WD4A" type="text" value="2026학년도" /></td>
+    <td><label for="WD9E">학기</label></td>
+    <td><input id="WD9E" type="text" value="1학기" /></td>
+  </tr>
+</table>
+
 <table>
   <tbody id="WDB5-contentTBody">
     <tr rt="2" role="row" class="urST4RowActive">
