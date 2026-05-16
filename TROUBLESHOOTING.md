@@ -161,6 +161,45 @@
 
 ---
 
+## 2026-05-16 — Deployment `secretRef.name` 와 매뉴얼 Secret 이름의 한 글자 drift
+
+- 맥락: SmartID 로그인이 prod 에서 end-to-end 동작 확인된 직후,
+  `SSUAI_JWT_SECRET` / `SSUAI_CREDENTIAL_ENCRYPTION_KEY` 가 ConfigMap
+  에도 Secret 에도 없어 매 pod 재시작마다 사용자 세션 invalidate 되는
+  문제를 잡으러 들어감. Handoff doc 에 적힌 명령은 `kubectl create
+  secret generic ssuai-backend-secret …` (singular).
+- 증상: 사용자가 명령 실행 전에 `kubectl get deployment … -o yaml |
+  grep -A 3 envFrom` 으로 확인했더니 manifest 의 `envFrom.secretRef.name`
+  은 **`ssuai-backend-secrets`** (plural 의 trailing-s) 였음. handoff
+  의 명령 그대로 적용했으면 secret 은 생성되지만 Deployment 가 다른
+  이름으로 찾아 `optional: true` 인 secretRef 가 조용히 0개 env 를
+  load — 즉 secret 은 cluster 에 있는데 backend 는 여전히 empty.
+- 원인: handoff doc 작성 시 manifest 의 실제 secretRef 이름을 확인하지
+  않고 "관용적인 단수형" 으로 짐작해서 작성. `secretRef.optional: true`
+  설정이라 misnamed secret 도 startup 실패 없이 통과 → 검증 없이
+  배포되면 발견 자체가 늦어짐.
+- 해결: handoff doc 의 모든 `ssuai-backend-secret` 표기를 `ssuai-backend-secrets`
+  로 정정. ADR 0014 Addendum 에는 manifest-vs-handoff 이름 drift 가
+  실제로 발생한 사례임을 남김.
+- 검증: 사용자가 정정된 `ssuai-backend-secrets` 이름으로 적용 →
+  `kubectl logs … | grep 'is empty'` 결과가 비어야 정상 (두 WARN
+  사라짐).
+- 포트폴리오 포인트:
+  - **`secretRef.optional: true` 의 양날** — 운영 안정성 (Secret
+    누락이 cluster crash 가 아니라 graceful degrade) 과 silent
+    misconfiguration (이름 오타가 startup fail-fast 로 안 잡힘) 의
+    트레이드오프. 두 환경 (dev = optional OK, prod = required)
+    분기 또는 startup-time self-check (`@PostConstruct` 에서 expected
+    env keys 가 채워졌는지 assert) 로 균형 가능. ssuAI 의 `JwtProvider`
+    는 후자 패턴 (`secret is empty` WARN + ephemeral fallback) 으로
+    부분 방어 — fail-fast 까지는 안 가지만 로그로 노출.
+  - **handoff doc 의 명령은 manifest 와 cross-check 후 적자**. 사용자가
+    명령 실행 *전에* `kubectl get deployment … -o yaml | grep envFrom`
+    을 한 번 돌린 게 정확히 그 cross-check. handoff doc 작성 시
+    "확인 명령 한 줄 + 본 명령 한 줄" 패턴이 default.
+
+---
+
 ## 2026-05-14 — 학식 데이터 매 요청 라이브 스크래핑 → 주간 배치 캐시로 전환
 
 - 맥락: 라이브 챗봇이 동작하기 시작한 직후 데이터 흐름을 점검하다가, 학생이 "오늘 학식 뭐야?" 하고 물어볼 때마다 `RealMealConnector` 가 `soongguri.com` 으로 4~6번의 Jsoup HTTP GET 을 매번 fan-out 하고 있다는 걸 확인. 학식 메뉴는 학교 측에서 주 1회 일괄 갱신되는데 호출은 매번 라이브였음.
