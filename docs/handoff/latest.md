@@ -1,250 +1,129 @@
-# Session handoff — 2026-05-17 새벽 (PR 16b WIP, 토큰 소진 중단)
+# Session handoff — 2026-05-16 밤 (Task 16 u-SAINT 데이터 layer 완료)
 
-> Single rolling handoff file (CLAUDE.md / AGENTS.md "Session handoff
-> to a different AI" 정책). 이전 핸드오프를 overwrite 한다.
+> Single rolling handoff (CLAUDE.md / AGENTS.md 정책). 이전 핸드오프 overwrite.
 
 ## TL;DR
 
-- **PR 16b (시간표 connector) 중단** — encoder / unwrapper / parser /
-  connector + 단위 테스트까지 작성하고 **gradlew test 실행 전에 토큰
-  소진**. 다음 세션 첫 액션 = `gradlew.bat test` 돌려서 빨강 잡고
-  나머지 (service / controller / MCP class / yml wiring / PR open)
-  마무리.
-- **브랜치**: `feat/task-16b-schedule-connector` (commit 1개 push 완료).
-- **머지된 PR 없음** — 이번 세션은 한 줄도 main 안 건드림.
-- **외부 의존 그대로**: TTL spike (PR #81, 사용자 직접) + GitHub
-  Actions auto-deploy (선택).
+- **Task 16 u-SAINT realtime data — 데이터 layer 완료**. 학적 portal + 시간표
+  + 성적 3 endpoints 모두 end-to-end live (mock-default + real connector
+  + REST controller + 단위 테스트 그린).
+- **이번 세션 — PR 16c-B 빨강 3 → green 잡고 머지** (PR #128). prev fixture
+  tbody id suffix fix + `termHistory` row 0 `passFailCredits` 기대값 6.0
+  (spec-locked fixture 의 P/F-only 6학점 truth). `gradlew test` 전체 green.
+- **main clean, 열린 PR 없음, 작업 브랜치 다 삭제**. 외부 의존 (TTL spike
+  서버 polling + GitHub Actions auto-deploy) 만 남음.
+- **다음 세션 옵션**: (a) Task 16 follow-up — `get_my_schedule`/`get_my_grades`
+  MCP tool 등록 + `LlmChatService.compactToolResponse` 본문 누출 가드 단위
+  테스트 / (b) Task 17 (LMS integration) 신규 시작 — `get_my_assignments`,
+  세션 store 패턴 재사용.
 
 ## 이번 세션 머지/푸시
 
-| 항목 | 상태 |
-|------|------|
-| 머지된 PR | 없음 |
-| 푸시된 브랜치 | `feat/task-16b-schedule-connector` (WIP — PR open 안 됨) |
+| 항목 | 상태 | PR / Branch |
+|------|------|-------------|
+| PR #128 성적 service+controller+tests | ✅ MERGED | `feat/task-16c-grades-impl` (deleted) |
+
+이전 세션 정리 잔여: 메타 (이 핸드오프 doc 자체) 만 남음. 본 doc 머지로 정리 완료.
 
 ## 열린 PR
 
-| PR | 브랜치 | 내용 | 상태 |
-|----|--------|------|------|
-| #81 | `chore/spike-ssotoken-ttl-script` | Task 13 ssotoken TTL spike script | 사용자가 마지막에 하기로 ([[feedback-user-defers-ttl-spike]]) |
+없음.
 
 ## 외부 의존 — 사용자 직접 (폴링 금지)
 
 | # | 항목 | 상태 |
 |---|------|------|
-| 1 | TTL spike (PR #81) | ⏳ 사용자 직접 |
+| 1 | TTL spike — ssumcp 서버 nohup polling | 🟢 백그라운드. PID 385859, log `~/ssuAI/scripts/ssotoken-ttl.log`, 1h interval, expired 감지 시 자동 종료. 결과 사용자 통지 대기 ([[feedback-user-will-notify]]) |
 | 2 | GitHub Actions auto-deploy (KUBE_CONFIG) | ⏳ 사용자 의지 (선택) |
 
-## PR 16b WIP — 현재 상태 (정확)
+## Task 16 현재 상태 — 정확
 
-### ✅ 작성 완료 (브랜치에 commit + push 됨)
+### ✅ 완료 (main 머지됨)
 
-| 파일 | 비고 |
-|------|------|
-| `backend/src/main/java/com/ssuai/domain/saint/service/WebDynproSapEventEncoder.java` | `~E001..~E005` + URL escape. `encodeButtonPress(WDA7)` |
-| `backend/src/main/java/com/ssuai/domain/saint/service/WebDynproResponseUnwrapper.java` | CDATA 추출 + secure-id parse |
-| `backend/src/main/java/com/ssuai/domain/saint/service/SaintScheduleParser.java` | `tbody[id$=-contentTBody] tr[rt=1]` selector, cc→ISO DayOfWeek |
-| `backend/src/main/java/com/ssuai/domain/saint/dto/ScheduleEntry.java` | record |
-| `backend/src/main/java/com/ssuai/domain/saint/dto/TermSchedule.java` | record |
-| `backend/src/main/java/com/ssuai/domain/saint/dto/ScheduleResponse.java` | record |
-| `backend/src/main/java/com/ssuai/domain/saint/config/SaintScheduleProperties.java` | `ssuai.saint.schedule.timetable-url` + `timeout` |
-| `backend/src/main/java/com/ssuai/domain/saint/connector/SaintScheduleConnector.java` | interface |
-| `backend/src/main/java/com/ssuai/domain/saint/connector/SaintScheduleHelpers.java` | `parseEnrollmentYear`, `termFor` |
-| `backend/src/main/java/com/ssuai/domain/saint/connector/MockSaintScheduleConnector.java` | default (`matchIfMissing=true`). 학번→enrollmentYear→iterate, hardcoded entries |
-| `backend/src/main/java/com/ssuai/domain/saint/connector/RealSaintScheduleConnector.java` | `@ConditionalOnProperty(..., havingValue="real")`. java.net.http.HttpClient, GET + WDA7 POST iterate, mergeSetCookies, guardAuthOrThrow → `SaintSessionExpiredException` |
-| `backend/src/test/java/com/ssuai/domain/saint/service/WebDynproSapEventEncoderTests.java` | captured cURL 와 round-trip |
-| `backend/src/test/java/com/ssuai/domain/saint/service/WebDynproResponseUnwrapperTests.java` | CDATA / secure-id |
-| `backend/src/test/java/com/ssuai/domain/saint/service/SaintScheduleParserTests.java` | fixture `timetable-success.html` 기반, 7 entries |
-| `backend/src/test/java/com/ssuai/domain/saint/connector/MockSaintScheduleConnectorTests.java` | iterate / fresh enroll |
-| `backend/src/test/java/com/ssuai/domain/saint/connector/RealSaintScheduleConnectorTests.java` | MockWebServer, 3 scenarios + mergeSetCookies |
+| 영역 | 산출물 |
+|------|--------|
+| 학적 portal | PR #110~ : `PortalSnapshotConnector` + `SaintLoginService` (smart-id auth → cookie store) |
+| 시간표 (PR #126) | dto/parser/encoder/unwrapper/connector(mock+real)/service/controller + `application.yml` `ssuai.connector.saint-schedule: mock` |
+| 성적 fixture+spec lock (PR #127) | `grades-success.html` (180KB redact), spec §3.5 잠금 (WebDynpro wrapper, cc=0..13, 한국어 학기 라벨, prev-button iterate) |
+| 성적 구현 (PR #128) | dto (TermGpa/GpaSummary/CourseGrade/GradesResponse), `GradesParser`, `MockSaintGradesConnector` (default), `RealSaintGradesConnector` (WD01F0 prev iterate), `SaintGradesService`, `SaintGradesController` (`GET /api/saint/grades`), 5 test class 그린 |
 
-### ❌ 아직 안 함
+### ❌ Task 16 follow-up (다음 PR 후보)
 
-1. **`gradlew.bat test` 한 번도 안 돌림** — 컴파일 에러 / Jsoup `wholeText()`
-   가 `<br>` 를 `\n` 으로 변환하는지 (parser test fallback path 의도) /
-   MockWebServer setBody UTF-8 byte length / `SaintScheduleProperties`
-   가 `@ConfigurationProperties` 로 등록되려면 `@EnableConfigurationProperties`
-   필요 여부 등 다 미검증. **첫 액션 = test 돌려서 빨강 다 잡기.**
-2. `SaintScheduleService` (cookies lookup → connector → `SaintSessionExpiredException`
-   처리, 옵션 cache) — 아직 없음
-3. `SaintScheduleController` (`GET /api/saint/schedule`, JwtAuthFilter
-   `AuthAttributes.STUDENT_ID` 읽기, `UnauthorizedException` if missing) — 아직 없음
-4. `SaintScheduleMcpTool` — 작성 안 함. **중요 결정**: spec §9 의 "chat
-   thread-local pattern 미구현" 때문에 PR 16b 첫 cut 에는 **MCP tool 등록
-   하지 않음** (class 만 작성하고 `McpServerConfig` 에 추가 안 함). chat
-   thread-local pattern 갖춰지면 별도 PR 에서 등록. PR body 에 명시할 것.
-5. `application.yml` 에 `ssuai.connector.saint-schedule: mock` default
-   추가 — 아직 안 함 (Mock connector 는 `matchIfMissing=true` 라 동작은 함)
-6. `dev-log` 한 줄 추가 안 함
-7. PR open 안 함
-8. tests for service / controller — 아직 없음
+1. **`get_my_schedule` / `get_my_grades` MCP tool 등록** — 시간표/성적 둘 다
+   first cut 에서 빠짐. 이유: spec §9 의 "chat thread-local pattern" 미구비
+   (chat path 가 studentId 를 MCP self-call 에 propagate 하는 mechanism 없음)
+   + 외부 MCP client (Claude Desktop) 가 학번 인자 위조 가능. **선결 조건**:
+   chat 본인 호출 vs 외부 MCP client 호출 구분 + studentId thread-local
+   주입. 그 다음 별도 PR 에서 두 tool 등록.
+2. **`LlmChatService.compactToolResponse` 본문 누출 가드 단위 테스트** —
+   spec §6 #6 + §8. `get_my_grades` / `get_my_schedule` 응답이 LLM 프롬프트로
+   raw 흘러가지 않게 compact 단계 unit-pin. 성적은 특히 LLM 프롬프트 절대
+   금지 — 본문 누출 단위 테스트로 영구 고정.
+3. **multi-term nav 확장** — 시간표 현재는 "전체 학년도 1학기 iterate" 만
+   (WDA7 prev). 2학기/계절학기 nav follow-up (spec §3.4).
 
-### 결정 사항 (이번 세션에 정한 것)
+## Task 17 — LMS integration (다음 큰 마디 후보)
 
-- **MCP tool 등록은 follow-up PR**. 이유: 현 LlmChatService.executeToolCall
-  switch case 가 명시적 라우팅이고 chat path 가 studentId 를 MCP self-call
-  에 propagate 하는 mechanism 없음. 외부 MCP client (Claude Desktop) 에
-  학번 인자 노출은 위조 가능 → 보안 위험. REST `/api/saint/schedule` 가
-  PR 16b 의 첫 user-facing path. chat 의 "내 시간표 알려줘" 는 일단
-  `LlmChatService.looksLikePrivateAcademicRequest()` 가 catch.
-- **첫 cut scope = "전체 학년도 1학기 iterate"** (WDA7 prev only).
-  2학기 / 계절학기 nav 는 follow-up. spec §3.4 그대로.
-- **Mock 이 default** (`matchIfMissing=true` + 추후 yml `mock`). prod 전환
-  은 PR 16b/16c 안정 + 사용자 검증 후 별도 `application-prod.yml` patch.
-
-## 다음 세션 액션 (우선순위 순서)
-
-### 1. `gradlew.bat test` 돌려서 컴파일/테스트 빨강 다 잡기 (필수 첫 단계)
-
-예상 함정 / hotspot:
-- `SaintScheduleParser.splitLines` 의 `wholeText()` vs `<br>` 분할 —
-  Jsoup 1.22 가 `<br>` 를 newline 으로 normalize 하는지 fixture 로 검증.
-  안 되면 fallback path 만 남기고 wholeText 빼기.
-- `SaintScheduleProperties` 가 `@Component + @ConfigurationProperties`
-  로 등록돼있어 별도 `@EnableConfigurationProperties` 불필요해야 하나,
-  Spring Boot 4 에서 동작 확인.
-- `SaintSessionStore.fingerprint(studentId)` static call — store 이미
-  있음 ✅.
-- `RealSaintScheduleConnector.mergeSetCookies` 가 package-private static
-  이라 test 에서 직접 호출 가능 (확인 완료).
-- `MockWebServer` 가 OkHttp 5.x 라 `enqueue(MockResponse)` API 동일.
-
-### 2. `SaintScheduleService` + service test
-
-```java
-@Service
-public class SaintScheduleService {
-    private final SaintScheduleConnector connector;
-    private final SaintSessionStore sessionStore;
-    
-    public ScheduleResponse fetchSchedule(String studentId) {
-        if (studentId == null || studentId.isBlank()) {
-            throw new UnauthorizedException();
-        }
-        PortalCookies cookies = sessionStore.cookies(studentId)
-                .orElseThrow(SaintSessionExpiredException::new);
-        return connector.fetchSchedule(studentId, cookies);
-    }
-}
-```
-
-cache 는 첫 cut 에 생략 가능 (sessionStore TTL 30분 안에 fetch 가 무거우면
-follow-up). spec §6 #5 의 ~1h TTL cache 는 nice-to-have.
-
-### 3. `SaintScheduleController` + MockMvc test
-
-```java
-@RestController
-@RequestMapping("/api/saint")
-@Tag(name = "Saint", description = "u-SAINT realtime data API")
-public class SaintScheduleController {
-    private final SaintScheduleService service;
-    
-    @GetMapping("/schedule")
-    public ApiResponse<ScheduleResponse> getMySchedule(HttpServletRequest request) {
-        String studentId = (String) request.getAttribute(AuthAttributes.STUDENT_ID);
-        if (studentId == null || studentId.isBlank()) {
-            throw new UnauthorizedException();
-        }
-        return ApiResponse.success(service.fetchSchedule(studentId));
-    }
-}
-```
-
-Tests: 200 envelope / 401 missing attr / 401 SAINT_SESSION_EXPIRED.
-
-### 4. `application.yml` 에 `ssuai.connector.saint-schedule: mock` default 추가
-
-```yaml
-ssuai:
-  connector:
-    saint-schedule: mock # mock | real
-```
-
-이미 `matchIfMissing=true` 라 yml 없어도 mock 동작은 하지만 명시성을 위해.
-
-### 5. `dev-log` 한 줄 + commit + PR open
-
-PR body 에 명시할 점:
-- 첫 cut scope = 전체 학년도 1학기 iterate (WDA7 only)
-- MCP tool 등록은 follow-up (chat thread-local pattern 구비 후)
-- prod 전환은 사용자 검증 후 별도 PR (`application-prod.yml` patch)
-- Mock 이 default — CI/prod 가 saint 안 침
-
-자동 머지 정책 적용 — mergeable + tests pass + mock default 면
-`gh pr merge --auto --rebase --delete-branch`.
-
-### 6. 그 뒤 — PR 16c (성적 connector) — spec §3.5 의 단일 GET. 같은 패턴.
-
-성적은 fixture 도 아직 없음. PR 16c 시작 시 사용자 brower spike 필요.
-
-### 7. TTL spike (PR #81), GitHub Actions auto-deploy — 사용자 직접.
+`docs/tasks/17-lms-integration.md` 작성 완료 (이전 세션). Phase 3 4번째
+deliverable. `get_my_assignments` 1개. Task 16 의 encrypted session store
+패턴 재사용 — LMS host 가 별 host + 별 auth 라 첫 단계가 **auth shape spike**.
+Task 17 §1 / §2 부터 읽어서 시작.
 
 ## 사용자 컨텍스트 — 잊지 말 것
 
-- **숭실대 컴퓨터학부 3학년**, 포트폴리오 프로젝트
-- 데드라인 (5/15) 지나서 SmartID 라이브 데모는 이미 완성된 상태
-- 3-AI rotation (claude1/claude2/codex) — CLAUDE.md = AGENTS.md mirror
-  ([[role-3-ai-rotation]])
-- **commit/PR body 에 Claude/AI 흔적 절대 금지** ([[feedback-no-claude-coauthor]])
+- 숭실대 컴퓨터학부 3학년 (학번 20221528, 홍성주). 본인 학번/이름은
+  채팅 paste OK ([[feedback-user-student-id-not-sensitive]]). 단
+  **fixture/commit/server log 에는 절대 placeholder** (20999999/홍길동).
+- 3-AI rotation (claude1/claude2/codex). CLAUDE.md = AGENTS.md mirror
+  ([[role-3-ai-rotation]]).
+- **commit/PR body 에 Claude/AI 흔적 절대 금지** ([[feedback-no-claude-coauthor]]).
 - 안전한 PR 자동 머지 — mergeable + tests pass + mock default
-  ([[feedback-auto-merge-safe-prs]])
-- 외부 작업 사용자 통지 대기 — "내가 알려줄게" 한 작업은 폴링/언급 금지
-  ([[feedback-user-will-notify]])
-- 본인 JWT/secret/cookie/학번 chat 노출 시 rotate/redact 권고 X
-  ([[feedback-own-auth-values-not-sensitive]],
-  [[feedback-user-student-id-not-sensitive]])
-- TTL spike 는 마지막에 ([[feedback-user-defers-ttl-spike]])
-- 간결한 한국어 응답 선호
-- in-flight context 는 in-repo (handoff / task spec / dev-log) 에 쓰고
-  auto-memory 에는 안 씀 ([[feedback-save-progress-to-project]])
-- portal HTML 캡처 부탁 시 Ctrl+U vs F12 Elements 구분 명시 필수
-  ([[learning-browser-view-source-vs-devtools]])
-- 두 제품 framing — MCP 서버 + ssuAI 웹/앱 ([[project-final-goal]])
+  ([[feedback-auto-merge-safe-prs]]). 본 세션도 PR #128 auto-merge.
+- 외부 작업 사용자 통지 대기 ([[feedback-user-will-notify]]) — TTL spike +
+  GitHub Actions auto-deploy 둘 다 그대로.
+- 본인 JWT/secret/cookie 채팅 노출 시 rotate/redact 권고 X
+  ([[feedback-own-auth-values-not-sensitive]]).
+- 간결한 한국어 응답 선호. "너무 애매하게 설명하지 말고 그냥 내가
+  해줘야하는것만 알려줘" — 다음 AI 도 짧게 짧게.
+- 두 제품 framing — MCP 서버 + ssuAI 웹/앱 ([[project-final-goal]]).
 
 ## 보안 주의
 
-- prod Secret 매뉴얼 잡힘 (이전 세션). `ssuai-backend-secrets` (plural).
-- 사용자 본인 학번/이름은 chat 면제. fixture / commit / log 에는 절대
-  placeholder (`홍길동` / `20999999` / `0.0.0.0`).
-- **성적은 LLM 프롬프트 절대 금지** — PR 16c 시 `LlmChatService.compactToolResponse`
-  단위 테스트로 본문 누출 고정.
+- prod Secret `ssuai-backend-secrets` (plural).
+- 사용자 본인 학번/이름은 chat 면제. fixture/commit/log 는 placeholder.
+- **성적 / 시간표는 LLM 프롬프트 raw 금지** — Task 16 follow-up #2
+  (`compactToolResponse` 누출 가드 단위 테스트) 가 영구 고정 책임.
 - MYSAPSSO2 SAP SSO 토큰 base64 디코드 시 학번 노출. SaintSessionStore
   AES-256-GCM 으로 이미 처리 ✅.
+- 사용자 본인 성적 raw 데이터 다운로드 파일 (`C:\Users\akftj\Downloads\grades-raw.txt`
+  등) PR 작업 중 cleanup 완료. 잔여 없음.
 
 ## 자동 메모리
 
 `C:\Users\akftj\.claude-personal\projects\C--Users-akftj-ssuAI\memory\`
 
-이번 세션 신규 메모리 없음 (PR 16b 작업 자체는 in-repo 에 다 잠김).
+이번 세션 신규 메모리 없음 (PR 16c-B 작업은 in-repo 에 다 잠김).
 
 ---
 
 ## Next-AI opener block
 
-다음 AI 세션을 시작할 때 사용자가 통째로 paste 할 첫 turn:
-
 ```text
-ssuAI 프로젝트 이어받음. 다음 순서대로 시작:
+ssuAI 프로젝트 이어받음. 다음 순서대로:
 
-1. AGENTS.md (또는 CLAUDE.md — 동일 mirror) 의 Project + Session-handoff
-   섹션 읽기
-2. docs/handoff/latest.md 읽기 — 이번 인계 컨텍스트 (PR 16b WIP)
+1. AGENTS.md (또는 CLAUDE.md — 동일 mirror) 의 Project + Session-handoff 섹션 읽기
+2. docs/handoff/latest.md 읽기 — 이번 인계 (Task 16 u-SAINT 데이터 layer 완료, main clean)
 3. MEMORY.md (auto-memory) 한 번 훑기
-4. git checkout feat/task-16b-schedule-connector (브랜치 이미 push 됨)
-5. git status --short --branch — clean 인지 확인 (frontend/next-env.d.ts
-   M 은 Next.js auto-gen 무시 OK)
+4. git status --short --branch — main clean 확인
 
 현재 상태:
-- 브랜치 `feat/task-16b-schedule-connector` push 됨 (PR 안 열림)
-- PR 16b WIP: encoder/unwrapper/parser/connector + 단위 테스트까지
-  작성. gradlew.bat test 한 번도 안 돌렸음 — 빨강 가능성 높음
-- 머지된 PR 없음, 외부 의존 그대로 (TTL spike PR #81 + 선택 auto-deploy)
+- main clean, 열린 PR 없음, 작업 브랜치 다 삭제됨
+- u-SAINT 3 endpoints (학적/시간표/성적) end-to-end live with mock default
+- 외부 의존 그대로 (TTL spike 서버 polling + GitHub Actions auto-deploy 선택) — 폴링/언급 금지, 사용자가 결과 통지
 
-다음 세션 첫 액션 — 핸드오프 doc "다음 세션 액션 #1":
-**`gradlew.bat test` 돌려서 컴파일/테스트 빨강 다 잡기**. 그 다음
-순서대로 #2 service → #3 controller → #4 yml → #5 dev-log + PR open.
+다음 세션 옵션 — 사용자 의지 확인 후 진행:
+(a) Task 16 follow-up — get_my_schedule/get_my_grades MCP tool 등록 + compactToolResponse 누출 가드 단위 테스트
+(b) Task 17 (LMS integration) 신규 시작 — docs/tasks/17-lms-integration.md §1/§2 읽기
 
-MCP tool 등록은 follow-up PR (이번 PR 에 포함 X — spec §9 chat
-thread-local pattern 미구현 + 외부 MCP client 학번 노출 보안).
+사용자 짧은 답 선호. 진단/계획만 길게 늘어놓지 말고 바로 진행.
 ```
