@@ -5,6 +5,23 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-16
 
+- 2026-05-16: **Task 16 PR 16a — endpoint/host 정정**. 1차 spike 의
+  `zcmw9001n` 추측 틀림. 사용자가 브라우저 Network 탭 → ZCMW2102 row
+  의 "Copy as cURL" 결과를 paste 한 진단에서 4가지 사실 확정:
+  (1) host = `https://ecc.ssu.ac.kr:8443` (saint 가 아닌 ecc 서브도메인 —
+  portal contentAreaFrame 이 cross-subdomain iframe), (2) component =
+  `ZCMW2102` (대문자, SAP custom Z-namespace), (3) 인증 = `MYSAPSSO2`
+  cookie cross-subdomain 흐름 — `.ssu.ac.kr` 도메인이라 portal phase 가
+  발급한 SSO 토큰이 ecc 까지 자동 attach, 별도 ecc 로그인 round-trip
+  불필요. base64 디코드하면 `portal:20221528` 처럼 학번 들어있는
+  SAP NetWeaver 표준 cross-domain SSO 토큰. (4) CSRF =
+  `sap-wd-secure-id` (매 page load 마다 다름. WebDynpro 표준 — connector
+  가 첫 GET 응답에서 parse → 후속 POST 마다 동봉). 추가로 SAP-PASSPORT
+  / X-XHR-Logon / X-Requested-With custom header 도 잡힘 (생략 가능
+  추정). spec §3.1 ~ §3.3 으로 재구성: §3.1 endpoint/auth/CSRF 사실,
+  §3.2 표 parsing structure (fixture 그대로), §3.3 PR 16b 시작 전 남은
+  마지막 spike (ZCMW2102 첫 GET response body 에 표가 직접 들어있는지
+  vs partial XHR delta 가 필요한지 — connector 복잡도를 결정).
 - 2026-05-16: **Task 16 PR 16a 1차 spike** — 개인수업시간표조회 endpoint
   확정. 사용자 본인 brower 에서 시간표 메뉴 진입 → wrapper 의
   contentAreaFrame iframe 안쪽 source 캡처. wrapper 가 portal nav event
