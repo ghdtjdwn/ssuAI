@@ -30,6 +30,17 @@ class WebCorsProdConfigTest {
     }
 
     @Test
+    void apiCorsMappingAllowsCredentialsUnderProd() {
+        InspectableCorsRegistry registry = new InspectableCorsRegistry();
+
+        new WebCorsProdConfig("https://test.example.com").addCorsMappings(registry);
+
+        CorsConfiguration config = registry.corsConfiguration("/api/**");
+        assertThat(config).isNotNull();
+        assertThat(config.getAllowCredentials()).isTrue();
+    }
+
+    @Test
     void beanIsAbsentUnderDevProfile() {
         new ApplicationContextRunner()
                 .withInitializer(ctx -> ctx.getEnvironment().setActiveProfiles("dev"))
