@@ -114,7 +114,7 @@ true` 라 Secret 미설정도 startup 통과. → Secret 매뉴얼로 만들고 
 JWT_SECRET=$(openssl rand -base64 48)
 SAINT_KEY=$(openssl rand -base64 48)
 
-sudo kubectl create secret generic ssuai-backend-secret \
+sudo kubectl create secret generic ssuai-backend-secrets \
   --from-literal=SSUAI_JWT_SECRET="$JWT_SECRET" \
   --from-literal=SSUAI_CREDENTIAL_ENCRYPTION_KEY="$SAINT_KEY" \
   -n ssuai-prod \
@@ -123,7 +123,7 @@ sudo kubectl create secret generic ssuai-backend-secret \
 sudo kubectl rollout restart deployment ssuai-backend -n ssuai-prod
 ```
 
-Deployment 의 `envFrom.secretRef.name` 이 `ssuai-backend-secret` 인지
+Deployment 의 `envFrom.secretRef.name` 이 `ssuai-backend-secrets` 인지
 선행 확인 필요. 별도 PR 없이 cluster 매뉴얼 작업.
 
 ### 3. 운영 파이프라인 정리 — GitHub Actions deploy step
