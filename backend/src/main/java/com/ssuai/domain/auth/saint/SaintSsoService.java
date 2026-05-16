@@ -3,15 +3,12 @@ package com.ssuai.domain.auth.saint;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -35,14 +32,18 @@ import com.ssuai.global.exception.SaintPortalUnavailableException;
  * cookies in {@code Set-Cookie} headers.
  *
  * <p>Phase 2 — GET {@code saint.ssu.ac.kr/irj/portal} with the phase 1
- * cookies. saint returns the dashboard HTML; Jsoup pulls the student name
- * out of the {@code .main_box09 .box_top .main_title} greeting and reads
- * the {@code <ul class="main_box09_con"> <li><dl><dt>키</dt><dd>값</dd></dl></li> }
- * student-info card to recover 학번 / 소속 / 과정/학기 by key (not by
- * positional index — order changes in the live portal would silently mis-
- * assign fields otherwise). Task 14 §risks documented that ssutoday's
- * old positional {@code main_box09_con} parse no longer matches the
- * current portal; that fixture has been replaced.
+ * cookies. The live portal is a SAP NetWeaver frameset wrapper: the
+ * top-level HTML carries only a {@code <span class="top_user">{이름}님
+ * 접속을 환영합니다.</span>} greeting (and the same학번 echoed in JS
+ * config); the actual {@code .main_box09} student-info card is loaded
+ * lazily into {@code <iframe id="contentAreaFrame">} by SAP portal JS,
+ * so a static fetch cannot see 소속 / 과정·학기 / 학년·학기. We only
+ * use phase 2 to (a) confirm the session is alive (HTTP 200 + greeting
+ * span present) and (b) extract the display name. Student id is taken
+ * from the {@code sIdno} that already proved itself in phase 1. 소속 /
+ * 학적상태 stay null until a later u-SAINT data tool (Task 16
+ * {@code get_my_schedule} / {@code get_my_grades}) fetches them from
+ * the deep portal endpoints.
  *
  * <p>Security invariants:
  * <ul>
@@ -60,15 +61,12 @@ import com.ssuai.global.exception.SaintPortalUnavailableException;
 public class SaintSsoService {
 
     private static final String PHASE1_SUCCESS_MARKER = "location.href = \"/irj/portal\"";
-    private static final String IDENTITY_NAME_SELECTOR = ".main_box09 .box_top .main_title span";
-    private static final String IDENTITY_ROW_SELECTOR = ".main_box09 ul.main_box09_con li dl";
-    private static final String IDENTITY_KEY_SELECTOR = "dt";
-    private static final String IDENTITY_VALUE_SELECTOR = "dd";
-    private static final String NAME_GREETING_SUFFIX = "님 환영합니다.";
-    private static final String NAME_SUFFIX_TITLE = "님";
-    private static final String FIELD_KEY_STUDENT_ID = "학번";
-    private static final String FIELD_KEY_MAJOR = "소속";
-    private static final String FIELD_KEY_ENROLLMENT_STATUS = "과정/학기";
+    private static final String IDENTITY_NAME_SELECTOR = ".top_user";
+    // Live portal greets with "{이름}님 접속을 환영합니다." Keep the shorter
+    // "님 환영합니다." variant + plain trailing "님" as fallbacks so a copy
+    // change on the SSU side does not break login.
+    private static final List<String> NAME_GREETING_SUFFIXES = List.of(
+            "님 접속을 환영합니다.", "님 환영합니다.", "님");
 
     private final SaintSsoProperties properties;
     private final RestClient restClient;
@@ -98,7 +96,7 @@ public class SaintSsoService {
         }
 
         String portalHtml = phase2FetchPortal(portalCookieHeader);
-        UsaintAuthResult identity = parseIdentity(portalHtml);
+        UsaintAuthResult identity = parseIdentity(portalHtml, sIdno);
         sessionStore.put(identity.studentId(), new PortalCookies(portalCookieHeader));
         return identity;
     }
@@ -143,76 +141,42 @@ public class SaintSsoService {
         }
     }
 
-    private UsaintAuthResult parseIdentity(String portalHtml) {
+    private UsaintAuthResult parseIdentity(String portalHtml, String sIdno) {
         if (portalHtml == null || portalHtml.isBlank()) {
             throw new SaintPortalUnavailableException("portal HTML is empty");
         }
         Document document = Jsoup.parse(portalHtml);
-
         String name = extractName(document);
-        Map<String, String> fields = extractIdentityFields(document);
-
-        String studentId = fields.getOrDefault(FIELD_KEY_STUDENT_ID, "").trim();
-        String major = fields.getOrDefault(FIELD_KEY_MAJOR, "").trim();
-        String enrollmentStatus = fields.getOrDefault(FIELD_KEY_ENROLLMENT_STATUS, "").trim();
-
-        if (studentId.isBlank()) {
-            throw new SaintPortalUnavailableException(
-                    "portal HTML missing 학번 row in main_box09_con");
-        }
-        return new UsaintAuthResult(
-                studentId,
-                name,
-                major.isBlank() ? null : major,
-                enrollmentStatus.isBlank() ? null : enrollmentStatus);
+        // sIdno survived phase 1's success-marker check and produced a usable
+        // portal session in phase 2 — trust it as the authoritative student
+        // id rather than re-parsing it out of the page. The portal main HTML
+        // only echoes 학번 inside JS config, not in a stable DOM element.
+        return new UsaintAuthResult(sIdno.trim(), name, null, null);
     }
 
     private static String extractName(Document document) {
         Element nameElement = document.selectFirst(IDENTITY_NAME_SELECTOR);
         if (nameElement == null) {
             throw new SaintPortalUnavailableException(
-                    "portal HTML missing name element (" + IDENTITY_NAME_SELECTOR + ")");
+                    "portal HTML missing greeting element (" + IDENTITY_NAME_SELECTOR + ")");
         }
         String raw = nameElement.text().trim();
         if (raw.isBlank()) {
-            throw new SaintPortalUnavailableException("portal HTML name element is blank");
+            throw new SaintPortalUnavailableException("portal HTML greeting element is blank");
         }
-        // Greeting is "{이름}님 환영합니다." in the live portal; strip the
-        // suffix so we persist just the name. Fall back to plain "님"
-        // trimming in case the trailing sentence ever drops.
-        String stripped = raw;
-        if (stripped.endsWith(NAME_GREETING_SUFFIX)) {
-            stripped = stripped.substring(0, stripped.length() - NAME_GREETING_SUFFIX.length());
-        } else if (stripped.endsWith(NAME_SUFFIX_TITLE)) {
-            stripped = stripped.substring(0, stripped.length() - NAME_SUFFIX_TITLE.length());
-        }
-        stripped = stripped.trim();
-        if (stripped.isBlank()) {
-            throw new SaintPortalUnavailableException("portal HTML name resolved to blank");
-        }
-        return stripped;
-    }
-
-    private static Map<String, String> extractIdentityFields(Document document) {
-        Elements rows = document.select(IDENTITY_ROW_SELECTOR);
-        if (rows.isEmpty()) {
-            throw new SaintPortalUnavailableException(
-                    "portal HTML missing identity rows (" + IDENTITY_ROW_SELECTOR + ")");
-        }
-        Map<String, String> fields = new HashMap<>();
-        for (Element row : rows) {
-            Element key = row.selectFirst(IDENTITY_KEY_SELECTOR);
-            Element value = row.selectFirst(IDENTITY_VALUE_SELECTOR);
-            if (key == null || value == null) {
-                continue;
-            }
-            String keyText = key.text().trim();
-            String valueText = value.text().trim();
-            if (!keyText.isEmpty()) {
-                fields.put(keyText, valueText);
+        for (String suffix : NAME_GREETING_SUFFIXES) {
+            if (raw.endsWith(suffix)) {
+                String stripped = raw.substring(0, raw.length() - suffix.length()).trim();
+                if (!stripped.isBlank()) {
+                    return stripped;
+                }
             }
         }
-        return fields;
+        // No known suffix matched; bail out rather than persisting a string
+        // that includes the greeting tail — caller will redirect with
+        // error=portal_unavailable and we keep a log line for diagnosis.
+        throw new SaintPortalUnavailableException(
+                "portal HTML greeting did not match any known name suffix");
     }
 
     private static String buildCookieHeader(List<String> setCookies) {
