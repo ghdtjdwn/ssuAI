@@ -5,6 +5,17 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-16
 
+- 2026-05-16: **Task 16 PR 16b — 시간표 connector + service + controller**.
+  `RealSaintScheduleConnector` (ZCMW2102 GET → WDA7 prev iterate, CSRF
+  rotation, Set-Cookie merge), `MockSaintScheduleConnector` (default
+  via `matchIfMissing=true`), `SaintScheduleService` (SaintSessionStore
+  lookup → `SaintSessionExpiredException` 변환), `SaintScheduleController`
+  (`GET /api/saint/schedule`, `AuthAttributes.STUDENT_ID` 누락 시
+  `UnauthorizedException`). Multi-term iterate 는 입학년도까지 학년도
+  단위 prev (학기 단위·계절학기 nav 는 follow-up). 단위 테스트:
+  encoder/unwrapper/parser/connector + service + controller. application.yml
+  에 `ssuai.connector.saint-schedule: mock` 명시. MCP tool 등록은 spec §9
+  thread-local pattern 미구비로 follow-up PR 로 분리.
 - 2026-05-16: **Task 16 PR 16a — 성적 fetch shape (시간표보다 단순)**.
   사용자 brower spike: 이수구분별 성적표 / 학기별 성적 조회 류 페이지
   진입 → 응답 캡처. 핵심 발견 — 페이지 상단에 "학기별 성적" 표가

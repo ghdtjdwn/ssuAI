@@ -69,6 +69,7 @@ ssuai:
     dorm-meal: mock # mock | real
     library-seat: mock # mock | real
     library-book: mock # mock | real
+    saint-schedule: mock # mock | real
     chat: ${SSUAI_CONNECTOR_CHAT:mock} # mock | llm
   library:
     seat:
