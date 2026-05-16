@@ -2,33 +2,17 @@
 <html>
 <head><meta charset="utf-8"></head>
 <body>
-<!-- The student-info card is intact but the `.main_title` greeting is
-     gone. The parser must refuse rather than persist an empty-name
-     student (the dashboard greets "안녕하세요, {name} 학생"). -->
-<div class="main_box09">
-  <div class="box_top">
-    <!-- main_title span removed -->
-    <p class="access_text">
-      최종접속 :
-      <span>2000-01-01 00:00:00</span>
-    </p>
+<!-- The greeting span is missing — simulates the SAP NetWeaver wrapper
+     responding with the standard portal chrome but no `<span class=
+     "top_user">{name}님 접속을 환영합니다.</span>`. Without that span we
+     cannot recover the display name; phase 2 must refuse rather than
+     persist an empty-name student. -->
+<header>
+  <div class="top_wrap">
+    <div class="top_box">
+      <!-- top_user span removed -->
+    </div>
   </div>
-  <div class="main_box09_con_w">
-    <ul class="main_box09_con">
-      <li>
-        <dl>
-          <dt>학번</dt>
-          <dd><a href="javascript:;" class="font_col02"><strong>20999999</strong></a></dd>
-        </dl>
-      </li>
-      <li>
-        <dl>
-          <dt>소속</dt>
-          <dd><a href="javascript:;" class="font_col02"><strong>컴퓨터학부</strong></a></dd>
-        </dl>
-      </li>
-    </ul>
-  </div>
-</div>
+</header>
 </body>
 </html>

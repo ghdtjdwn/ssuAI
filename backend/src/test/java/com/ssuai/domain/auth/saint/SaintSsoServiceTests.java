@@ -89,13 +89,16 @@ class SaintSsoServiceTests {
 
         UsaintAuthResult result = service.authenticate("sToken-one-shot", "20231234");
 
-        assertThat(result.studentId()).isEqualTo("20999999");
+        // studentId comes from sIdno (already validated by phase 1's success
+        // marker). The portal main page does not expose 학번 in a stable DOM
+        // element; the deeper 소속 / 학적상태 cards live in the lazy-loaded
+        // contentAreaFrame iframe and stay null at this layer.
+        assertThat(result.studentId()).isEqualTo("20231234");
         assertThat(result.name()).isEqualTo("홍길동");
-        assertThat(result.major()).isEqualTo("컴퓨터학부");
-        assertThat(result.enrollmentStatus()).isEqualTo("학사과정 재학");
-        assertThat(sessionStore.cookies("20999999"))
-                .as("phase 1 portal cookies should be persisted under the portal-confirmed "
-                        + "studentId (sIdno can disagree with the authoritative HTML id)")
+        assertThat(result.major()).isNull();
+        assertThat(result.enrollmentStatus()).isNull();
+        assertThat(sessionStore.cookies("20231234"))
+                .as("phase 1 portal cookies should be persisted under the sIdno-derived studentId")
                 .hasValueSatisfying(cookies -> assertThat(cookies.rawCookieHeader())
                         .isEqualTo("MYSAPSSO2=portal-session-abc; JSESSIONID=jsess-xyz"));
         mockServer.verify();
@@ -137,7 +140,7 @@ class SaintSsoServiceTests {
     }
 
     @Test
-    void phase2PortalParseFailsOnMissingCells() {
+    void phase2PortalParseFailsWhenGreetingSuffixIsUnknown() {
         HttpHeaders phase1Headers = new HttpHeaders();
         phase1Headers.setContentType(TEXT_HTML_UTF8);
         phase1Headers.add(HttpHeaders.SET_COOKIE, "MYSAPSSO2=cookie; Path=/");
@@ -146,19 +149,19 @@ class SaintSsoServiceTests {
                 .andRespond(withSuccess(loadFixture("saint/phase1-success.html"),
                         TEXT_HTML_UTF8).headers(phase1Headers));
         mockServer.expect(requestTo(PORTAL_URL))
-                .andRespond(withSuccess(loadFixture("saint/portal-missing-cells.html"),
+                .andRespond(withSuccess(loadFixture("saint/portal-greeting-unknown-suffix.html"),
                         TEXT_HTML_UTF8));
 
         assertThatThrownBy(() -> service.authenticate("token", "20231234"))
                 .isInstanceOf(SaintPortalUnavailableException.class)
-                .hasMessageContaining("missing identity rows");
+                .hasMessageContaining("did not match any known name suffix");
         assertThat(sessionStore.size())
-                .as("no cookies should be persisted when portal parse fails")
+                .as("no cookies should be persisted when the greeting suffix is unrecognized")
                 .isZero();
     }
 
     @Test
-    void phase2PortalParseFailsWhenGreetingNameIsMissing() {
+    void phase2PortalParseFailsWhenGreetingElementIsMissing() {
         HttpHeaders phase1Headers = new HttpHeaders();
         phase1Headers.setContentType(TEXT_HTML_UTF8);
         phase1Headers.add(HttpHeaders.SET_COOKIE, "MYSAPSSO2=cookie; Path=/");
@@ -172,9 +175,9 @@ class SaintSsoServiceTests {
 
         assertThatThrownBy(() -> service.authenticate("token", "20231234"))
                 .isInstanceOf(SaintPortalUnavailableException.class)
-                .hasMessageContaining("missing name element");
+                .hasMessageContaining("missing greeting element");
         assertThat(sessionStore.size())
-                .as("no cookies should be persisted when the name greeting is missing")
+                .as("no cookies should be persisted when the greeting span is missing")
                 .isZero();
     }
 
