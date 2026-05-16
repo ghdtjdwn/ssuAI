@@ -53,15 +53,18 @@ class RealSaintScheduleConnectorTests {
     }
 
     @Test
-    void singleTermStudentDoesOneGetAndZeroPosts() throws Exception {
-        String fixture = loadFixture();
-        server.enqueue(htmlOk(fixture));
+    void enrollmentAlreadyAtCurrentTermDoesOneGetAndZeroPosts() throws Exception {
+        // pinned fixture shows (2026, 1학기). Student enrolled 2026-1학기 →
+        // displayedTerm already at the enrollment-start anchor → no PREV
+        // POST needed.
+        server.enqueue(htmlOk(loadFixture()));
 
         ScheduleResponse response = connector.fetchSchedule("20261234",
                 new PortalCookies("MYSAPSSO2=abc"));
 
         assertThat(response.enrollmentYear()).isEqualTo(2026);
         assertThat(response.currentYear()).isEqualTo(2026);
+        assertThat(response.currentTerm()).isEqualTo(1);
         assertThat(response.terms()).hasSize(1);
         assertThat(response.terms().get(0).entries()).hasSize(7);
         assertThat(server.getRequestCount()).isEqualTo(1);
@@ -72,53 +75,57 @@ class RealSaintScheduleConnectorTests {
     }
 
     @Test
-    void multiYearIterateSendsButtonPressPostsAndMergesCookies() throws Exception {
-        String fixtureWithSecureId = withSecureId(loadFixture(), "FRESH-CSRF-1");
-        String wrapperWithNextCsrf = wrap(withSecureId(loadFixture(), "FRESH-CSRF-2"));
-        String wrapperFinal = wrap(loadFixture());
+    void multiTermIteratePostsPrevButtonPerStepAndLabelsEachHopFromTheResponse() throws Exception {
+        // Construct a 4-step iterate. GET sits at (2026, 1학기) → PREV →
+        // (2025, 4=겨울) → PREV → (2025, 3=2학기) → PREV → (2025, 2=여름)
+        // → PREV → (2025, 1=1학기). Student enrolled 2025-1학기 → stop.
+        String getBody = withSecureId(synthFixture(2026, "1학기"), "CSRF-0");
+        String postWinter2025 = wrap(withSecureId(synthFixture(2025, "겨울학기"), "CSRF-1"));
+        String postFall2025 = wrap(withSecureId(synthFixture(2025, "2학기"), "CSRF-2"));
+        String postSummer2025 = wrap(withSecureId(synthFixture(2025, "여름학기"), "CSRF-3"));
+        String postSpring2025 = wrap(synthFixture(2025, "1학기"));
 
-        // First GET sets an extra ecc session cookie via Set-Cookie.
         server.enqueue(new MockResponse()
                 .setResponseCode(200)
                 .setHeader("Content-Type", "text/html; charset=utf-8")
                 .addHeader("Set-Cookie", "SAP_SESSIONID_SSP_100=ABCD; Path=/")
-                .setBody(fixtureWithSecureId));
-        // POST 1 → still has a fresh secure-id
-        server.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setHeader("Content-Type", "application/xml; charset=utf-8")
-                .setBody(wrapperWithNextCsrf));
-        // POST 2 → final response (no secure-id is fine: iterate completes naturally)
-        server.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setHeader("Content-Type", "application/xml; charset=utf-8")
-                .setBody(wrapperFinal));
+                .setBody(getBody));
+        server.enqueue(xmlOk(postWinter2025));
+        server.enqueue(xmlOk(postFall2025));
+        server.enqueue(xmlOk(postSummer2025));
+        server.enqueue(xmlOk(postSpring2025));
 
-        ScheduleResponse response = connector.fetchSchedule("20241234",
+        ScheduleResponse response = connector.fetchSchedule("20251234",
                 new PortalCookies("MYSAPSSO2=abc"));
 
-        // 2026 (current) + 2025 + 2024 = 3 terms
-        assertThat(response.terms()).hasSize(3);
+        // GET + 4 PREV POSTs = 5 server hits / 5 terms.
+        assertThat(server.getRequestCount()).isEqualTo(5);
+        assertThat(response.terms()).hasSize(5);
+        // First entry is the GET-displayed term.
         assertThat(response.terms().get(0).year()).isEqualTo(2026);
-        assertThat(response.terms().get(2).year()).isEqualTo(2024);
-        assertThat(server.getRequestCount()).isEqualTo(3);
+        assertThat(response.terms().get(0).term()).isEqualTo(1);
+        // Each subsequent entry came from parsing the POST response — not
+        // from a clock-based calculation — so the cycle order is exact.
+        assertThat(response.terms().get(1).year()).isEqualTo(2025);
+        assertThat(response.terms().get(1).term()).isEqualTo(4);
+        assertThat(response.terms().get(2).term()).isEqualTo(3);
+        assertThat(response.terms().get(3).term()).isEqualTo(2);
+        assertThat(response.terms().get(4).year()).isEqualTo(2025);
+        assertThat(response.terms().get(4).term()).isEqualTo(1);
 
-        server.takeRequest(); // skip the initial GET
+        server.takeRequest(); // skip GET
         RecordedRequest firstPost = server.takeRequest();
         assertThat(firstPost.getMethod()).isEqualTo("POST");
-        assertThat(firstPost.getHeader("Content-Type"))
-                .startsWith("application/x-www-form-urlencoded");
-        String firstPostBody = firstPost.getBody().readUtf8();
-        assertThat(firstPostBody).contains("sap-wd-secure-id=FRESH-CSRF-1");
-        assertThat(firstPostBody).contains("SAPEVENTQUEUE=");
+        String firstBody = firstPost.getBody().readUtf8();
+        assertThat(firstBody).contains("sap-wd-secure-id=CSRF-0");
+        assertThat(firstBody).contains("SAPEVENTQUEUE=");
         // mergeSetCookies must carry the upstream Set-Cookie through to the POST.
         assertThat(firstPost.getHeader("Cookie"))
                 .contains("MYSAPSSO2=abc")
                 .contains("SAP_SESSIONID_SSP_100=ABCD");
 
         RecordedRequest secondPost = server.takeRequest();
-        assertThat(secondPost.getMethod()).isEqualTo("POST");
-        assertThat(secondPost.getBody().readUtf8()).contains("sap-wd-secure-id=FRESH-CSRF-2");
+        assertThat(secondPost.getBody().readUtf8()).contains("sap-wd-secure-id=CSRF-1");
     }
 
     @Test
@@ -132,6 +139,7 @@ class RealSaintScheduleConnectorTests {
 
         assertThat(response.terms()).hasSize(1);
         assertThat(response.terms().get(0).year()).isEqualTo(2026);
+        assertThat(response.terms().get(0).term()).isEqualTo(1);
         assertThat(server.getRequestCount()).isEqualTo(1);
     }
 
@@ -175,6 +183,22 @@ class RealSaintScheduleConnectorTests {
                 StandardCharsets.UTF_8);
     }
 
+    /**
+     * Synthesizes a minimal timetable page with a specific (year, term)
+     * pair in the 학년도/학기 dropdown anchors and the same lecture rows
+     * as the pinned fixture. Used by the multi-term iterate test to drive
+     * the connector through a chosen cycle path without committing four
+     * extra full-page fixtures.
+     */
+    private static String synthFixture(int year, String termLabel) throws IOException {
+        String full = loadFixture();
+        // Pinned fixture value="2026학년도" / value="1학기" — swap to
+        // the requested (year, term).
+        return full
+                .replace("value=\"2026학년도\"", "value=\"" + year + "학년도\"")
+                .replace("value=\"1학기\"", "value=\"" + termLabel + "\"");
+    }
+
     private static String withSecureId(String html, String value) {
         // Inject a hidden secure-id input next to the table so the unwrapper
         // can find it. Any location inside the document is fine.
@@ -194,6 +218,13 @@ class RealSaintScheduleConnectorTests {
         return new MockResponse()
                 .setResponseCode(200)
                 .setHeader("Content-Type", "text/html; charset=utf-8")
+                .setBody(body);
+    }
+
+    private static MockResponse xmlOk(String body) {
+        return new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/xml; charset=utf-8")
                 .setBody(body);
     }
 }

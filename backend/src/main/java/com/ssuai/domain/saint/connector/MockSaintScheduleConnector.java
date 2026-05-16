@@ -48,13 +48,23 @@ class MockSaintScheduleConnector implements SaintScheduleConnector {
     public ScheduleResponse fetchSchedule(String studentId, PortalCookies cookies) {
         int enrollmentYear = SaintScheduleHelpers.parseEnrollmentYear(studentId);
         LocalDate today = LocalDate.now(clock.withZone(KST));
-        int currentYear = today.getYear();
+        int currentYear = SaintScheduleHelpers.academicYearFor(today);
         int currentTerm = SaintScheduleHelpers.termFor(today);
 
         List<ScheduleEntry> entries = sampleEntries();
         List<TermSchedule> terms = new ArrayList<>();
-        for (int year = currentYear; year >= enrollmentYear; year--) {
-            terms.add(new TermSchedule(year, currentTerm, entries));
+        // Walk PREV from (currentYear, currentTerm) back to (enrollmentYear,
+        // 1학기). Matches the Real connector's hop sequence exactly so the
+        // chat path, controller path, and any downstream cache see the
+        // same shape regardless of which connector is active.
+        int year = currentYear;
+        int term = currentTerm;
+        terms.add(new TermSchedule(year, term, entries));
+        while (!(year <= enrollmentYear && term <= SaintScheduleHelpers.TERM_SPRING)) {
+            SaintScheduleHelpers.TermPosition prev = SaintScheduleHelpers.previousTerm(year, term);
+            year = prev.year();
+            term = prev.term();
+            terms.add(new TermSchedule(year, term, entries));
         }
         return new ScheduleResponse(enrollmentYear, currentYear, currentTerm, terms);
     }

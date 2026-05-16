@@ -8,8 +8,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,14 +43,21 @@ import com.ssuai.global.exception.SaintSessionExpiredException;
  *
  * <ol>
  *   <li>{@code GET ZCMW2102} with the portal cookies attached. The
- *       response is the rendered HTML for the current term and contains
- *       a fresh {@code sap-wd-secure-id} hidden input (the CSRF token
- *       the next POST must echo).</li>
- *   <li>For each prior year we still want, {@code POST ZCMW2102} with
+ *       response is the rendered HTML for the currently selected term
+ *       and contains a fresh {@code sap-wd-secure-id} hidden input
+ *       (the CSRF token the next POST must echo). The displayed
+ *       {@code (학년도, 학기)} pair is parsed from the page's dropdowns
+ *       — never derived from the wall clock — so the (year, term)
+ *       label we emit matches what u-SAINT actually shows.</li>
+ *   <li>For each prior term we still want, {@code POST ZCMW2102} with
  *       a {@code SAPEVENTQUEUE} that simulates pressing the
- *       "previous year" button ({@code WDA7}). The response is a
- *       WebDynpro {@code <updates><full-update>...CDATA...} envelope
- *       carrying the re-rendered page plus a new secure-id.</li>
+ *       "이전학기" button ({@code WDA7}). The response is a WebDynpro
+ *       {@code <updates><full-update>...CDATA...} envelope carrying
+ *       the re-rendered page (timetable + dropdowns + new secure-id).
+ *       PREV cycles 1학기 → 겨울학기 of the previous year, otherwise
+ *       term-1 within the same year — confirmed by the 2026-05-17
+ *       spike. The original spec §3.4 claim "WDA7 = previous year,
+ *       term unchanged" is retired.</li>
  * </ol>
  *
  * <p>Cookie handling — the first GET typically picks up additional ecc
@@ -60,10 +65,11 @@ import com.ssuai.global.exception.SaintSessionExpiredException;
  * via {@code Set-Cookie}. We merge those into the cookie header used by
  * subsequent POSTs so SAP's session affinity holds across the iterate.
  *
- * <p>Partial-failure policy — if CSRF rotation breaks mid-iterate, we
- * stop walking back and return whatever terms we already collected
- * rather than failing the whole request. The student would rather see
- * recent terms than a blank screen while we investigate.
+ * <p>Partial-failure policy — if CSRF rotation breaks mid-iterate, or
+ * the response stops carrying parseable (year, term) dropdowns, we stop
+ * walking back and return whatever terms we already collected rather
+ * than failing the whole request. The student would rather see recent
+ * terms than a blank screen while we investigate.
  */
 @Component
 @ConditionalOnProperty(name = "ssuai.connector.saint-schedule", havingValue = "real")
@@ -71,12 +77,15 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
 
     private static final Logger log = LoggerFactory.getLogger(RealSaintScheduleConnector.class);
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final String PREV_YEAR_BUTTON_ID = "WDA7";
+    private static final String PREV_TERM_BUTTON_ID = "WDA7";
     private static final String TIMETABLE_TABLE_SELECTOR = "tbody[id$=-contentTBody]";
-    private static final int MAX_PREV_YEAR_HOPS = 10;
+    // 4 terms × ~6 years of enrollment + slack. The real worst case for
+    // a 4-year student is 16 hops; we keep some margin for re-admitted
+    // students whose enrollment year is older.
+    private static final int MAX_PREV_TERM_HOPS = 32;
 
     private final SaintScheduleProperties properties;
+    @SuppressWarnings("unused") // retained for future cache TTL keying
     private final Clock clock;
     private final HttpClient httpClient;
 
@@ -94,9 +103,6 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
     @Override
     public ScheduleResponse fetchSchedule(String studentId, PortalCookies cookies) {
         int enrollmentYear = SaintScheduleHelpers.parseEnrollmentYear(studentId);
-        LocalDate today = LocalDate.now(clock.withZone(KST));
-        int currentYear = today.getYear();
-        int currentTerm = SaintScheduleHelpers.termFor(today);
 
         HttpResponse<String> firstResponse = httpGet(cookies.rawCookieHeader());
         String currentHtml = firstResponse.body();
@@ -106,31 +112,58 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
                 firstResponse.headers().allValues("Set-Cookie"));
         Optional<String> secureId = WebDynproResponseUnwrapper.extractSecureId(currentHtml);
 
-        List<TermSchedule> terms = new ArrayList<>();
-        List<ScheduleEntry> currentEntries = SaintScheduleParser.parse(currentHtml);
-        terms.add(new TermSchedule(currentYear, currentTerm, currentEntries));
+        int displayedYear = SaintScheduleParser.parseDisplayedYear(currentHtml);
+        int displayedTerm = SaintScheduleParser.parseDisplayedTerm(currentHtml);
+        if (displayedYear < 0 || displayedTerm < 0) {
+            log.warn("saint schedule first-get missing dropdowns: studentFp={} year={} term={}",
+                    SaintSessionStore.fingerprint(studentId), displayedYear, displayedTerm);
+            throw new ConnectorParseException();
+        }
 
-        int year = currentYear;
+        int currentYear = displayedYear;
+        int currentTerm = displayedTerm;
+        List<TermSchedule> terms = new ArrayList<>();
+        terms.add(new TermSchedule(displayedYear, displayedTerm,
+                SaintScheduleParser.parse(currentHtml)));
+
         int hops = 0;
-        while (year > enrollmentYear && hops < MAX_PREV_YEAR_HOPS) {
+        while (hops < MAX_PREV_TERM_HOPS && !atEnrollmentStart(displayedYear, displayedTerm, enrollmentYear)) {
             if (secureId.isEmpty()) {
-                log.warn("saint schedule iterate halted: studentFp={} reason=missing-secure-id year={}",
-                        SaintSessionStore.fingerprint(studentId), year);
+                log.warn("saint schedule iterate halted: studentFp={} reason=missing-secure-id year={} term={}",
+                        SaintSessionStore.fingerprint(studentId), displayedYear, displayedTerm);
                 break;
             }
             String xmlEnvelope = httpPostButtonPress(mergedCookieHeader, secureId.get(),
-                    PREV_YEAR_BUTTON_ID);
+                    PREV_TERM_BUTTON_ID);
             String prevHtml = WebDynproResponseUnwrapper.extractHtml(xmlEnvelope);
             secureId = WebDynproResponseUnwrapper.extractSecureId(prevHtml);
-            List<ScheduleEntry> prevEntries = SaintScheduleParser.parse(prevHtml);
-            year--;
-            terms.add(new TermSchedule(year, currentTerm, prevEntries));
+
+            int prevYear = SaintScheduleParser.parseDisplayedYear(prevHtml);
+            int prevTerm = SaintScheduleParser.parseDisplayedTerm(prevHtml);
+            if (prevYear < 0 || prevTerm < 0) {
+                // u-SAINT 가 dropdown 없는 응답을 내려보내면 cycle 정확도 보장 못 함.
+                // expected 위치를 fallback 으로 사용해서 (year, term) label 은 유지.
+                SaintScheduleHelpers.TermPosition expected =
+                        SaintScheduleHelpers.previousTerm(displayedYear, displayedTerm);
+                prevYear = expected.year();
+                prevTerm = expected.term();
+                log.warn("saint schedule iterate dropdown-missing: studentFp={} fallbackYear={} fallbackTerm={}",
+                        SaintSessionStore.fingerprint(studentId), prevYear, prevTerm);
+            }
+
+            terms.add(new TermSchedule(prevYear, prevTerm, SaintScheduleParser.parse(prevHtml)));
+            displayedYear = prevYear;
+            displayedTerm = prevTerm;
             hops++;
         }
-        log.info("saint schedule fetched: studentFp={} terms={} entries={}",
+        log.info("saint schedule fetched: studentFp={} terms={} entries={} hops={}",
                 SaintSessionStore.fingerprint(studentId), terms.size(),
-                terms.stream().mapToInt(t -> t.entries().size()).sum());
+                terms.stream().mapToInt(t -> t.entries().size()).sum(), hops);
         return new ScheduleResponse(enrollmentYear, currentYear, currentTerm, terms);
+    }
+
+    private static boolean atEnrollmentStart(int year, int term, int enrollmentYear) {
+        return year <= enrollmentYear && term <= SaintScheduleHelpers.TERM_SPRING;
     }
 
     private HttpResponse<String> httpGet(String cookieHeader) {

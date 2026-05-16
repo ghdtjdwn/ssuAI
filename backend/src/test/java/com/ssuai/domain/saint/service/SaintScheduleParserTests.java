@@ -76,6 +76,59 @@ class SaintScheduleParserTests {
     }
 
     @Test
+    void parsesDisplayedYearAndTermFromDropdownLabels() throws IOException {
+        String html = Files.readString(FIXTURE, StandardCharsets.UTF_8);
+
+        assertThat(SaintScheduleParser.parseDisplayedYear(html)).isEqualTo(2026);
+        // pinned fixture shows 1학기
+        assertThat(SaintScheduleParser.parseDisplayedTerm(html)).isEqualTo(1);
+    }
+
+    @Test
+    void parsesAllFourTermLabelsBackToCycleInteger() {
+        String spring = labeledTermInput("1학기");
+        String summer = labeledTermInput("여름학기");
+        String fall = labeledTermInput("2학기");
+        String winter = labeledTermInput("겨울학기");
+
+        assertThat(SaintScheduleParser.parseDisplayedTerm(spring)).isEqualTo(1);
+        assertThat(SaintScheduleParser.parseDisplayedTerm(summer)).isEqualTo(2);
+        assertThat(SaintScheduleParser.parseDisplayedTerm(fall)).isEqualTo(3);
+        assertThat(SaintScheduleParser.parseDisplayedTerm(winter)).isEqualTo(4);
+    }
+
+    @Test
+    void returnsMinusOneWhenLabeledInputAnchorIsMissing() {
+        // Page without the 학년도/학기 dropdown pair (e.g. only the inner
+        // timetable table fragment) — caller falls back to its own state.
+        String html = "<html><body><tbody id=\"X-contentTBody\"></tbody></body></html>";
+
+        assertThat(SaintScheduleParser.parseDisplayedYear(html)).isEqualTo(-1);
+        assertThat(SaintScheduleParser.parseDisplayedTerm(html)).isEqualTo(-1);
+    }
+
+    @Test
+    void parsesYearAndTermFromPrevButtonResponseFixture() throws IOException {
+        // The PREV-press response wraps the page HTML in <updates><full-update>
+        // <content-update><![CDATA[..., so the connector unwraps it first.
+        String envelope = Files.readString(
+                Path.of("src", "test", "resources", "saint", "timetable-prev-success.html"),
+                StandardCharsets.UTF_8);
+        String inner = WebDynproResponseUnwrapper.extractHtml(envelope);
+
+        assertThat(SaintScheduleParser.parseDisplayedYear(inner)).isEqualTo(2025);
+        // PREV from 겨울학기 (cycle position 4) yields 2학기 (cycle position 3)
+        assertThat(SaintScheduleParser.parseDisplayedTerm(inner)).isEqualTo(3);
+    }
+
+    private static String labeledTermInput(String value) {
+        return "<html><body>"
+                + "<label for=\"WD9E\">학기</label>"
+                + "<input id=\"WD9E\" type=\"text\" value=\"" + value + "\" />"
+                + "</body></html>";
+    }
+
+    @Test
     void blankAndNullHtmlReturnEmpty() {
         assertThat(SaintScheduleParser.parse(null)).isEmpty();
         assertThat(SaintScheduleParser.parse("")).isEmpty();
