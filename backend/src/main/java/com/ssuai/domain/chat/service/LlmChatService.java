@@ -512,14 +512,22 @@ public class LlmChatService implements ChatService {
             log.info("chat private tool refused: tool={} reason=unauthenticated", toolName);
             return toolError(SAINT_SESSION_GUIDANCE);
         }
+        // Audit log (Task 16 spec §8 #6): pin the intent — who asked for
+        // what — before the connector runs. studentFp is a SHA-256 prefix,
+        // never the raw student id; tool name is one of the literal
+        // enum-like strings ("get_my_schedule" / "get_my_grades"). The
+        // response payload (course names, grade letters, etc.) MUST NOT
+        // appear in any log line on this code path; the only other log
+        // below is post-fetch completion which again uses studentFp only.
+        String studentFp = com.ssuai.domain.auth.saint.SaintSessionStore.fingerprint(studentId);
+        log.info("chat private tool requested: tool={} studentFp={}", toolName, studentFp);
         try {
             Object response = serviceCall.get();
             String json = objectMapper.writeValueAsString(response);
-            log.info("chat private tool fetched: tool={} studentFp={}",
-                    toolName, com.ssuai.domain.auth.saint.SaintSessionStore.fingerprint(studentId));
+            log.info("chat private tool completed: tool={} studentFp={}", toolName, studentFp);
             return compactAndCap(toolName, json);
         } catch (SaintSessionExpiredException exception) {
-            log.info("chat private tool expired: tool={}", toolName);
+            log.info("chat private tool expired: tool={} studentFp={}", toolName, studentFp);
             return toolError(SAINT_SESSION_EXPIRED_GUIDANCE);
         } catch (JsonProcessingException exception) {
             throw new ChatUnavailableException(exception);
