@@ -5,6 +5,23 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-16
 
+- 2026-05-16: **Task 16 PR 16a — 성적 fetch shape (시간표보다 단순)**.
+  사용자 brower spike: 이수구분별 성적표 / 학기별 성적 조회 류 페이지
+  진입 → 응답 캡처. 핵심 발견 — 페이지 상단에 "학기별 성적" 표가
+  **입학년도부터 현재까지 모든 학기 GPA 를 한 번에 표시**, 하단은
+  "학기별 세부 성적" (선택된 학기의 과목별 상세). 즉 시간표의 multi-term
+  iterate (WDA7 prev 반복) 와 달리 **단일 GET 한 번으로 전체 학적
+  누적 fetch** 가능. 추가로 응답 안에 학적부 누적 통계 (졸업요건 기준
+  GPA) + 증명용 누적 통계 (재수강·P/F 처리 반영) 가 분리되어 들어있음.
+  Component = `ZCMB3W0017` (시간표 ZCMW2102 와 다른 SAP 모듈). 응답
+  shape 는 시간표와 동일 WebDynpro full-update XML. 학기 코드 enum
+  추출: `091` = 1학기, `092` = 2학기 (계절학기는 PR 16c 통합 테스트 시
+  확정). 학년도 dropdown 옵션 `2010~2025` 다 들어있음. spec §3.5 신설
+  — 성적 endpoint / 응답 영역 2개 / 학기 코드 / connector pseudo-code
+  / 시간표와의 차이 요약 / LLM prompt 정책 재확인 (요약만 LLM, 세부는
+  controller path 로만). PR 16c 첫 cut scope: 누적 GPA + 학적부/증명용
+  통계 + 현재 학기 세부 만 — 학기별 세부 변경 (다른 학기 dropdown
+  선택 후 조회) 은 follow-up.
 - 2026-05-16: **Task 16 PR 16a — multi-term iterate spike**. 사용자
   요구를 다시 정리: `get_my_schedule` 의 본질은 입학년도부터 현재까지
   누적 시간표 (학번에서 입학 학년 추출 → 모든 학기 iterate). 시간표
