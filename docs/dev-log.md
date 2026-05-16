@@ -5,6 +5,21 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-17
 
+- 2026-05-17: **Task 16 시간표 multi-term nav 확장 + bug fix**. 사용자
+  DevTools Network spike (2025-겨울학기에서 이전학기 클릭 응답 캡쳐)
+  결과 spec §3.4 의 "WDA7 = 학년도 -1, 학기 그대로" 가정이 **틀림**.
+  실제 WDA7 = 이전학기 (4-term cycle 한 칸, 학년도 경계 cross). 두
+  버튼만 존재 (WDA7 PREV / WDA9 NEXT). 학기 cycle = 1학기 → 여름 →
+  2학기 → 겨울 → 다음년도 1학기. fix 내용: (1) `SaintScheduleHelpers`
+  에 term cycle 헬퍼 (TERM_SPRING/SUMMER/FALL/WINTER, previousTerm,
+  labelFor, termFromLabel). (2) `SaintScheduleParser` 에 parseDisplayedYear
+  / parseDisplayedTerm 추가 — `label[for="..."]` text 가 "학년도"/"학기"
+  인 anchor 에서 input value 읽음. clock-derived 폐기. (3) `RealSaintScheduleConnector`
+  fetchSchedule 가 매 응답에서 displayed (year, term) parse, (enrollmentYear,
+  1학기) 도달까지 PREV iterate. MAX_PREV_TERM_HOPS = 32 (4년 × 4학기 + slack).
+  (4) `MockSaintScheduleConnector` 도 4-term cycle 로 generate. (5) timetable-success.html
+  에 학년도/학기 dropdown markup 추가, timetable-prev-success.html 신규 (PREV
+  press 응답 envelope). 전체 gradle test 그린.
 - 2026-05-17: **Task 16 §8 #6 audit log 마무리**. `dispatchPrivateSaintTool`
   의 log line 을 `requested` / `completed` / `expired` 3종으로 정리,
   모두 `tool={name} studentFp={SHA-256 prefix}` 형태로 response payload

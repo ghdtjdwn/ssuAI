@@ -47,6 +47,7 @@ public final class SaintScheduleParser {
     private static final int MIN_LECTURE_LINES = 4;
 
     private static final Pattern PERIOD_NUMBER = Pattern.compile("(\\d+)\\s*교시");
+    private static final Pattern YEAR_NUMBER = Pattern.compile("(\\d{4})학년도");
 
     // ISO DayOfWeek: 월=1 .. 일=7. u-SAINT cc=1..6 -> 월..토.
     private static final Map<Integer, DayMapping> CC_MAPPING = Map.of(
@@ -59,6 +60,78 @@ public final class SaintScheduleParser {
     );
 
     private SaintScheduleParser() {
+    }
+
+    /**
+     * Reads the {@code 학년도} dropdown value (e.g., "2025학년도") and
+     * returns the four-digit year. Anchors on the {@code <label>} whose
+     * text is exactly "학년도" so the WDxxxx ids may shift across renders
+     * without breaking us. Returns -1 when the anchor is missing — that
+     * happens on the minimal timetable-only fragment fixtures, in which
+     * case the caller falls back to the value it already has.
+     */
+    public static int parseDisplayedYear(String html) {
+        String value = readLabeledInputValue(html, "학년도");
+        if (value == null) {
+            return -1;
+        }
+        Matcher matcher = YEAR_NUMBER.matcher(value);
+        if (!matcher.find()) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
+    /**
+     * Reads the {@code 학기} dropdown value ("1학기" / "여름학기" / "2학기"
+     * / "겨울학기") and returns the cycle position 1..4. Returns -1 when
+     * either the anchor is missing or the label is not one of the four
+     * known values — callers fall back to the previous step's term in
+     * that case.
+     */
+    public static int parseDisplayedTerm(String html) {
+        String value = readLabeledInputValue(html, "학기");
+        if (value == null) {
+            return -1;
+        }
+        return switch (value.trim()) {
+            case "1학기" -> 1;
+            case "여름학기" -> 2;
+            case "2학기" -> 3;
+            case "겨울학기" -> 4;
+            default -> -1;
+        };
+    }
+
+    private static String readLabeledInputValue(String html, String labelText) {
+        if (html == null || html.isBlank()) {
+            return null;
+        }
+        Document document = Jsoup.parse(html);
+        for (Element label : document.select("label[for]")) {
+            String text = label.text() == null ? "" : label.text().trim();
+            if (!labelText.equals(text)) {
+                continue;
+            }
+            String inputId = label.attr("for");
+            if (inputId.isEmpty()) {
+                continue;
+            }
+            Element input = document.getElementById(inputId);
+            if (input == null) {
+                continue;
+            }
+            String value = input.attr("value");
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            return value;
+        }
+        return null;
     }
 
     public static List<ScheduleEntry> parse(String html) {

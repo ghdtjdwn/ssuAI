@@ -219,21 +219,35 @@ Elements rows = doc.select("tbody[id$=-contentTBody] tr[rt=1]");
 // ... parse each row's td[role=gridcell] cells → ScheduleEntry DTOs
 ```
 
-### 3.4 학기 이동 (multi-term iterate) — 2차 spike 결과
+### 3.4 학기 이동 (multi-term iterate) — 2차 spike 결과 + 2026-05-17 재spike
 
 ssuAI 의 `get_my_schedule` 의 **본질은 입학년도부터 현재 학기까지 누적
 시간표** (학번에서 입학 학년 추출 → 현재까지 모든 학기 iterate). 첫
 cut 의 단일 학기 GET 만으로는 부족.
 
-**UI 패턴**: 시간표 페이지에 `<select>` dropdown 이 아니라
-**PREVIOUS / NEXT 버튼** 으로 학기 nav. 사용자 spike 결과 `WDA7` 가
-"이전 학년도" 버튼 (한 번 클릭하면 2026 → 2025 로 학년도 단위 점프.
-2026-1 → 2025-1). 즉:
+**UI 패턴 (재확정 2026-05-17)**: 시간표 페이지에는 `<select>` 가 아니라
+**이전학기 / 다음학기 두 버튼 + 학년도/학기 dropdown** 이 있음. 사용자
+DevTools Network spike 결과:
 
-- `WDA7` = 이전 학년도 (학년도 −1, 학기 그대로 유지 추정)
-- 계절학기 (여름·겨울) 와 2학기 nav 는 별도 버튼 (`WDA8`/`WDA9` 등)
-  일 가능성. PR 16b 통합 테스트 시 응답 HTML 에서 button ID grep 으로
-  확정.
+- `WDA7` = **이전학기** (PREVIOUS). 4-term cycle 을 한 칸씩 거꾸로
+  이동: 1학기 → 겨울학기(전년) ← 2학기 ← 여름학기 ← 1학기. 즉
+  학년도 경계를 cross.
+- `WDA9` = **다음학기** (NEXT). 같은 cycle 을 정방향으로.
+
+**기존 spec 의 "WDA7 = 학년도 −1, 학기 그대로" 가정은 폐기** — 이전
+RC implementations 의 `year--` 만 하던 코드는 실제 응답을 따라가지
+않은 채 (year, term) label 을 wrong 으로 생성. 본 PR 에서 두 가지 fix:
+
+1. parser 가 응답 HTML 의 학년도/학기 dropdown 에서 displayed (year, term)
+   직접 읽음 (`label[for="WD4A"]` text="학년도", input value="2025학년도";
+   `label[for="WD9E"]` text="학기", input value="1학기" / "여름학기" /
+   "2학기" / "겨울학기"). clock-derived 사용 X.
+2. connector 가 매 PREV 응답마다 새 (year, term) 을 parser 로 읽어
+   누적, (enrollmentYear, 1학기) 도달까지 iterate.
+
+**학기 cycle (정방향)**: 1학기 → 여름학기 → 2학기 → 겨울학기 → (다음 학년도)
+1학기. 코드 매핑은 spec §3.5 에서 grades 도 동일 — 090=1학기, 091=여름,
+092=2학기, 093=겨울 (= cycle position 1, 2, 3, 4).
 
 **SAPEVENTQUEUE event shape** (사용자 cURL paste 디코드):
 
