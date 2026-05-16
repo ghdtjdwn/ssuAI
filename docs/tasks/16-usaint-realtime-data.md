@@ -112,9 +112,48 @@ PR 16a includes a **30-min manual spike**: log into u-SAINT with a test
 account, navigate to 시간표 + 성적 **through the portal nav into the
 iframe**, capture iframe URLs + page HTML, scrub PII (replace 학번/이름/
 실 성적 with `20999999`/홍길동/placeholder), commit fixtures under
-`backend/src/test/resources/fixtures/saint/`. Capture the **real
+`backend/src/test/resources/saint/`. Capture the **real
 response**, not a synthetic shape — Task 14 §13 retrospective documents
 why synthetic fixtures cost three rewrites at prod-verify time.
+
+### 3.1 PR 16a 1차 spike 결과 (2026-05-16 — 개인수업시간표조회)
+
+**시간표 endpoint 확정**: SAP WebDynpro 컴포넌트 `zcmw9001n`. wrapper 의
+contentAreaFrame 이 portal nav event (`POST .../prteventname/Navigate/...
+/com.sap.portal.contentarea?windowId=WID...&PrevNavTarget=navurl://...`
++ body `NavigationTarget=navurl://1724938fdd5d98311a8647b31efd21fe`) 를
+거쳐 최종적으로 `https://saint.ssu.ac.kr/sap/bc/webdynpro/sap/zcmw9001n`
+의 응답 HTML 을 로드. 메뉴 nav ID (개인수업시간표조회) =
+`1724938fdd5d98311a8647b31efd21fe`. 같은 wrapper 응답에서 강의시간표
+메뉴 ID = `56883564eb5b429e9876b8176235a960` 도 함께 잡힘.
+
+**표 parsing structure 잠금** (`backend/src/test/resources/saint/timetable-success.html`):
+
+| Selector | Role | Notes |
+|---|---|---|
+| `tbody[id$="-contentTBody"]` | 표 컨테이너 | WD-prefix id 는 dynamic 이지만 suffix 는 안정 |
+| `tr[rt="2"]` | 헤더 row | 1개. `<th>` 의 `lsdata="{7:'월요일'}"` 가 요일명 |
+| `tr[rt="1"]` | 데이터 row | 10개 (1-10교시). 각 row 는 (시간 column + 6요일 column) 7개 cell |
+| `td[role="gridcell"][cc="N"]` | cell | `cc=0` 시간 column, `cc=1..6` 월~토 (일요일은 아예 column 없음) |
+| `div.lsSTEmptyRow` | 빈 cell | 이 div 가 있으면 해당 요일·교시는 강의 없음 |
+| `span.lsTextView--wrap` | 강의 cell | text content 가 `과목명<br>교수<br>시간<br>강의실` 4줄 |
+
+빈 cell vs 강의 cell 의 구분이 명확 (서로 배타적). cc attribute 가
+column 매핑을 줘서 헤더-data row 의 column 순서 drift 도 robust.
+
+**아직 미정 (별도 spike 필요 — PR 16b 시작 직전)**:
+
+1. WebDynpro form 의 정확한 action URL + query params + hidden inputs
+   (`sap-wd-secure-id`, `sap-wd-csrf-token`, ViewState 류).
+2. wrapper 의 portal nav POST 응답이 곧바로 zcmw9001n HTML 인지, 아니면
+   intermediate 페이지 (e.g., AFP launcher → secondary redirect) 가
+   더 끼는지.
+3. 시간표 변경 (학기 전환, refresh 후) 시 표가 새 HTML 응답인지 아니면
+   부분 AJAX update 인지.
+
+이 셋은 PR 16b 의 connector 코드 첫 line 쓰기 직전 한 번 더 capture
+(브라우저 F12 → Network 탭, doc/xhr 필터, 응답 body 에 zcmw9001n 또는
+시간표 셀 data 가 들어있는 request 한두 개 paste) 로 확정 후 진행.
 
 ## 4. Architecture
 
