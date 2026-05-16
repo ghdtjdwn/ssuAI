@@ -5,6 +5,27 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-16
 
+- 2026-05-16: **PR #112 follow-up** — 첫 parser 재작성 (`.main_box09
+  .box_top .main_title span` + `<dt>→<dd>` key map) 도 여전히
+  `missing name element` 떴음. 사용자 paste 한 portal main page 전체
+  HTML 분석 결과 더 큰 가정 오류 발견: portal `/irj/portal` 응답은
+  **SAP NetWeaver frameset wrapper** 이고 학번/소속 카드는 모두
+  `<iframe id="contentAreaFrame">` 안쪽에 lazy load 됨. wrapper 자체엔
+  학번/소속/학적상태 그 무엇도 없고, 단지 `<span class="top_user">{이름}님
+  접속을 환영합니다.</span>` greeting + JS config 의 `LogonUid` 만
+  있음. 사용자가 보여준 `.main_box09_con` markup 은 iframe 안쪽 페이지
+  의 것이었음 (F12 Elements 가 cross-frame 까지 보여줘 wrapper 와 안쪽
+  구분이 안 됐던 것). 두 번째 parser 재작성: 이름은 `.top_user` 의
+  greeting 에서 `["님 접속을 환영합니다.", "님 환영합니다.", "님"]`
+  순으로 suffix 스트립. 학번은 phase 1 의 sIdno 그대로 trust (phase 1
+  success marker 통과 + portal session cookie 발급된 시점에 sIdno 가
+  실제 학생 번호임이 입증됨). 소속/학적상태는 **null**, Task 16
+  `get_my_schedule` / `get_my_grades` 가 별도 deep portal endpoint 에서
+  채울 영역. fixture 3개 (`portal-success.html`, `portal-missing-name.html`,
+  `portal-greeting-unknown-suffix.html`) 도 frameset wrapper 의 minimal
+  shape 으로 재작성. Task 14 spec §risks 가 ssutoday parse anchors 변화
+  를 경고했었으나 "wrapper vs iframe" 구분까지는 적시 안 됐음 — spec
+  업데이트는 follow-up. 별도 PR.
 - 2026-05-16: SmartID prod end-to-end 첫 검증 → portal HTML parser
   실패로 두 갈래 prod incident 해소. (1) PR #110 의 fail-fast 가
   prod 에서 발동 — `ssuai-backend-config` ConfigMap 에 `SSUAI_API_BASE_URL`
