@@ -14,9 +14,10 @@
   서버 polling + GitHub Actions auto-deploy) 만 남음.
 - **이번 세션 자동 작업 추가**: PR #130 — `LlmChatService.compactAndCap` 에
   `get_my_grades` ({count,link} 만) / `get_my_schedule` (compact row) 분기
-  잠금 + 단위 테스트 3개로 본문 누출 영구 고정 (spec §6 #6 / §8). Task
-  16 security checklist 8개 중 7개 ✅, 1개 (grades audit log) MCP tool 등록
-  시점으로 deferred.
+  잠금 + 단위 테스트 3개로 본문 누출 영구 고정 (spec §6 #6 / §8). PR #132 —
+  `get_my_schedule` / `get_my_grades` MCP tool 등록 (spec §9 #4
+  chat thread-local pattern). Task 16 security checklist 8개 전부 ✅
+  완료 (audit log 까지 PR #133 로 마무리).
 - **다음 세션 옵션**: (a) Task 16 follow-up — `get_my_schedule`/`get_my_grades`
   MCP tool 등록 — chat thread-local pattern 결정 필요 (아키텍처) /
   (b) Task 17 (LMS integration) 신규 시작 — `get_my_assignments`, 세션

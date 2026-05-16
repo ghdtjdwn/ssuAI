@@ -835,10 +835,14 @@ follow-up `application-prod.yml` PR — same sequenced-flip pattern Task
       compactAndCap 의 `get_my_schedule` 분기 (dayOfWeek/period/course/room
       만) + `get_my_grades` 분기 (`{count, link}` 만) PR #130 잠금, 단위
       테스트 3개로 영구 고정.
-- [ ] Tool-call audit on grades — when chat invokes `get_my_grades`,
+- [x] Tool-call audit on grades — when chat invokes `get_my_grades`,
       log only "user X requested grades", not what it returned. —
-      MCP tool 등록 (chat thread-local pattern 갖춰진 뒤 별 PR) 시점에
-      executeToolCall 분기에서 audit log 추가.
+      `LlmChatService.dispatchPrivateSaintTool` 가 `requested` /
+      `completed` / `expired` 세 log line 모두 `tool={toolName}
+      studentFp={SHA-256 prefix}` 형태로만 출력, response payload 절대
+      X. 단위 테스트 (`privateGradesAuditLogPinsToolNameAndStudentFingerprintWithoutLeakingPayload`)
+      가 logback `ListAppender` 로 log 캡처해서 raw 성적/과목명/교수명/
+      학번 어느 log line 에도 안 들어가는지 영구 고정.
 - [x] Test fixtures contain only `20999999` / 홍길동 / placeholder
       grades. Never a real student row. — `grades-success.html` /
       `grades-prev-success.html` / `timetable-success.html` 다 placeholder.
