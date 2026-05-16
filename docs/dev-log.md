@@ -5,6 +5,23 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-16
 
+- 2026-05-16: **Task 16 PR 16a 1차 spike** — 개인수업시간표조회 endpoint
+  확정. 사용자 본인 brower 에서 시간표 메뉴 진입 → wrapper 의
+  contentAreaFrame iframe 안쪽 source 캡처. wrapper 가 portal nav event
+  (`POST .../prteventname/Navigate/...?windowId=WID...&PrevNavTarget=
+  navurl://...` body `NavigationTarget=navurl://1724938fdd5d98311a8647b31efd21fe`)
+  를 거쳐 최종적으로 SAP WebDynpro 컴포넌트 `zcmw9001n` 의 HTML 응답을
+  로드함을 확인. 표 parsing structure 잠금: `tbody[id$="-contentTBody"]`
+  안에 헤더 row (`tr[rt="2"]`) + 1-10교시 data row (`tr[rt="1"]`), 각
+  cell `td[role="gridcell"][cc="N"]` (cc=0 시간 column, cc=1..6 월~토),
+  빈 cell `div.lsSTEmptyRow` / 강의 cell `span.lsTextView--wrap` 의
+  text content 가 `과목명<br>교수<br>시간<br>강의실` 4줄. fixture
+  `backend/src/test/resources/saint/timetable-success.html` 로 pinning
+  (PII placeholder: 자료구조/알고리즘/운영체제, 김교수/이교수/박교수,
+  정보과학관 30100 등 generic). Task 16 spec §3.1 신설로 spike 결과
+  명문화. **아직 미정** (PR 16b 시작 직전 별도 spike): WebDynpro form
+  action URL + hidden inputs + 정확한 nav request sequence. 표 자체의
+  parsing 은 지금 잡힌 fixture 로 PR 16b 진행 가능.
 - 2026-05-16: **PR #116 — SmartID prod 완전 동작**. PR #114 SameSite=None
   으로도 풀리지 않던 "세션 갱신 실패" root cause 가 별개 layer 였음:
   backend CORS 의 `.allowCredentials(false)` 때문에 응답에 `Access-Control-Allow-Credentials:
