@@ -5,6 +5,19 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-16
 
+- 2026-05-16: **Task 16 PR 16c-B — 학기별 세부 iterate path 확정**. 추가
+  spike (이전학기 button-press 후 응답 캡처) 결과 spec §3.5.1 의 "학기별
+  세부는 단일 GET 으로 못 받음, follow-up" 가정 폐기. button IDs 확정
+  (`WD01F0` 이전학기 / `WD01F2` 다음학기 / `WD0187` 조회), 이전학기
+  POST 응답이 시간표 WDA7 와 동일 full-update XML wrapper + 세부 8 row
+  채워짐 + secure-id rotation. connector 가 첫 GET → 학기별 GPA history
+  (전체) + 학적부/증명 + default 학기 세부, 그 후 이전학기 button-press
+  POST × (history.size()-1) 회 iterate 로 전 학기 세부 받는 path 잠금
+  (§3.5.2). 학기 매핑은 connector 가 호출 횟수와 history 인덱스로 외부
+  추적 — 시간표 multi-year iterate 의 "WDA7 N회 후 학년도 = currentYear-N"
+  동일 패턴. minimal prev fixture `grades-prev-success.html` (5KB, 두
+  row — 정규학기 letter-grade + P/F 학기) 추가. PR 16c 첫 cut scope =
+  학기별 GPA history + 학적부/증명 누적 + 모든 학기 세부.
 - 2026-05-16: **Task 16 PR 16c-A — 성적 fixture spike + spec §3.5 잠금**.
   사용자 brower spike (Network 탭 ZCMB3W0017 응답 Copy response, raw
   180KB) 결과 spec §3.5 추정의 큰 변경 5개 잠금: (1) 첫 GET 응답이
