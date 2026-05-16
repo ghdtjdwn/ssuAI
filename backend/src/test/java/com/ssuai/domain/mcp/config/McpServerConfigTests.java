@@ -33,6 +33,7 @@ class McpServerConfigTests {
                         "get_library_seat_status",
                         "search_library_book",
                         "get_my_schedule",
-                        "get_my_grades");
+                        "get_my_grades",
+                        "get_my_assignments");
     }
 }

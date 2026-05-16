@@ -43,9 +43,11 @@ import com.ssuai.domain.chat.service.llm.LlmCompletionResult;
 import com.ssuai.domain.chat.service.llm.LlmPrivacyMode;
 import com.ssuai.domain.chat.service.llm.LlmProvider;
 import com.ssuai.domain.chat.service.llm.LlmProviderException;
+import com.ssuai.domain.lms.service.LmsAssignmentsService;
 import com.ssuai.domain.saint.service.SaintGradesService;
 import com.ssuai.domain.saint.service.SaintScheduleService;
 import com.ssuai.global.exception.ChatUnavailableException;
+import com.ssuai.global.exception.LmsSessionExpiredException;
 import com.ssuai.global.exception.SaintSessionExpiredException;
 
 @Service
@@ -74,6 +76,11 @@ public class LlmChatService implements ChatService {
               만들어내지 마. 답은 "성적 페이지에서 N과목 확인 가능합니다 (링크 안내)"
               형태로만 해. 본문 데이터는 사용자가 controller 페이지에서 직접 확인해.
 
+            인증된 본인 데이터 (LMS 로그인 필요):
+            - 내 LMS 과제 (get_my_assignments) — 현재 학기 미제출 과제·퀴즈 목록.
+              과목명·제목·유형·마감일이 포함. 사용자가 "과제", "LMS", "제출 안 한 거"
+              같은 식으로 물으면 호출해. LMS 로그인이 안 된 경우 재로그인 안내.
+
             행동 원칙:
             1. 모호한 질문도 일단 가장 그럴듯한 가정으로 즉시 도구를 불러. 되묻기는
                최후 수단이야. 예: "오늘 학식 뭐야?" → 식당을 안 골라줬다면 학생식당으로
@@ -98,7 +105,7 @@ public class LlmChatService implements ChatService {
             """;
 
     private static final String SCOPE_GUIDANCE =
-            "아직은 그 정보는 지원하지 않아요. 지금은 학식, 기숙사 식단, 캠퍼스 시설, 도서관 좌석/도서 검색, 그리고 (로그인된 경우) 본인 시간표·성적 요약을 도와줄 수 있어요.";
+            "아직은 그 정보는 지원하지 않아요. 지금은 학식, 기숙사 식단, 캠퍼스 시설, 도서관 좌석/도서 검색, 그리고 (로그인된 경우) 본인 시간표·성적·LMS 과제를 도와줄 수 있어요.";
 
     private static final String SECRET_GUIDANCE =
             "비밀번호, 쿠키, 세션, API key 같은 비밀 정보는 입력하지 말아주세요. 지금은 학식, 기숙사 식단, 캠퍼스 시설, 도서관 좌석/도서 검색만 도와줄 수 있어요.";
@@ -108,6 +115,12 @@ public class LlmChatService implements ChatService {
 
     private static final String SAINT_SESSION_EXPIRED_GUIDANCE =
             "u-SAINT 세션이 만료됐어요. SmartID 로 다시 로그인하고 물어봐 주세요.";
+
+    private static final String LMS_SESSION_GUIDANCE =
+            "LMS 로그인이 필요한 정보예요. 먼저 LMS(SmartID)로 로그인하고 다시 물어봐 주세요.";
+
+    private static final String LMS_SESSION_EXPIRED_GUIDANCE =
+            "LMS 세션이 만료됐어요. LMS(SmartID)로 다시 로그인하고 물어봐 주세요.";
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final Locale KOREAN = Locale.KOREAN;
@@ -122,6 +135,7 @@ public class LlmChatService implements ChatService {
     private final ChatConversationStore conversationStore;
     private final SaintScheduleService scheduleService;
     private final SaintGradesService gradesService;
+    private final LmsAssignmentsService lmsAssignmentsService;
     private final Clock clock;
     private volatile List<OpenAiChatCompletionRequest.Tool> cachedChatTools;
 
@@ -135,10 +149,11 @@ public class LlmChatService implements ChatService {
             ChatConversationStore conversationStore,
             SaintScheduleService scheduleService,
             SaintGradesService gradesService,
+            LmsAssignmentsService lmsAssignmentsService,
             @Lazy List<McpSyncClient> mcpClients
     ) {
         this(properties, providers, objectMapper, conversationStore,
-                scheduleService, gradesService, mcpClients, Clock.system(KST));
+                scheduleService, gradesService, lmsAssignmentsService, mcpClients, Clock.system(KST));
     }
 
     LlmChatService(
@@ -148,6 +163,7 @@ public class LlmChatService implements ChatService {
             ChatConversationStore conversationStore,
             SaintScheduleService scheduleService,
             SaintGradesService gradesService,
+            LmsAssignmentsService lmsAssignmentsService,
             List<McpSyncClient> mcpClients,
             Clock clock
     ) {
@@ -158,6 +174,7 @@ public class LlmChatService implements ChatService {
         this.conversationStore = conversationStore;
         this.scheduleService = scheduleService;
         this.gradesService = gradesService;
+        this.lmsAssignmentsService = lmsAssignmentsService;
         this.mcpClients = mcpClients;
         this.clock = clock;
     }
@@ -273,7 +290,9 @@ public class LlmChatService implements ChatService {
         // local parameter, so the binding is also a safety net for
         // future loopback routing changes.
         try (com.ssuai.domain.saint.mcp.SaintToolContext.Scope ignored =
-                     com.ssuai.domain.saint.mcp.SaintToolContext.withStudentId(studentId)) {
+                     com.ssuai.domain.saint.mcp.SaintToolContext.withStudentId(studentId);
+             com.ssuai.domain.lms.mcp.LmsToolContext.Scope ignoredLms =
+                     com.ssuai.domain.lms.mcp.LmsToolContext.withStudentId(studentId)) {
             for (int index = 0; index < toolCalls.size(); index++) {
                 OpenAiToolCall toolCall = toolCalls.get(index);
                 String toolCallId = toolCall.id() == null || toolCall.id().isBlank()
@@ -486,6 +505,8 @@ public class LlmChatService implements ChatService {
                         toolName, studentId, () -> scheduleService.fetchSchedule(studentId));
                 case "get_my_grades" -> dispatchPrivateSaintTool(
                         toolName, studentId, () -> gradesService.fetchGrades(studentId));
+                case "get_my_assignments" -> dispatchPrivateLmsTool(
+                        toolName, studentId, () -> lmsAssignmentsService.fetchAssignments(studentId));
                 default -> toolError("지원하지 않는 도구입니다: " + toolName);
             };
         } catch (IllegalArgumentException | IllegalStateException exception) {
@@ -529,6 +550,30 @@ public class LlmChatService implements ChatService {
         } catch (SaintSessionExpiredException exception) {
             log.info("chat private tool expired: tool={} studentFp={}", toolName, studentFp);
             return toolError(SAINT_SESSION_EXPIRED_GUIDANCE);
+        } catch (JsonProcessingException exception) {
+            throw new ChatUnavailableException(exception);
+        }
+    }
+
+    private String dispatchPrivateLmsTool(
+            String toolName,
+            String studentId,
+            java.util.function.Supplier<Object> serviceCall
+    ) {
+        if (studentId == null || studentId.isBlank()) {
+            log.info("chat private tool refused: tool={} reason=unauthenticated", toolName);
+            return toolError(LMS_SESSION_GUIDANCE);
+        }
+        String studentFp = com.ssuai.domain.auth.lms.LmsSessionStore.fingerprint(studentId);
+        log.info("chat private tool requested: tool={} studentFp={}", toolName, studentFp);
+        try {
+            Object response = serviceCall.get();
+            String json = objectMapper.writeValueAsString(response);
+            log.info("chat private tool completed: tool={} studentFp={}", toolName, studentFp);
+            return compactAndCap(toolName, json);
+        } catch (LmsSessionExpiredException exception) {
+            log.info("chat private tool expired: tool={} studentFp={}", toolName, studentFp);
+            return toolError(LMS_SESSION_EXPIRED_GUIDANCE);
         } catch (JsonProcessingException exception) {
             throw new ChatUnavailableException(exception);
         }
@@ -585,6 +630,7 @@ public class LlmChatService implements ChatService {
                 case "search_library_book" -> compactLibraryBookSearchNode(tree);
                 case "get_my_schedule" -> compactScheduleNode(tree);
                 case "get_my_grades" -> compactGradesNode(tree);
+                case "get_my_assignments" -> compactAssignmentsNode(tree);
                 default -> tree;
             };
             return capLength(objectMapper.writeValueAsString(compacted));
@@ -753,6 +799,27 @@ public class LlmChatService implements ChatService {
             }
         }
         return total;
+    }
+
+    private ObjectNode compactAssignmentsNode(JsonNode node) {
+        ObjectNode compact = objectMapper.createObjectNode();
+        compact.put("termId", node.path("termId").asLong());
+        JsonNode items = node.path("items");
+        if (items.isArray()) {
+            ArrayNode compacted = objectMapper.createArrayNode();
+            for (JsonNode item : items) {
+                ObjectNode ci = objectMapper.createObjectNode();
+                copyTextIfPresent(item, ci, "courseName");
+                copyTextIfPresent(item, ci, "title");
+                copyTextIfPresent(item, ci, "type");
+                if (item.hasNonNull("dueDate")) {
+                    copyTextIfPresent(item, ci, "dueDate");
+                }
+                compacted.add(ci);
+            }
+            compact.set("items", compacted);
+        }
+        return compact;
     }
 
     private ObjectNode compactLibraryBookSearchNode(JsonNode node) {
@@ -928,7 +995,7 @@ public class LlmChatService implements ChatService {
      */
     private static boolean looksLikeOutOfScopeRequest(String message) {
         String normalized = normalize(message);
-        return containsAny(normalized, "lms", "과제", "수강신청", "졸업요건", "개인정보");
+        return containsAny(normalized, "수강신청", "졸업요건", "개인정보");
     }
 
     private static boolean looksLikeSecretInput(String message) {
