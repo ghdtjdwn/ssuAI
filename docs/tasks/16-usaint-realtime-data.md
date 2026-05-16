@@ -428,6 +428,91 @@ public GradesResponse fetchGrades(String studentId, PortalCookies cookies) {
 - `LlmChatService.compactToolResponse` 의 `get_my_grades` 분기 단위
   테스트로 고정 — 회귀 시 CI 차단.
 
+### 3.5.1 PR 16c spike 결과 잠금 (2026-05-16)
+
+브라우저 spike (Network 탭 → ZCMB3W0017 응답 Copy response, raw 180KB)
+결과로 §3.5 의 추정 사항들이 다음과 같이 확정/갱신됨. fixture 는
+`backend/src/test/resources/saint/grades-success.html` 에 잠금 (PII 치환,
+시간표 fixture 와 동일 패턴 — 핵심 anchor 보존).
+
+**확정 — 시간표와 같은 부분**:
+
+- Host + Component: `https://ecc.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMB3W0017` ✓
+- 인증: cross-subdomain MYSAPSSO2 (시간표와 동일 패턴, 별도 ecc 로그인 X)
+- CSRF: `<input id="sap-wd-secure-id" value="...">` (페이지 안에 들어있음)
+- 표 anchor: `tbody[id$="-contentTBody"]`, `tr[rt="2"]` 헤더 / `tr[rt="1"]`
+  데이터, `td[role="gridcell"][cc="N"]` cell, `<span class*="lsTextView">`
+  text content — 시간표 §3.2 selector 패턴 그대로 재사용 가능
+- 빈 cell anchor: `<div class="lsSTEmptyRow">` 동일
+
+**갱신 — 시간표와 다른 부분 (중요)**:
+
+1. **첫 GET 응답이 WebDynpro full-update XML wrapper 형태** — 시간표
+   첫 GET 은 raw HTML, WDA7 POST 응답만 wrapper 였는데 ZCMB3W0017 는
+   **첫 GET 부터** wrapper. connector 가 `WebDynproResponseUnwrapper.extractHtml()`
+   통과 후 parse 해야 함.
+
+   ```xml
+   <updates>
+     <full-update windowid="sapwd_main_window">
+       <content-update id="sapwd_main_window_root_">
+         <![CDATA[ ... HTML (표 + secure-id + form) ... ]]>
+       </content-update>
+     </full-update>
+   </updates>
+   ```
+
+2. **상단 학기별 표 컬럼 14개** (cc=0..13) — §3.5 의 8개 추정에서
+   확장:
+
+   | cc | 컬럼 | 비고 |
+   |----|------|------|
+   | 0 | (선택 컬럼) | 행 선택 토글, parser skip |
+   | 1 | 학년도 | "2025", "2022" 같은 4자리 |
+   | 2 | 학기 | **한국어 텍스트** ("1학기" / "2학기" / "여름학기" / "겨울학기") — `091/092/093/094` enum 가정 폐기 |
+   | 3 | 신청학점 | "19.5" |
+   | 4 | 취득학점 | |
+   | 5 | P/F학점 | |
+   | 6 | 평점평균 | P/F 학기는 "0.00" |
+   | 7 | 평점계 | |
+   | 8 | 산술평균 | 신규 (§3.5 에 없던 컬럼) |
+   | 9 | 학기별석차 | "70&#x2f;140" (HTML-encoded "/") |
+   | 10 | 전체석차 | 신규 |
+   | 11 | 학사경고여부 | 신규 (정상 학적은 빈 cell) |
+   | 12 | 상담여부 | 신규 |
+   | 13 | 유급 | 신규 |
+
+3. **학적부/증명 통계는 별도 grid** (학기별 표 아래의 두 개 group
+   layout container) — `<label for="WDxxx">` ↔ `<input id="WDxxx" value="N">`
+   쌍. label.lsdata 의 `3:'학적부신청학점'` 텍스트 또는 label 자식
+   span text 가 anchor. 산술평균 행도 포함 (학적부산술평균 + 증명산술평균
+   = 신규).
+
+4. **학기별 세부 표 default 빈 상태** — 페이지 첫 로드 시 `<tbody id="...-contentTBody">`
+   안에 헤더 row (rt="2") 만 있고 data row (rt="1") 가 0개. 학년도/학기
+   listbox + 조회 button 을 click 해야 채워짐. → **PR 16c 단일 GET 만으로
+   세부 성적을 못 받음.** 첫 cut scope 에서 제외:
+
+   | PR 16c 첫 cut | follow-up PR |
+   |---|---|
+   | 학기별 GPA history (전체) | 학기별 세부 (과목별 성적) |
+   | 학적부 누적 통계 (6 항목) | 학기 dropdown nav + "조회" button-press POST iterate (시간표 WDA7 와 동일 패턴) |
+   | 증명용 누적 통계 (6 항목) | |
+
+5. **응답 본문에 학번/이름 미포함** — spike grep 결과 0 hit. portal
+   wrapper (portal-success.html) 가 학번/이름 추출 담당. ZCMB3W0017
+   응답은 grade 통계만. fixture redaction 부담 작음 (수치만 placeholder).
+
+**메뉴 nav ID** (portal contentAreaFrame 의 PrevNavTarget 에서 캡처):
+`65c7bab0180b19f422443f400d4d041c` (학기별 성적조회). 시간표 메뉴 ID
+들 (개인수업시간표조회 `1724938fdd5d98311a8647b31efd21fe`, 강의시간표
+`56883564eb5b429e9876b8176235a960`) 과 함께 portal nav ID 목록에 추가.
+
+**URL query params** (`sap-sessioncmd=USR_ABORT` 등) 은 portal 의 iView
+transient ID — 매 nav 마다 바뀜. connector 는 base path (`/sap/bc/webdynpro/SAP/ZCMB3W0017`)
+만 쓰고 query 는 ecc 가 자체 생성. 시간표 RealSaintScheduleConnector 와
+동일 패턴.
+
 ## 4. Architecture
 
 ```text

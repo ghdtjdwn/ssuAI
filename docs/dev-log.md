@@ -5,6 +5,19 @@ ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 
 ## 2026-05-16
 
+- 2026-05-16: **Task 16 PR 16c-A — 성적 fixture spike + spec §3.5 잠금**.
+  사용자 brower spike (Network 탭 ZCMB3W0017 응답 Copy response, raw
+  180KB) 결과 spec §3.5 추정의 큰 변경 5개 잠금: (1) 첫 GET 응답이
+  이미 WebDynpro full-update XML wrapper (시간표는 raw HTML 였음 —
+  connector 가 unwrap 필수), (2) 상단 학기별 표 컬럼 14개 (cc=0..13)
+  — 산술평균/전체석차/학사경고여부/상담여부/유급 추가, (3) 학기 라벨이
+  한국어 텍스트 ("1학기"/"2학기"/"여름학기"/"겨울학기") — `091/092` enum
+  가정 폐기, (4) 학기별 세부 표 default 빈 상태 — PR 16c 단일 GET 으로
+  못 받음, 학기 nav + "조회" button-press POST iterate 가 follow-up 으로
+  분리, (5) 응답 본문에 학번/이름 0 hit (PII 부담 작음). fixture
+  `backend/src/test/resources/saint/grades-success.html` 잠금 (PII 수치
+  redacted, raw 패턴 보존). PR 16c 첫 cut scope 단순해짐 — 학기별
+  GPA history + 학적부/증명 누적 통계만.
 - 2026-05-16: **Task 16 PR 16b — 시간표 connector + service + controller**.
   `RealSaintScheduleConnector` (ZCMW2102 GET → WDA7 prev iterate, CSRF
   rotation, Set-Cookie merge), `MockSaintScheduleConnector` (default
