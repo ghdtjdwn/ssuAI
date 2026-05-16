@@ -118,16 +118,64 @@ why synthetic fixtures cost three rewrites at prod-verify time.
 
 ### 3.1 PR 16a 1차 spike 결과 (2026-05-16 — 개인수업시간표조회)
 
-**시간표 endpoint 확정**: SAP WebDynpro 컴포넌트 `zcmw9001n`. wrapper 의
-contentAreaFrame 이 portal nav event (`POST .../prteventname/Navigate/...
-/com.sap.portal.contentarea?windowId=WID...&PrevNavTarget=navurl://...`
-+ body `NavigationTarget=navurl://1724938fdd5d98311a8647b31efd21fe`) 를
-거쳐 최종적으로 `https://saint.ssu.ac.kr/sap/bc/webdynpro/sap/zcmw9001n`
-의 응답 HTML 을 로드. 메뉴 nav ID (개인수업시간표조회) =
+**시간표 endpoint 확정**: SAP WebDynpro 컴포넌트 `ZCMW2102` (대문자.
+SAP custom Z-namespace component naming), host **`https://ecc.ssu.ac.kr:8443`**
+(saint 아님!). portal 의 contentAreaFrame 이 cross-subdomain iframe 으로
+`https://ecc.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMW2102;sap-ext-sid=<transient>?sap-contextid=...`
+에 진입. 메뉴 nav ID (개인수업시간표조회) =
 `1724938fdd5d98311a8647b31efd21fe`. 같은 wrapper 응답에서 강의시간표
 메뉴 ID = `56883564eb5b429e9876b8176235a960` 도 함께 잡힘.
 
-**표 parsing structure 잠금** (`backend/src/test/resources/saint/timetable-success.html`):
+**인증 모델 — cross-subdomain SAP SSO**:
+
+- portal 의 phase 1 / phase 2 가 발급한 cookie 중 `MYSAPSSO2` 가
+  domain `.ssu.ac.kr` 으로 set 되어 `ecc.ssu.ac.kr:8443` 에도 자동
+  attach. base64 디코드하면 `portal:20221528` 처럼 학번이 들어있는
+  SAP NetWeaver 표준 cross-subdomain SSO 토큰.
+- 따라서 ssuAI backend connector 는 **별도 ecc 로그인 round-trip 불필요**.
+  `SaintSessionStore` 에 portal phase cookies 다 담아두면 ecc 호출
+  시 그대로 `Cookie:` 헤더로 보내면 SAP 가 SSO 통과시킴.
+- 추가로 ecc 가 발급하는 session cookie 들 (`SAP_SESSIONID_SSP_100`,
+  `sap-usercontext=sap-language=KO&sap-client=100`, `WAF`) 도 첫
+  ZCMW2102 응답에서 받아 후속 호출까지 유지.
+
+**CSRF 토큰 = `sap-wd-secure-id`** (예: `871202BF3389E157FBEB10D187CEB48A`).
+WebDynpro 의 표준 CSRF 토큰. 매 page load 마다 다름. connector 의
+sequence:
+
+1. **GET** `.../sap/bc/webdynpro/SAP/ZCMW2102` (cookies 첨부, ecc 세션
+   초기화)
+2. 응답 HTML 에서 `<input name="sap-wd-secure-id" value="..."/>` 또는
+   유사 hidden field parse → 캐싱
+3. 응답 HTML 안에 시간표 표가 직접 들어있는지, 아니면 WebDynpro
+   partial XHR delta 한두 번 더 보내야 표가 채워지는지는 **별도 확인**
+   (사용자 paste 한 cURL 은 partial XHR update 였음 — 페이지 load 후
+   client-side init telemetry. 진짜 시간표 표 HTML 의 출처는 첫 GET
+   응답 body 를 봐야 확정).
+
+**Custom Headers WebDynpro 가 보내는 것들** (connector 가 흉내내야
+할지 별도 spike 필요):
+
+- `SAP-PASSPORT: 2A54482A0300E60000...` — SAP telemetry. 없어도
+  동작할 가능성 큼.
+- `X-XHR-Logon: accept` — SAP login challenge 처리 모드 (logon ticket
+  expire 시 popup 대신 401 JSON 응답 요청). connector 가 401 처리
+  파이프 있으면 보내는 게 안전.
+- `X-Requested-With: XMLHttpRequest` — XHR 표식. 정적 GET 만 한다면
+  생략 가능.
+
+**Request body** (POST 일 때 — partial update sequence):
+
+- `sap-charset=utf-8`
+- `sap-wd-secure-id=<CSRF token from step 2>`
+- `fesrAppName=ZCMW2102`, `fesrUseBeacon=true` — frontend telemetry,
+  생략 가능 추정
+- `SAPEVENTQUEUE=...` — WebDynpro client→server event delta. 초기
+  page load 만 필요하면 단순 GET 이라 SAPEVENTQUEUE 안 보낸다.
+
+### 3.2 표 parsing structure (fixture 로 잠금)
+
+표 자체의 parsing structure (`backend/src/test/resources/saint/timetable-success.html`):
 
 | Selector | Role | Notes |
 |---|---|---|
@@ -141,19 +189,26 @@ contentAreaFrame 이 portal nav event (`POST .../prteventname/Navigate/...
 빈 cell vs 강의 cell 의 구분이 명확 (서로 배타적). cc attribute 가
 column 매핑을 줘서 헤더-data row 의 column 순서 drift 도 robust.
 
-**아직 미정 (별도 spike 필요 — PR 16b 시작 직전)**:
+### 3.3 PR 16b 시작 전 마지막 spike (남은 1건)
 
-1. WebDynpro form 의 정확한 action URL + query params + hidden inputs
-   (`sap-wd-secure-id`, `sap-wd-csrf-token`, ViewState 류).
-2. wrapper 의 portal nav POST 응답이 곧바로 zcmw9001n HTML 인지, 아니면
-   intermediate 페이지 (e.g., AFP launcher → secondary redirect) 가
-   더 끼는지.
-3. 시간표 변경 (학기 전환, refresh 후) 시 표가 새 HTML 응답인지 아니면
-   부분 AJAX update 인지.
+ZCMW2102 페이지의 **첫 GET response body** 에 시간표 표 markup
+(`<tbody id="...contentTBody">` + cell content) 이 직접 들어있는지
+확인 필요. 두 가지 가능 시나리오:
 
-이 셋은 PR 16b 의 connector 코드 첫 line 쓰기 직전 한 번 더 capture
-(브라우저 F12 → Network 탭, doc/xhr 필터, 응답 body 에 zcmw9001n 또는
-시간표 셀 data 가 들어있는 request 한두 개 paste) 로 확정 후 진행.
+- **(a) initial render 가 표 포함**: connector 가 GET 한 번으로
+  HTML 받아 Jsoup parse 가능. 가장 단순한 경로.
+- **(b) partial XHR delta 필요**: GET 응답은 빈 표 + WebDynpro client
+  bootstrap → 후속 POST 1-2번이 표를 채움. connector 가 secure-id
+  parse 후 작은 SAPEVENTQUEUE event 한 번 더 던져야.
+
+이 둘 중 어느 쪽인지가 connector 구현 복잡도를 결정. 브라우저에서
+Network 탭의 ZCMW2102 row 중 응답 size 가 가장 큰 첫 번째 row 의
+**Response 탭 → 전체 응답 body 캡처** → `<tbody` 키워드 grep 으로
+확인. (a) 면 connector 는 4-5줄, (b) 면 secure-id 추출 + 추가 POST
+필요.
+
+표 parsing 은 이미 fixture 로 잠겨있어 (a)/(b) 어느 쪽이든 parser
+재사용 가능. spike 결과는 connector 의 fetch sequence 만 결정.
 
 ## 4. Architecture
 
