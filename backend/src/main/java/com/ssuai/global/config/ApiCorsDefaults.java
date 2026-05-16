@@ -12,7 +12,7 @@ final class ApiCorsDefaults {
                 .allowedOrigins(origin)
                 .allowedMethods("GET", "POST", "OPTIONS")
                 .allowedHeaders("*")
-                .allowCredentials(false)
+                .allowCredentials(true)
                 .maxAge(3600);
     }
 }
