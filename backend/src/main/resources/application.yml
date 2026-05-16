@@ -71,6 +71,7 @@ ssuai:
     library-book: mock # mock | real
     saint-schedule: mock # mock | real
     saint-grades: mock # mock | real
+    lms-assignments: mock # mock | real
     chat: ${SSUAI_CONNECTOR_CHAT:mock} # mock | llm
   library:
     seat:
@@ -111,6 +112,14 @@ ssuai:
       # ephemeral random per JVM start (dev/test convenience; stored
       # sessions become unreadable across restarts). Prod must set the
       # SSUAI_CREDENTIAL_ENCRYPTION_KEY env var on the ConfigMap/secret.
+      encryption-key: ${SSUAI_CREDENTIAL_ENCRYPTION_KEY:}
+  lms:
+    gw-callback-url: ${SSUAI_LMS_GW_CALLBACK_URL:https://lms.ssu.ac.kr/xn-sso/gw-cb.php}
+    canvas-base-url: ${SSUAI_LMS_CANVAS_BASE_URL:https://canvas.ssu.ac.kr}
+    timeout: 10s
+    session:
+      ttl: 2h
+      max-sessions: 1000
       encryption-key: ${SSUAI_CREDENTIAL_ENCRYPTION_KEY:}
   auth:
     # Public origin of THIS backend, used to build the SmartID

@@ -61,6 +61,8 @@ class LlmChatServiceTests {
             mock(com.ssuai.domain.saint.service.SaintScheduleService.class);
     private final com.ssuai.domain.saint.service.SaintGradesService gradesService =
             mock(com.ssuai.domain.saint.service.SaintGradesService.class);
+    private final com.ssuai.domain.lms.service.LmsAssignmentsService lmsAssignmentsService =
+            mock(com.ssuai.domain.lms.service.LmsAssignmentsService.class);
 
     @Test
     void fallsBackAcrossProvidersWhenFirstProviderRateLimitIsExceeded() {
@@ -277,7 +279,7 @@ class LlmChatServiceTests {
                 .reply("gemini-model", "should not be called");
         LlmChatService chatService = chatService(List.of(gemini), List.of("gemini"));
 
-        ChatResponse response = chatService.reply("c-test", "내 LMS 과제 알려줘");
+        ChatResponse response = chatService.reply("c-test", "수강신청 어떻게 해?");
 
         assertThat(response.reply()).contains("그 정보는 지원하지 않");
         assertThat(gemini.callCount()).isZero();
@@ -778,6 +780,7 @@ class LlmChatServiceTests {
                 new ChatConversationStore(new ChatMemoryProperties()),
                 scheduleService,
                 gradesService,
+                lmsAssignmentsService,
                 List.of(mcpClient)
         );
     }
@@ -796,6 +799,7 @@ class LlmChatServiceTests {
                 new ChatConversationStore(new ChatMemoryProperties()),
                 scheduleService,
                 gradesService,
+                lmsAssignmentsService,
                 List.of(mcpClient),
                 clock
         );

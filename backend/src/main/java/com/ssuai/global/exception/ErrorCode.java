@@ -13,6 +13,8 @@ public enum ErrorCode {
     CHAT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 응답 기능을 일시적으로 사용할 수 없습니다."),
     LIBRARY_SESSION_REQUIRED(HttpStatus.UNAUTHORIZED, "도서관 로그인이 필요합니다."),
     SAINT_SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "u-SAINT 세션이 만료되었습니다. 다시 로그인해주세요."),
+    LMS_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "LMS 인증에 실패했습니다."),
+    LMS_SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "LMS 세션이 만료되었습니다. 다시 로그인해주세요."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method not allowed");
