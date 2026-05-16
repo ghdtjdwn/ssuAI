@@ -342,6 +342,92 @@ List<TermSchedule> fetchAllTerms(String studentId, PortalCookies cookies) {
 권장: PR 16b 첫 cut = "**전체 학년도 1학기 iterate**". 사용자 의도의
 70% cover, code 복잡도 적당. 2학기 nav 는 follow-up spike + PR 로.
 
+### 3.5 성적 (`get_my_grades`) — 단일 GET 으로 전체 누적 fetch
+
+성적은 시간표와 결정적으로 다름: **multi-term iterate 가 불필요**.
+페이지 자체에 모든 학기 누적 GPA history 가 한 번에 표시됨.
+
+**엔드포인트 확정** (사용자 brower spike, 2026-05-16):
+
+- Host: `https://ecc.ssu.ac.kr:8443` (시간표와 동일)
+- Component: **`ZCMB3W0017`** (시간표의 `ZCMW2102` 와 다른 SAP 모듈 —
+  성적 전용)
+- 응답 shape: 시간표와 동일 WebDynpro full-update XML wrapper
+  (`<updates><full-update><content-update><![CDATA[...HTML...]]>`)
+- 인증·CSRF: 시간표와 동일 (MYSAPSSO2 + sap-wd-secure-id)
+
+**페이지 영역 2개**:
+
+| 영역 | 내용 | 컬럼 (lsdata 에서 추출) |
+|---|---|---|
+| 상단 "학기별 성적" | 입학년도 ~ 현재 학기 모든 학기의 GPA history (한 번에 다 보임) | 학년도 / 학기 / 신청학점 / 취득학점 / P·F학점 / 평점평균 / 평점계 / 학기별석차 |
+| 하단 "학기별 세부 성적" | 선택된 한 학기의 과목별 상세 (학기 dropdown 변경 + "조회" 버튼 클릭 후 갱신) | 성적 / 상세성적 / 과목학점 / 과목명 / 교수 / 등 |
+
+추가로 응답 안 (separate 학적 통계 row):
+
+- **학적부 누적 통계**: 학적부신청학점 / 학적부취득학점 / 학적부평점평균
+  / 학적부평점계 / 학적부P·F학점 — 졸업요건 기준
+- **증명용 누적 통계**: 증명신청학점 / 증명취득학점 / 증명평점평균 /
+  증명평점계 / 증명P·F학점 — 재수강 / P·F 처리 차이를 반영한 외부
+  증명서 기준. 학적부와 다를 수 있음.
+
+**학기 코드 enum** (lsdata `'4':'091'/'092'` 등에서 추출):
+
+| 코드 | 의미 |
+|------|------|
+| `091` | 1학기 |
+| `092` | 2학기 |
+| `093` | 여름계절학기 (추정 — 실제 spike 시 확정) |
+| `094` | 겨울계절학기 (추정) |
+
+학년도는 4자리 숫자 그대로 (`2025` 등).
+
+**Connector pseudo-code** (PR 16c — 단일 GET):
+
+```java
+public GradesResponse fetchGrades(String studentId, PortalCookies cookies) {
+    String html = httpGet(ZCMB3W0017_URL, cookies);
+    Document doc = Jsoup.parse(html);
+
+    // 상단: 학기별 성적 누적 표 (모든 학기 GPA history)
+    Elements termRows = doc.select("[id$=_GL] [lsdata*=학기별 성적] tbody tr[rt=1]");
+    List<TermGpa> byTerm = termRows.stream()
+        .map(GradesParser::parseTermRow)
+        .toList();
+
+    // 통계 row 들 — `학적부평점평균` / `증명평점평균` 등 ID 로 매칭
+    GpaSummary academicRecord = parseSummary(doc, "학적부");  // WD0147~WD015C
+    GpaSummary certificate = parseSummary(doc, "증명");        // WD0168~WD017D
+
+    // 하단: 현재 학기 세부 (default 가 가장 최근 학기) — optional
+    List<CourseGrade> currentDetails = parseDetailsTable(
+        doc.select("[lsdata*=학기별 세부 성적] tbody tr[rt=1]"));
+
+    return new GradesResponse(byTerm, academicRecord, certificate, currentDetails);
+}
+```
+
+**시간표 (§3.4) 와의 차이 요약**:
+
+| 항목 | 시간표 (`get_my_schedule`) | 성적 (`get_my_grades`) |
+|---|---|---|
+| Component | `ZCMW2102` | `ZCMB3W0017` |
+| Multi-term iterate | 필요 (WDA7 prev N회) | **불필요** (단일 GET 으로 전체) |
+| 누적 통계 | 없음 (학기별 표만) | 있음 (학적부 + 증명용 각각) |
+| 학기 UI | PREV/NEXT 버튼 (WDA7) | listbox dropdown (학년도/학기) + 조회 버튼 |
+| 응답 단위 | 한 학기 표 | 전체 학적 + 한 학기 세부 |
+
+**LLM prompt 정책 재확인** (Task 16 §6 #6 + §8 동일):
+
+- `get_my_grades` MCP tool 응답으로 LLM 에 보내는 것 = **요약만**:
+  `{ "totalTerms": int, "cumulativeGpa": double (학적부 기준),
+     "creditsEarned": int, "link": "/grades" }`
+- 학기별 GPA history / 과목별 성적 / 등급 / 석차 등 **세부 데이터는
+  controller path 로만** (`GET /api/saint/grades` → dashboard card +
+  REST consumer). LLM 토큰 스트림에 절대 안 들어감.
+- `LlmChatService.compactToolResponse` 의 `get_my_grades` 분기 단위
+  테스트로 고정 — 회귀 시 CI 차단.
+
 ## 4. Architecture
 
 ```text
