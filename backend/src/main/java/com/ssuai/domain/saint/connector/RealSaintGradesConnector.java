@@ -215,8 +215,9 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
             throw new SaintSessionExpiredException("ecc returned empty body");
         }
         if (org.jsoup.Jsoup.parse(html).selectFirst("tbody[id$=-contentTBody]") == null) {
-            log.info("saint grades auth gate tripped: studentFp={}",
-                    SaintSessionStore.fingerprint(studentId));
+            String snippet = html.substring(0, Math.min(500, html.length())).replaceAll("\\s+", " ");
+            log.info("saint grades auth gate tripped: studentFp={} htmlSnippet='{}'",
+                    SaintSessionStore.fingerprint(studentId), snippet);
             throw new SaintSessionExpiredException(
                     "ecc did not return the grades tables (likely logon redirect)");
         }
