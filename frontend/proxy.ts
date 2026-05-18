@@ -6,8 +6,13 @@ const BACKEND_BASE = (
   "http://localhost:8080"
 ).replace(/\/$/, "");
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+// Intercept the SmartID SSO callback before the /api/* rewrite runs.
+// Vercel strips Set-Cookie from rewrite proxy responses that come from a
+// different domain, so the backend can never set the refresh cookie through
+// a rewrite. Middleware runs first and re-issues the cookie itself, which
+// makes it land on ssuai.vercel.app rather than ssumcp.duckdns.org.
+export async function proxy(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
 
   let backendRes: Response;
   try {
@@ -19,19 +24,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth/return?error=unknown", request.url));
   }
 
-  // Success: backend returns 200 + Set-Cookie (PR #144 fix).
-  // We re-set the cookie here so it lands on ssuai.vercel.app, not
-  // ssumcp.duckdns.org — Vercel strips cross-domain cookies from rewrites.
-  if (backendRes.status === 200) {
-    const setCookie = backendRes.headers.get("set-cookie");
+  const setCookie = backendRes.headers.get("set-cookie");
+
+  if (backendRes.status === 200 && setCookie) {
     const response = NextResponse.redirect(new URL("/auth/return?ok=1", request.url));
-    if (setCookie) {
-      response.headers.set("Set-Cookie", setCookie);
-    }
+    response.headers.set("Set-Cookie", setCookie);
     return response;
   }
 
-  // Error paths: backend returns 302 with ?error=... query param.
   if (backendRes.status === 302 || backendRes.status === 301) {
     const location = backendRes.headers.get("location") ?? "";
     try {
@@ -44,3 +44,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.redirect(new URL("/auth/return?error=unknown", request.url));
 }
+
+export const config = {
+  matcher: ["/api/auth/saint/sso-callback"],
+};
