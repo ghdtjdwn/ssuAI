@@ -140,7 +140,9 @@ class McpSaintAuthControllerTests {
         mockMvc.perform(get("/api/mcp/auth/saint/callback")
                         .param("sToken", "bad").param("sIdno", "bad").param("state", "valid-state"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("로그인 실패")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("로그인 실패")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("invalid tokens"))));
 
         verify(mcpAuthService, never()).linkProvider(any(), any(), any());
     }

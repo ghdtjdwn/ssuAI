@@ -43,9 +43,8 @@ public class McpAuthMcpTools {
 
     @Tool(
             name = "get_auth_status",
-            description = "MCP 인증 세션의 현재 상태를 반환합니다. "
-                    + "각 provider(SAINT/LMS/LIBRARY)의 연결 여부를 확인합니다. "
-                    + "mcp_session_id가 없거나 유효하지 않으면 모든 provider가 미연결 상태로 반환됩니다."
+            description = "Returns the current MCP auth session status for each provider (SAINT, LMS, LIBRARY). "
+                    + "If mcp_session_id is missing or invalid, all providers show as not linked."
     )
     public McpAuthStatusResponse getAuthStatus(String mcp_session_id) {
         McpAuthSession session = mcpAuthService.find(mcp_session_id).orElse(null);
@@ -70,17 +69,16 @@ public class McpAuthMcpTools {
 
     @Tool(
             name = "start_auth",
-            description = "지정한 provider(SAINT/LMS/LIBRARY)에 대한 로그인 URL을 생성합니다. "
-                    + "mcp_session_id가 없으면 새 세션을 발급합니다. "
-                    + "반환된 loginUrl을 브라우저에서 열어 로그인을 완료하면, "
-                    + "이후 private tool 호출 시 mcpSessionId를 인자로 전달하세요."
+            description = "Generates a login URL for the specified provider (SAINT, LMS, or LIBRARY). "
+                    + "Creates a new MCP session if mcp_session_id is not provided. "
+                    + "Open loginUrl in a browser to complete login, then pass the returned mcpSessionId to private tool calls."
     )
     public McpAuthStartResponse startAuth(String provider, String mcp_session_id) {
         McpProviderType providerType = parseProvider(provider);
         if (providerType == null) {
             return new McpAuthStartResponse(
                     "ERROR", provider, mcp_session_id, null, null,
-                    "알 수 없는 provider: " + provider + ". SAINT, LMS, LIBRARY 중 하나를 사용하세요.");
+                    "Unknown provider: " + provider + ". Use SAINT, LMS, or LIBRARY.");
         }
 
         McpAuthSession session = mcpAuthService.getOrCreate(mcp_session_id);
@@ -94,29 +92,28 @@ public class McpAuthMcpTools {
                 session.id().value(),
                 loginUrl,
                 state.expiresAt(),
-                "브라우저에서 loginUrl을 열어 로그인을 완료하세요. "
-                        + "완료 후 mcpSessionId(" + session.id().value() + ")를 사용해 private tool을 다시 호출하세요.");
+                "Open loginUrl in a browser to complete login, then call private tools with mcpSessionId.");
     }
 
     @Tool(
             name = "logout_provider",
-            description = "지정한 provider(SAINT/LMS/LIBRARY)의 인증 세션을 해제합니다. "
-                    + "mcp_session_id와 provider가 모두 필요합니다."
+            description = "Unlinks a specific provider (SAINT, LMS, or LIBRARY) from the MCP session. "
+                    + "Requires both mcp_session_id and provider."
     )
     public McpAuthLogoutResponse logoutProvider(String provider, String mcp_session_id) {
         McpProviderType providerType = parseProvider(provider);
         if (providerType == null) {
             return new McpAuthLogoutResponse("ERROR", mcp_session_id, provider,
-                    "알 수 없는 provider: " + provider);
+                    "Unknown provider: " + provider + ". Use SAINT, LMS, or LIBRARY.");
         }
         if (mcp_session_id == null || mcp_session_id.isBlank()) {
-            return new McpAuthLogoutResponse("ERROR", null, provider, "mcp_session_id가 필요합니다.");
+            return new McpAuthLogoutResponse("ERROR", null, provider, "mcp_session_id is required.");
         }
 
         McpAuthSession session = mcpAuthService.find(mcp_session_id).orElse(null);
         if (session == null) {
             return new McpAuthLogoutResponse("ERROR", mcp_session_id, provider,
-                    "유효한 MCP 세션이 없습니다.");
+                    "No valid MCP session found.");
         }
 
         mcpAuthService.unlinkProvider(session.id(), providerType);
@@ -126,18 +123,18 @@ public class McpAuthMcpTools {
 
     @Tool(
             name = "logout_all",
-            description = "MCP 인증 세션 전체를 삭제합니다. 모든 provider 연결이 해제됩니다. "
-                    + "mcp_session_id가 필요합니다."
+            description = "Removes the entire MCP auth session and all linked providers. "
+                    + "Requires mcp_session_id."
     )
     public McpAuthLogoutResponse logoutAll(String mcp_session_id) {
         if (mcp_session_id == null || mcp_session_id.isBlank()) {
-            return new McpAuthLogoutResponse("ERROR", null, null, "mcp_session_id가 필요합니다.");
+            return new McpAuthLogoutResponse("ERROR", null, null, "mcp_session_id is required.");
         }
 
         McpAuthSession session = mcpAuthService.find(mcp_session_id).orElse(null);
         if (session == null) {
             return new McpAuthLogoutResponse("ERROR", mcp_session_id, null,
-                    "유효한 MCP 세션이 없습니다.");
+                    "No valid MCP session found.");
         }
 
         mcpAuthService.invalidateSession(session.id());

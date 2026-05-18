@@ -8,11 +8,11 @@ public record McpAuthLogoutResponse(String status, String mcpSessionId, String p
 
     public static McpAuthLogoutResponse providerLogout(String mcpSessionId, String provider) {
         return new McpAuthLogoutResponse("OK", mcpSessionId, provider,
-                provider + " 로그아웃 완료. 다시 사용하려면 start_auth를 호출하세요.");
+                provider + " logged out. Call start_auth to re-authenticate.");
     }
 
     public static McpAuthLogoutResponse allLogout(String mcpSessionId) {
         return new McpAuthLogoutResponse("OK", mcpSessionId, null,
-                "MCP 세션 전체 로그아웃 완료.");
+                "All providers logged out. MCP session invalidated.");
     }
 }
