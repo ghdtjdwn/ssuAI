@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -59,6 +60,15 @@ public class LibrarySessionController {
         log.info("library session captured: sessionKey={} tokenFingerprint={}",
                 LibrarySessionStore.fingerprint(sessionKey),
                 LibrarySessionStore.fingerprint(request.token()));
+        return ApiResponse.success(null);
+    }
+
+    @DeleteMapping("/api/library/session")
+    @Operation(summary = "Clear the stored oasis.ssu.ac.kr Pyxis-Auth-Token for the current ssuAI session")
+    public ApiResponse<Void> clearSession(HttpServletRequest httpRequest) {
+        String sessionKey = httpRequest.getSession().getId();
+        sessionStore.invalidate(sessionKey);
+        log.info("library session cleared: sessionKey={}", LibrarySessionStore.fingerprint(sessionKey));
         return ApiResponse.success(null);
     }
 }

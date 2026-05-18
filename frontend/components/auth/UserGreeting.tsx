@@ -11,9 +11,9 @@ export function UserGreeting() {
 
   if (isAuthenticated && user) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-col items-end gap-0.5">
         <p
-          className="max-w-[8rem] truncate text-sm font-medium text-foreground sm:max-w-[12rem]"
+          className="max-w-[8rem] truncate text-right text-sm font-medium text-foreground sm:max-w-[12rem]"
           title={`안녕하세요, ${user.name} 학생`}
         >
           <span className="hidden sm:inline">안녕하세요, </span>
@@ -22,7 +22,7 @@ export function UserGreeting() {
         </p>
         <button
           type="button"
-          className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          className="text-xs leading-none text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           onClick={() => void logout()}
         >
           로그아웃
