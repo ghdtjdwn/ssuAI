@@ -13,23 +13,41 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ssuai.domain.library.auth.dto.LibraryCredentialLoginRequest;
 import com.ssuai.domain.library.auth.dto.LibrarySessionCaptureRequest;
 import com.ssuai.global.response.ApiResponse;
 
 @RestController
-@RequestMapping("/api/library/session")
 @Tag(name = "Library", description = "Library upstream session capture")
 public class LibrarySessionController {
 
     private static final Logger log = LoggerFactory.getLogger(LibrarySessionController.class);
 
     private final LibrarySessionStore sessionStore;
+    private final LibraryCredentialLoginService credentialLoginService;
 
-    public LibrarySessionController(LibrarySessionStore sessionStore) {
+    public LibrarySessionController(
+            LibrarySessionStore sessionStore,
+            LibraryCredentialLoginService credentialLoginService) {
         this.sessionStore = sessionStore;
+        this.credentialLoginService = credentialLoginService;
     }
 
-    @PostMapping
+    /** Credential login — frontend sends AES-encrypted password as oasis JS does. */
+    @PostMapping("/api/library/login")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Login to oasis.ssu.ac.kr and store the resulting Pyxis-Auth-Token")
+    public ApiResponse<Void> credentialLogin(
+            @Valid @RequestBody LibraryCredentialLoginRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String sessionKey = httpRequest.getSession().getId();
+        credentialLoginService.login(sessionKey, request);
+        return ApiResponse.success(null);
+    }
+
+    /** Legacy: manual token capture (kept for backward compat). */
+    @PostMapping("/api/library/session")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Capture the oasis.ssu.ac.kr Pyxis-Auth-Token for the current ssuAI session")
     public ApiResponse<Void> captureSession(
