@@ -13,6 +13,15 @@ export function captureLibrarySession(token: string) {
   });
 }
 
+export function loginLibrary(loginId: string, password: string) {
+  return fetchJson<null>("/api/library/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ loginId, password }),
+  });
+}
+
 export function searchLibraryBooks(query: string, page = 0, size = 10) {
   const params = new URLSearchParams({ query, page: String(page), size: String(size) });
   return fetchJson<LibraryBookSearchResponse>(`/api/library/books?${params.toString()}`);

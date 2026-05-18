@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 
 export function UserGreeting() {
@@ -33,13 +31,5 @@ export function UserGreeting() {
     );
   }
 
-  return (
-    <Link
-      href="/auth/login"
-      className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-    >
-      <span className="hidden sm:inline">유세인트로 로그인</span>
-      <span className="sm:hidden">로그인</span>
-    </Link>
-  );
+  return null;
 }
