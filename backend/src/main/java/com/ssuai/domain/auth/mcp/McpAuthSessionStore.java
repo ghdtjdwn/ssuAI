@@ -102,6 +102,9 @@ public class McpAuthSessionStore {
      * A no-op if the session does not exist or has expired.
      */
     public void linkProvider(McpAuthSessionId id, McpProviderType provider, String principalKey) {
+        if (id == null || provider == null || principalKey == null || principalKey.isBlank()) {
+            return;
+        }
         synchronized (sessions) {
             McpAuthSession existing = sessions.get(id.value());
             if (existing == null || existing.expiresAt().isBefore(clock.instant())) {
@@ -120,6 +123,9 @@ public class McpAuthSessionStore {
      * A no-op if the session or provider does not exist.
      */
     public void unlinkProvider(McpAuthSessionId id, McpProviderType provider) {
+        if (id == null || provider == null) {
+            return;
+        }
         synchronized (sessions) {
             McpAuthSession existing = sessions.get(id.value());
             if (existing == null) {
