@@ -31,6 +31,137 @@
 
 ---
 
+## 2026-05-18 — RestClient 302 redirect 중간 Set-Cookie 누락 → HttpClient Redirect.NEVER로 전환
+
+- 맥락: u-SAINT portal phase 2 에서 SAP ECC 커넥터가 403 을 계속 반환. SmartID 로그인 자체는
+  성공하고 portal HTML 도 정상 파싱되는데, 그 이후 시간표/성적 조회에서만 403 이 떨어짐.
+  MYSAPSSO2 쿠키가 문제라는 가설 하에 진단 로깅을 단계별로 추가하다 원인을 발견.
+- 증상:
+  - `ad83a99` 진단 로깅 결과: 저장된 MYSAPSSO2 가 portal phase 1 (`/webSSO/sso.jsp`) 에서
+    발급된 토큰이고, portal phase 2 redirect 체인에서 SAP 이 새로 발급한 갱신 토큰과 달랐음.
+  - ECC 커넥터가 오래된 MYSAPSSO2 를 실어 보내니 매 요청 403.
+- 원인: Spring RestClient 기본 `SimpleClientHttpRequestFactory` (내부적으로 `HttpURLConnection`)
+  는 3xx 리다이렉트를 조용히 따라가면서 **중간 응답의 Set-Cookie 헤더를 전부 버림**.
+  SAP portal phase 2 는 첫 번째 302 응답에 권위 있는 최신 MYSAPSSO2 를 실어 보내는데,
+  최종 목적지 응답만 보는 RestClient 가 그 쿠키를 수집하지 못한 채 phase 1 값을 계속 저장.
+- 해결: phase 2 fetch 를 `java.net.http.HttpClient(Redirect.NEVER)` + 수동 redirect 추적으로
+  교체 (`96b9e8c`). 각 hop 의 Set-Cookie 를 누적한 뒤 저장된 `PortalCookies` 에 merge.
+  충돌 시 phase 2 값이 phase 1 값을 덮어쓰도록 보장.
+- 검증: MockWebServer 기반 redirect cookie merge 테스트 추가. 302 hop → 200 최종 응답 시나리오에서
+  중간 Set-Cookie 가 최종 저장 쿠키에 반영되는 것을 핀.
+- 포트폴리오 포인트:
+  - **HTTP 클라이언트의 "투명한 redirect 추적"은 쿠키 수집 관점에선 불투명함**. 최종 응답에만
+    집중하는 고수준 클라이언트는 redirect 체인에서 세션을 발급하는 서버 (SAP NetWeaver 패턴)
+    앞에서 silent mismatch 를 만든다. 쿠키를 누적해야 하는 multi-hop 흐름은 Redirect.NEVER +
+    수동 추적이 유일한 안전한 선택.
+  - 증상이 phase 2 훨씬 뒤인 ECC 403 으로 나타나 원인 위치 특정이 어려웠음. 단계별 진단
+    로깅 (MYSAPSSO2 prefix, 4xx 응답 body) 을 추가해가며 범위를 좁히는 과정 자체가 실전 디버깅 사례.
+
+---
+
+## 2026-05-18 — Vercel 도메인 SSO callback 쿠키 4단계 cascade
+
+- 맥락: SmartID 로그인 prod 재검증 중 Vercel frontend 에서 로그인 후 세션이 안 잡히는 현상.
+  Backend 는 ssuai refresh cookie 를 내려보내지만 브라우저에서 보이지 않음.
+  CORS allowCredentials 는 이미 수정 (#116) 되어 있었음.
+- 증상 / 해결 단계 (4 layer):
+  1. **Cross-origin cookie**: `ssuai.vercel.app` → `ssumcp.duckdns.org` 직접 API 호출.
+     Backend 가 `Set-Cookie` 를 내려도 브라우저가 cross-site 쿠키를 Vercel origin 에 저장하지 않음.
+     → Next.js `next.config.ts` 에 `/api/*` rewrite 추가해 모든 API 호출을 same-origin proxy 로 통일 (`ccc0c30`).
+  2. **SSO callback 302**: Backend SmartID callback 이 302 redirect 를 반환하는 구조.
+     Vercel same-origin 으로 들어온 redirect 응답의 `Set-Cookie` 가 프록시를 거치면서 누락.
+     → Backend callback 을 200 + HTML 로 변경해 브라우저 redirect 없이 처리 (`3df25f3`).
+  3. **App Router route handler Set-Cookie 누락**: Next.js App Router 의 `/api/auth/saint/sso-callback/route.ts`
+     에서 backend 쿠키를 추출해 재발급 시도. `afterFiles` rewrite 가 App Router route 보다 먼저 실행돼
+     route handler 가 개입할 수 없었음.
+     → `proxy.ts` (Next.js 16 middleware convention) 로 이전, `/api/auth/saint/sso-callback` 패턴 매칭해
+     서버 사이드에서 쿠키 추출 후 재발급 (`a1e74a1`).
+  4. **Next.js 16 proxy Set-Cookie header stripping**: `proxy.ts` 에서 `response.headers.set('Set-Cookie', …)` 로
+     수동 지정했지만 Next.js 16 이 response header 로 직접 설정한 Set-Cookie 를 조용히 제거.
+     → `response.cookies.set(name, value, options)` Next.js API 로 교체 (`405c288`).
+- 검증: `https://ssuai.vercel.app` 브라우저에서 SmartID 로그인 → 대시보드 세션 정상 착지 확인.
+  Network 탭에서 ssuai.vercel.app 도메인 쿠키로 발급 확인.
+- 포트폴리오 포인트:
+  - **"쿠키가 안 붙는다"는 증상 하나가 cross-origin / redirect / route intercept order / framework
+    cookie API 네 개의 서로 다른 레이어에 걸쳐 있었음**. 레이어마다 해결하면 다음 레이어가
+    드러나는 구조라 각 단계를 커밋으로 격리해 추적.
+  - Vercel + Next.js 16 에서 SSO callback 쿠키를 안정적으로 내리는 유일한 패턴: middleware/proxy
+    에서 `response.cookies.set()` API 사용. 다른 방법은 전부 Next.js 또는 Vercel 의 어느 레이어가 조용히 제거.
+
+---
+
+## 2026-05-18 — SAP WebDynpro Chrome UA → JS bootstrap 응답, Form_Request POST 필요
+
+- 맥락: u-SAINT 시간표/성적 connector 를 prod 에서 처음 실행하자 데이터가 안 나옴. 단위 테스트는
+  HTML fixture 기준으로 전부 통과하고 있었음.
+- 증상: prod 로그에서 connector 가 `sap-wd-secure-id` 를 파싱 못해 `SaintSessionExpiredException` 발생.
+  응답 snippet 을 보니 시간표 HTML 이 아니라 SAP WebDynpro JavaScript bootstrap 코드였음.
+- 원인: 단위 테스트 fixture 는 렌더링 완료된 HTML 이었지만, 실제 u-SAINT 는 **Chrome-like User-Agent**
+  로 GET 하면 JS 로 초기화를 맡기는 bootstrap 페이지를 먼저 내려보냄. 사람의 브라우저라면 JS 가
+  실행되면서 `Form_Request` POST 를 자동 전송해 실제 HTML 을 받지만, connector 는 JS 를 실행하지 않음.
+- 해결: bootstrap HTML 에서 `sap-wd-secure-id` 를 추출한 뒤, SAP WebDynpro 가 기대하는 형식의
+  `Form_Request` (`SAPEVENTQUEUE` 포함) POST 를 명시적으로 전송해 렌더링된 HTML 을 응답으로 받는
+  2단계 init 흐름 추가 (`ccc0c30`). `WebDynproSapEventEncoder.encodeInitialLoad()` / `WebDynproResponseUnwrapper`
+  를 별도 유틸로 분리해 테스트 가능하게 구성.
+- 검증: `WebDynproResponseUnwrapperTests`, `WebDynproSapEventEncoderTests` 추가. 이후 prod 에서
+  시간표 데이터 정상 조회 확인.
+- 포트폴리오 포인트:
+  - **"HTML fixture 테스트 전부 통과" ≠ "prod 에서 동작"** 의 세 번째 사례 (앞서 portal parser,
+    3중 DI 장애에 이어). 이번엔 외부 서버가 User-Agent 에 따라 응답 자체를 다른 종류로 바꿔버림.
+    실서버 smoke test 를 mock 테스트와 별도 단계로 강제해야 한다는 교훈 반복 확인.
+  - SAP WebDynpro 패턴: GET → JS bootstrap → Form_Request POST → 렌더 HTML → 이후 SAPEVENTQUEUE
+    POST 반복. 이 흐름을 알면 다른 WDA 앱에도 동일하게 적용 가능.
+
+---
+
+## 2026-05-17 — 시간표 조회 WDA7 iterate 10회 → 1h TTL + single-flight 캐시
+
+- 맥락: `get_my_schedule` MCP tool 이 챗봇 경로에서 매 질문마다 호출될 수 있음. u-SAINT 시간표
+  전체 이력을 가져오려면 현재 학기 GET + "이전학기" 버튼 시뮬레이션 WDA7 POST 를 학기 수만큼
+  반복해야 하는 SAP WebDynpro 구조.
+- 증상 (예측): 입학 이후 N 개 학기가 쌓인 학생의 경우 한 chat 질문에서 외부 서버로 10여 회
+  HTTP 요청이 발생. latency 수십 초 + u-SAINT 서버 부하.
+- 원인: SAP WebDynpro 는 stateful UI 탐색 구조라 "전체 시간표를 한 번에 주는" API endpoint 가 없음.
+  학기별 페이지를 이전 버튼으로 하나씩 navigate 해야 함.
+- 해결: `SaintScheduleCache` 추가 (`7f17b9b`). 학번 key 기준 1h TTL + in-memory LRU.
+  **single-flight**: 동일 학번 동시 miss 시 첫 번째 요청만 실제 fetch, 나머지는 대기 후 결과 재사용.
+  `SaintSessionExpiredException` 은 캐시에 poison 하지 않아 재로그인 후 miss → 새로 fetch.
+  설계는 `LibraryBookCache` 와 동일 패턴으로 일관성 유지.
+- 검증: `SaintScheduleCacheTests` (TTL 만료, single-flight, session 예외 non-poison 포함) 313 라인.
+  `gradlew.bat test` 전체 통과.
+- 포트폴리오 포인트:
+  - 외부 시스템이 stateful navigate 구조일 때 "결과 캐시" 로 request 수를 N → 1 로 줄이는 패턴.
+    TTL 은 데이터 신선도 요구 (시간표는 학기 중 거의 불변) 에서 역산.
+  - single-flight 없이 TTL 캐시만 두면 cold start / 캐시 만료 순간 동시 요청이 thundering herd 를
+    만들어 외부 서버에 N 배 부하. 단순 캐시와 single-flight 의 차이를 면접에서 설명하기 좋은 사례.
+
+---
+
+## 2026-05-17 — Pyxis-Auth-Token 헤더 인증 + 실제 도서관 대출 API path/field 맵핑
+
+- 맥락: Task 13 도서관 좌석 현황 + 대출 현황 full stack 구현. Pyxis API 문서가 없어 브라우저
+  DevTools 로 실제 요청을 분석해 스펙을 역공학.
+- 증상 / 발견:
+  1. 좌석 현황 API: 쿠키 인증 X, **`Pyxis-Auth-Token` 헤더** 방식. Token 은 도서관 사이트 세션과
+     무관한 공개 토큰으로 동작. 층별 집계 endpoint: `/pyxis-api/1/seat-rooms`.
+  2. 대출 현황 API: 초기 가정한 path 가 달랐음. 실제 path = `/pyxis-api/1/api/charges`.
+     응답 field 도 예상과 다름 — `biblio.titleStatement` (제목), `callNo` (청구기호),
+     `chargeDate` (대출일), `dueDate` (반납예정일) 로 정확히 매핑해야 정상 파싱.
+  3. 대출 조회 미로그인 케이스: `noRecord` 플래그가 `true` 면 빈 배열, `needLogin` 이면
+     `LibraryAuthRequiredException` 로 분리.
+- 해결: `RealLibrarySeatConnector` (Pyxis-Auth-Token 헤더 인증, F2/F5/F6 층 집계),
+  `RealLibraryLoansConnector` (실 API path, 실 field 매핑, noRecord/needLogin 분기) 구현 (`38c15be`).
+  `LibraryLoanItem` DTO 필드를 실제 Oasis 응답 구조에 맞게 수정 (`ccc0c30` 에서 재수정).
+- 검증: MockRestServiceServer 기반 fixture 테스트 13 케이스 (좌석 6 + 대출 7). loans.json fixture 를
+  실제 Oasis 응답 구조로 교체.
+- 포트폴리오 포인트:
+  - 문서 없는 내부 API 역공학 순서: DevTools Network 탭에서 실제 요청 캡처 → 헤더/path/body 재현 →
+    response field 를 DTO 로 직접 매핑. "문서가 없으면 못한다" 가 아니라 브라우저가 곧 API 문서.
+  - 헤더 기반 인증 (`Pyxis-Auth-Token`) 과 쿠키 기반 인증 (`JSESSIONID`) 을 같은 도메인 내에서
+    분리 운영하는 구조 이해 — 좌석/검색은 공개 헤더 토큰, 대출/예약은 로그인 세션 쿠키.
+
+---
+
 ## 2026-05-16 — SmartID 로그인 prod 첫 검증: 두 갈래 장애 동시 해소
 
 - 맥락: PR #110 (Helm chart 에 `SSUAI_API_BASE_URL` 와이어링 + 빈 값
