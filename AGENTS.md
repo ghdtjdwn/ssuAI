@@ -78,20 +78,31 @@ context 에서 작업.
 - Commit: Conventional Commits (`feat(backend): ...`)
 - Verify 후 done 선언: 백엔드 `.\gradlew.bat test`, 프론트 `pnpm --dir frontend test|lint|typecheck`
 
-## opusplan 워크플로 (현재 모델 설정)
-- **설계·아키텍처 결정** (`/plan` 진입) → Opus 4.7. 비자명 feature 설계, security 판단, 아키텍처 트레이드오프
-- **구현·테스트·커밋** (일반 모드) → Sonnet. 파일 편집, 테스트 실행, git 커밋, PR 열기
+## Model / planning workflow
+- **Claude 설계·아키텍처 결정** (`/plan` 진입) → Opus 4.7. 비자명 feature 설계, security 판단, 아키텍처 트레이드오프
+- **Claude 구현·테스트·커밋** (일반 모드) → Sonnet. 파일 편집, 테스트 실행, git 커밋, PR 열기
+- **Codex 기본 구현 세션** → `~/.codex/config.toml` 의 `ssuai` profile:
+  GPT-5.5, `model_reasoning_effort=medium`,
+  `plan_mode_reasoning_effort=xhigh`, `approval_policy=never`,
+  `sandbox_mode=danger-full-access`. 단순 구현/테스트/커밋은 기본 구현
+  reasoning 을 사용하고, Codex Plan mode 는 자동으로 xhigh 사용.
+- **Codex 설계 세션** → `/plan` 트리거와 같은 조건이면 새 세션을
+  `codex --profile ssuai-deep -C C:/Users/akftj/ssuAI` 로 시작하거나
+  동등하게 GPT-5.5 `xhigh` reasoning 으로 진행. 끝나면 구현은 기본
+  `ssuai` profile 로 돌아간다.
 
 `/plan` 트리거 — **아래 중 하나여야 함:**
 - 외부 시스템 auth shape / 연동 방식이 spike 로 불명확한 상황
 - 새 도메인 패키지 신설 (클래스 책임·data flow·security policy 미결)
 - `docs/security.md` 관련 trade-off 결정
 
-**`/plan` 스킵 (Sonnet 직행):**
+**`/plan` / `ssuai-deep` 스킵 (일반 구현 직행):**
 - 해당 task 의 `docs/tasks/<NN>-*.md` spec 이 설계를 이미 커버 → 구현만
 - 단순 fix / 커밋 / 테스트 실행 / PR 열기 / spec 에 없는 사소한 판단
 
-세션 시작 시 `/model opusplan` 설정 필수 — 핸드오프 opener block 에 포함됨.
+Claude handoff opener 의 첫 줄은 `/model opusplan`. Codex handoff 는
+slash command 없이 시작하고, 필요 시 `ssuai-deep` profile 명을 명시한다.
+한 시점에 한 agent 만 active owner 로 작업한다.
 
 ## Authorship & Merge
 - **No Claude/AI/Anthropic attribution** — commit / PR body / docs /
