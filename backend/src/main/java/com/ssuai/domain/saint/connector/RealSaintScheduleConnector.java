@@ -237,8 +237,9 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
             throw new SaintSessionExpiredException("ecc returned empty body");
         }
         if (Jsoup.parse(html).selectFirst(TIMETABLE_TABLE_SELECTOR) == null) {
-            log.info("saint schedule auth gate tripped: studentFp={}",
-                    SaintSessionStore.fingerprint(studentId));
+            String snippet = html.substring(0, Math.min(500, html.length())).replaceAll("\\s+", " ");
+            log.info("saint schedule auth gate tripped: studentFp={} htmlSnippet='{}'",
+                    SaintSessionStore.fingerprint(studentId), snippet);
             throw new SaintSessionExpiredException(
                     "ecc did not return the timetable container (likely logon redirect)");
         }
