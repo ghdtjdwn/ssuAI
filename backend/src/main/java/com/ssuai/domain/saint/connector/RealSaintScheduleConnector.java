@@ -85,32 +85,45 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
     // a 4-year student is 16 hops; we keep some margin for re-admitted
     // students whose enrollment year is older.
     private static final int MAX_PREV_TERM_HOPS = 32;
+    private static final int MAX_INIT_GET_REDIRECTS = 10;
 
     private final SaintScheduleProperties properties;
     @SuppressWarnings("unused") // retained for future cache TTL keying
     private final Clock clock;
     private final HttpClient httpClient;
+    private final HttpClient httpClientNoRedirect;
 
     @Autowired
     public RealSaintScheduleConnector(SaintScheduleProperties properties) {
-        this(properties, Clock.systemUTC(), defaultHttpClient(properties));
+        this(properties, Clock.systemUTC(), defaultHttpClient(properties),
+                HttpClient.newBuilder()
+                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .connectTimeout(properties.getTimeout())
+                        .build());
     }
 
     RealSaintScheduleConnector(SaintScheduleProperties properties, Clock clock, HttpClient httpClient) {
+        this(properties, clock, httpClient, httpClient);
+    }
+
+    RealSaintScheduleConnector(SaintScheduleProperties properties, Clock clock,
+            HttpClient httpClient, HttpClient httpClientNoRedirect) {
         this.properties = properties;
         this.clock = clock;
         this.httpClient = httpClient;
+        this.httpClientNoRedirect = httpClientNoRedirect;
     }
+
+    private record InitGetResult(String html, String cookieHeader) {}
 
     @Override
     public ScheduleResponse fetchSchedule(String studentId, PortalCookies cookies) {
         int enrollmentYear = SaintScheduleHelpers.parseEnrollmentYear(studentId);
 
-        HttpResponse<String> firstResponse = httpGet(cookies.rawCookieHeader());
-        String bootstrapHtml = firstResponse.body();
-
-        String mergedCookieHeader = mergeSetCookies(cookies.rawCookieHeader(),
-                firstResponse.headers().allValues("Set-Cookie"));
+        InitGetResult initGet = httpGetFollowCookies(cookies.rawCookieHeader(),
+                properties.getTimetableUrl(), "saint schedule");
+        String bootstrapHtml = initGet.html();
+        String mergedCookieHeader = initGet.cookieHeader();
 
         // Chrome UA causes SAP WDA to return a JS bootstrap page on first GET.
         // We need a Form_Request POST to trigger the full server-side render.
@@ -191,17 +204,59 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         return year <= enrollmentYear && term <= SaintScheduleHelpers.TERM_SPRING;
     }
 
-    private HttpResponse<String> httpGet(String cookieHeader) {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(properties.getTimetableUrl()))
-                .header("Cookie", cookieHeader)
-                .header("Accept", "text/html,application/xhtml+xml")
-                .header("Accept-Language", "ko")
-                .header("User-Agent", BROWSER_UA)
-                .timeout(properties.getTimeout())
-                .GET()
-                .build();
-        return send(request);
+    private InitGetResult httpGetFollowCookies(String startCookieHeader, String startUrl, String logPrefix) {
+        String cookieHeader = startCookieHeader;
+        String url = startUrl;
+        for (int hop = 0; hop <= MAX_INIT_GET_REDIRECTS; hop++) {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Cookie", cookieHeader)
+                    .header("Accept", "text/html,application/xhtml+xml")
+                    .header("Accept-Language", "ko")
+                    .header("User-Agent", BROWSER_UA)
+                    .timeout(properties.getTimeout())
+                    .GET()
+                    .build();
+            HttpResponse<String> response;
+            try {
+                response = httpClientNoRedirect.send(request,
+                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            } catch (java.net.http.HttpTimeoutException e) {
+                throw new ConnectorTimeoutException(e);
+            } catch (IOException e) {
+                log.warn("{} connector IOException on GET", logPrefix, e);
+                throw new ConnectorUnavailableException(e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ConnectorUnavailableException(e);
+            }
+            cookieHeader = mergeSetCookies(cookieHeader, response.headers().allValues("Set-Cookie"));
+            int status = response.statusCode();
+            if (status / 100 == 3) {
+                String location = response.headers().firstValue("Location").orElse(null);
+                if (location == null) {
+                    log.warn("{} connector redirect missing Location: status={}", logPrefix, status);
+                    throw new ConnectorUnavailableException();
+                }
+                if (!location.startsWith("http")) {
+                    URI base = URI.create(url);
+                    location = base.getScheme() + "://" + base.getAuthority() + location;
+                }
+                url = location;
+                continue;
+            }
+            if (status / 100 == 2) {
+                return new InitGetResult(response.body(), cookieHeader);
+            }
+            if (status / 100 == 5) {
+                log.warn("{} connector 5xx on GET: status={}", logPrefix, status);
+                throw new ConnectorUnavailableException();
+            }
+            log.warn("{} connector unexpected status on GET: status={}", logPrefix, status);
+            throw new ConnectorUnavailableException();
+        }
+        log.warn("{} connector too many redirects on GET", logPrefix);
+        throw new ConnectorUnavailableException();
     }
 
     private String httpPostButtonPress(String cookieHeader, String secureId, String buttonId) {

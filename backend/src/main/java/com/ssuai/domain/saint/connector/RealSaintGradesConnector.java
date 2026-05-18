@@ -73,27 +73,40 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
     private static final String PREV_TERM_BUTTON_ID = "WD01F0";
     private static final int MAX_PREV_HOPS = 20;
+    private static final int MAX_INIT_GET_REDIRECTS = 10;
 
     private final SaintGradesProperties properties;
     private final HttpClient httpClient;
+    private final HttpClient httpClientNoRedirect;
 
     @Autowired
     public RealSaintGradesConnector(SaintGradesProperties properties) {
-        this(properties, defaultHttpClient(properties));
+        this(properties, defaultHttpClient(properties),
+                HttpClient.newBuilder()
+                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .connectTimeout(properties.getTimeout())
+                        .build());
     }
 
     RealSaintGradesConnector(SaintGradesProperties properties, HttpClient httpClient) {
+        this(properties, httpClient, httpClient);
+    }
+
+    RealSaintGradesConnector(SaintGradesProperties properties,
+            HttpClient httpClient, HttpClient httpClientNoRedirect) {
         this.properties = properties;
         this.httpClient = httpClient;
+        this.httpClientNoRedirect = httpClientNoRedirect;
     }
+
+    private record InitGetResult(String html, String cookieHeader) {}
 
     @Override
     public GradesResponse fetchGrades(String studentId, PortalCookies cookies) {
-        HttpResponse<String> firstResponse = httpGet(cookies.rawCookieHeader());
-        String rawFirstResponse = firstResponse.body();
-
-        String mergedCookieHeader = mergeSetCookies(cookies.rawCookieHeader(),
-                firstResponse.headers().allValues("Set-Cookie"));
+        InitGetResult initGet = httpGetFollowCookies(cookies.rawCookieHeader(),
+                properties.getGradesUrl(), "saint grades");
+        String rawFirstResponse = initGet.html();
+        String mergedCookieHeader = initGet.cookieHeader();
 
         // Chrome UA causes SAP WDA to return JS bootstrap on first GET.
         // Extract secure-id from the raw response (may be XML or plain HTML).
@@ -161,17 +174,59 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         return new GradesResponse(history, academicRecord, certificate, details);
     }
 
-    private HttpResponse<String> httpGet(String cookieHeader) {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(properties.getGradesUrl()))
-                .header("Cookie", cookieHeader)
-                .header("Accept", "text/html,application/xhtml+xml")
-                .header("Accept-Language", "ko")
-                .header("User-Agent", BROWSER_UA)
-                .timeout(properties.getTimeout())
-                .GET()
-                .build();
-        return send(request);
+    private InitGetResult httpGetFollowCookies(String startCookieHeader, String startUrl, String logPrefix) {
+        String cookieHeader = startCookieHeader;
+        String url = startUrl;
+        for (int hop = 0; hop <= MAX_INIT_GET_REDIRECTS; hop++) {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Cookie", cookieHeader)
+                    .header("Accept", "text/html,application/xhtml+xml")
+                    .header("Accept-Language", "ko")
+                    .header("User-Agent", BROWSER_UA)
+                    .timeout(properties.getTimeout())
+                    .GET()
+                    .build();
+            HttpResponse<String> response;
+            try {
+                response = httpClientNoRedirect.send(request,
+                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            } catch (java.net.http.HttpTimeoutException e) {
+                throw new ConnectorTimeoutException(e);
+            } catch (IOException e) {
+                log.warn("{} connector IOException on GET", logPrefix, e);
+                throw new ConnectorUnavailableException(e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ConnectorUnavailableException(e);
+            }
+            cookieHeader = mergeSetCookies(cookieHeader, response.headers().allValues("Set-Cookie"));
+            int status = response.statusCode();
+            if (status / 100 == 3) {
+                String location = response.headers().firstValue("Location").orElse(null);
+                if (location == null) {
+                    log.warn("{} connector redirect missing Location: status={}", logPrefix, status);
+                    throw new ConnectorUnavailableException();
+                }
+                if (!location.startsWith("http")) {
+                    URI base = URI.create(url);
+                    location = base.getScheme() + "://" + base.getAuthority() + location;
+                }
+                url = location;
+                continue;
+            }
+            if (status / 100 == 2) {
+                return new InitGetResult(response.body(), cookieHeader);
+            }
+            if (status / 100 == 5) {
+                log.warn("{} connector 5xx on GET: status={}", logPrefix, status);
+                throw new ConnectorUnavailableException();
+            }
+            log.warn("{} connector unexpected status on GET: status={}", logPrefix, status);
+            throw new ConnectorUnavailableException();
+        }
+        log.warn("{} connector too many redirects on GET", logPrefix);
+        throw new ConnectorUnavailableException();
     }
 
     private String httpPostInitialLoad(String cookieHeader, String secureId, String appName, String url) {
