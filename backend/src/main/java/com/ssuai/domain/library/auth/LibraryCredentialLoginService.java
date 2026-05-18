@@ -34,15 +34,11 @@ public class LibraryCredentialLoginService {
     private static final String OASIS_REFERER = "https://oasis.ssu.ac.kr/login";
 
     private final LibrarySessionStore sessionStore;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestClient restClient;
 
-    public LibraryCredentialLoginService(
-            LibrarySessionStore sessionStore,
-            ObjectMapper objectMapper
-    ) {
+    public LibraryCredentialLoginService(LibrarySessionStore sessionStore) {
         this.sessionStore = sessionStore;
-        this.objectMapper = objectMapper;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
         factory.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
