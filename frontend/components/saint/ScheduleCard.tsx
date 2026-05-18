@@ -70,9 +70,19 @@ export function ScheduleCard() {
 
         {isAuthenticated && isLoading && <ScheduleSkeleton />}
 
-        {errorState && (
+        {errorState && errorState.code === "SAINT_SESSION_EXPIRED" ? (
+          <div className="flex flex-col items-start gap-3 rounded-md border border-border bg-muted/40 p-4">
+            <p className="text-sm text-muted-foreground">
+              세션이 만료됐습니다. 다시 로그인하면 시간표를 볼 수 있습니다.
+            </p>
+            <Button size="sm" onClick={() => (window.location.href = getSsoInitUrl())}>
+              <LogIn className="h-4 w-4" aria-hidden="true" />
+              다시 로그인
+            </Button>
+          </div>
+        ) : errorState ? (
           <ErrorState code={errorState.code} message={errorState.message} traceId={errorState.traceId} />
-        )}
+        ) : null}
 
         {currentTerm && !errorState && (
           byDay.size === 0 ? (

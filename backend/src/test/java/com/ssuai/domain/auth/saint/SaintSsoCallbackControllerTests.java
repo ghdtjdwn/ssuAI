@@ -25,6 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.ssuai.domain.auth.AuthProperties;
+import com.ssuai.domain.auth.lms.LmsSsoService;
 import com.ssuai.domain.user.entity.Student;
 import com.ssuai.domain.user.service.StudentService;
 import com.ssuai.global.auth.JwtProperties;
@@ -51,6 +52,9 @@ class SaintSsoCallbackControllerTests {
 
     @MockitoBean
     private SaintSsoService saintSsoService;
+
+    @MockitoBean
+    private LmsSsoService lmsSsoService;
 
     @MockitoBean
     private StudentService studentService;

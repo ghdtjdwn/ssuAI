@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ssuai.domain.auth.AuthProperties;
+import com.ssuai.domain.auth.lms.LmsSsoService;
 import com.ssuai.domain.user.entity.Student;
 import com.ssuai.domain.user.service.StudentService;
 import com.ssuai.global.auth.JwtProperties;
@@ -49,6 +50,7 @@ public class SaintSsoCallbackController {
     private static final Logger log = LoggerFactory.getLogger(SaintSsoCallbackController.class);
 
     private final SaintSsoService saintSsoService;
+    private final LmsSsoService lmsSsoService;
     private final StudentService studentService;
     private final JwtProvider jwtProvider;
     private final JwtProperties jwtProperties;
@@ -57,6 +59,7 @@ public class SaintSsoCallbackController {
 
     public SaintSsoCallbackController(
             SaintSsoService saintSsoService,
+            LmsSsoService lmsSsoService,
             StudentService studentService,
             JwtProvider jwtProvider,
             JwtProperties jwtProperties,
@@ -76,6 +79,7 @@ public class SaintSsoCallbackController {
                             + "resolves against its own host and the callback never reaches us.");
         }
         this.saintSsoService = saintSsoService;
+        this.lmsSsoService = lmsSsoService;
         this.studentService = studentService;
         this.jwtProvider = jwtProvider;
         this.jwtProperties = jwtProperties;
@@ -107,6 +111,16 @@ public class SaintSsoCallbackController {
 
             String refresh = jwtProvider.issueRefresh(student);
             response.addHeader(HttpHeaders.SET_COOKIE, buildRefreshCookie(refresh).toString());
+
+            // Best-effort LMS auth with the same one-shot SmartID tokens.
+            // LMS uses an identical sToken/sIdno flow (lms.ssu.ac.kr/xn-sso/gw-cb.php).
+            // A failure here must never block the ssuAI JWT — the user lands on the
+            // dashboard authenticated; only LMS-specific cards degrade.
+            try {
+                lmsSsoService.authenticate(sToken, sIdno);
+            } catch (Exception lmsEx) {
+                log.info("saint sso-callback: LMS auth skipped ({})", lmsEx.getMessage());
+            }
 
             return redirect(frontendReturn("ok", "1"));
         } catch (SaintAuthFailedException exception) {

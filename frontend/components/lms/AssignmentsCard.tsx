@@ -66,14 +66,25 @@ export function AssignmentsCard() {
 
         {isAuthenticated && isLoading && <AssignmentsSkeleton />}
 
-        {errorState && (
+        {errorState &&
+        (errorState.code === "LMS_SESSION_EXPIRED" || errorState.code === "LMS_AUTH_FAILED") ? (
+          <div className="flex flex-col items-start gap-3 rounded-md border border-border bg-muted/40 p-4">
+            <p className="text-sm text-muted-foreground">
+              LMS 세션이 만료됐습니다. 다시 로그인하면 과제 현황을 볼 수 있습니다.
+            </p>
+            <Button size="sm" onClick={() => (window.location.href = getSsoInitUrl())}>
+              <LogIn className="h-4 w-4" aria-hidden="true" />
+              다시 로그인
+            </Button>
+          </div>
+        ) : errorState ? (
           <ErrorState
             code={errorState.code}
             message={errorState.message}
             traceId={errorState.traceId}
             onRetry={() => void refetch()}
           />
-        )}
+        ) : null}
 
         {data && !errorState && (
           data.items.length === 0 ? (
