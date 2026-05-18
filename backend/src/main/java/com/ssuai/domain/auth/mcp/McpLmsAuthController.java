@@ -82,7 +82,7 @@ public class McpLmsAuthController {
             lmsSsoService.authenticate(sToken, sIdno);
         } catch (LmsAuthFailedException e) {
             log.info("mcp lms callback: auth failed session={}", entry.mcpSessionId().fingerprint());
-            return completionPage(false, "LMS 로그인 실패: " + e.getMessage());
+            return completionPage(false, "LMS 로그인에 실패했습니다. 다시 시도해주세요.");
         } catch (Exception e) {
             log.warn("mcp lms callback: unexpected error session={}", entry.mcpSessionId().fingerprint());
             return completionPage(false, "로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
