@@ -137,6 +137,31 @@ class McpAuthSessionStoreTests {
     }
 
     @Test
+    void linkProviderWithNullArgsIsNoOp() {
+        McpAuthSessionStore store = store(T0, Duration.ofHours(4));
+        McpAuthSession session = store.create();
+
+        store.linkProvider(null, McpProviderType.SAINT, "key");
+        store.linkProvider(session.id(), null, "key");
+        store.linkProvider(session.id(), McpProviderType.SAINT, null);
+        store.linkProvider(session.id(), McpProviderType.SAINT, "");
+
+        assertThat(store.find(session.id()).orElseThrow().isLinked(McpProviderType.SAINT)).isFalse();
+    }
+
+    @Test
+    void unlinkProviderWithNullArgsIsNoOp() {
+        McpAuthSessionStore store = store(T0, Duration.ofHours(4));
+        McpAuthSession session = store.create();
+        store.linkProvider(session.id(), McpProviderType.SAINT, "key");
+
+        store.unlinkProvider(null, McpProviderType.SAINT);
+        store.unlinkProvider(session.id(), null);
+
+        assertThat(store.find(session.id()).orElseThrow().isLinked(McpProviderType.SAINT)).isTrue();
+    }
+
+    @Test
     void invalidateRemovesSession() {
         McpAuthSessionStore store = store(T0, Duration.ofHours(4));
         McpAuthSession session = store.create();
