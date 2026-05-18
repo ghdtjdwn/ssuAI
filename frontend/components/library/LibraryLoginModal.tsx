@@ -2,24 +2,35 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ExternalLink, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useLibraryAuth } from "@/contexts/LibraryAuthContext";
-import { useLibrarySession } from "@/hooks/useLibrarySession";
+import { loginLibrary } from "@/lib/api/library";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface LibraryLoginModalProps {
   onClose: () => void;
 }
 
+// TODO: confirm AES key from oasis.ssu.ac.kr login JS, then replace with real encryption.
+// For now sends password as-is to test connectivity; oasis expects AES-encrypted value.
+function encryptPassword(raw: string): string {
+  return raw; // placeholder — replace once key confirmed
+}
+
 export function LibraryLoginModal({ onClose }: LibraryLoginModalProps) {
-  const [token, setToken] = useState("");
-  const { state, errorMessage, submitToken } = useLibrarySession();
+  const [loginId, setLoginId] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const { setConnected } = useLibraryAuth();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const queryClient = useQueryClient();
+  const loginIdRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    textareaRef.current?.focus();
+    loginIdRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -32,15 +43,22 @@ export function LibraryLoginModal({ onClose }: LibraryLoginModalProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token.trim()) return;
-    const ok = await submitToken(token);
-    if (ok) {
+    if (!loginId.trim() || !password) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await loginLibrary(loginId.trim(), encryptPassword(password));
+      setSuccess(true);
       setConnected(true);
+      await queryClient.invalidateQueries({ queryKey: ["library", "loans"] });
+      await queryClient.invalidateQueries({ queryKey: ["library", "seats"] });
       setTimeout(onClose, 800);
+    } catch {
+      setError("로그인에 실패했습니다. 학번과 비밀번호를 확인해주세요.");
+    } finally {
+      setSubmitting(false);
     }
   }
-
-  const isSubmitting = state === "submitting";
 
   return (
     <div
@@ -48,18 +66,16 @@ export function LibraryLoginModal({ onClose }: LibraryLoginModalProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="library-login-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg">
-        <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-lg">
+        <div className="mb-5 flex items-start justify-between gap-3">
           <div>
             <h2 id="library-login-title" className="text-base font-semibold text-foreground">
               도서관 연동
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              좌석 현황·대출 내역 조회에 필요합니다. (약 2시간 유효)
+              대출 현황 조회를 위해 학교 계정으로 로그인합니다.
             </p>
           </div>
           <button
@@ -72,55 +88,57 @@ export function LibraryLoginModal({ onClose }: LibraryLoginModalProps) {
           </button>
         </div>
 
-        <div className="mb-4 space-y-2.5">
-          <a
-            href="https://oasis.ssu.ac.kr"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent"
-          >
-            <ExternalLink className="h-4 w-4" aria-hidden="true" />
-            oasis.ssu.ac.kr 열고 로그인하기
-          </a>
-          <div className="rounded-md bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">로그인 후 토큰 복사:</p>
-            <ol className="mt-1 space-y-0.5 leading-relaxed">
-              <li>① 좌석 예약 페이지로 이동</li>
-              <li>② F12 → Network 탭 → pyxis-api 요청 클릭</li>
-              <li>③ Request Headers에서 <code className="font-mono">Pyxis-Auth-Token</code> 복사</li>
-            </ol>
-          </div>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-3">
-          <textarea
-            ref={textareaRef}
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="복사한 Pyxis-Auth-Token 붙여넣기"
-            rows={3}
-            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            disabled={isSubmitting || state === "success"}
-          />
+          <div>
+            <label htmlFor="library-login-id" className="mb-1 block text-xs font-medium text-muted-foreground">
+              학번
+            </label>
+            <input
+              id="library-login-id"
+              ref={loginIdRef}
+              type="text"
+              inputMode="numeric"
+              autoComplete="username"
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value)}
+              placeholder="20221528"
+              disabled={submitting || success}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            />
+          </div>
 
-          {errorMessage ? (
-            <p className="text-sm text-destructive">{errorMessage}</p>
-          ) : null}
+          <div>
+            <label htmlFor="library-password" className="mb-1 block text-xs font-medium text-muted-foreground">
+              비밀번호 (유세인트 비밀번호)
+            </label>
+            <input
+              id="library-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={submitting || success}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            />
+          </div>
 
-          {state === "success" ? (
-            <p className="text-sm text-emerald-600">연동 완료! 데이터를 불러오는 중…</p>
-          ) : null}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          {success && <p className="text-sm text-emerald-600">연동 완료!</p>}
 
-          <div className="flex justify-end gap-2">
+          <p className="text-xs text-muted-foreground">
+            비밀번호는 도서관 로그인에만 사용되며 ssuAI 서버에 저장되지 않습니다.
+          </p>
+
+          <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               취소
             </Button>
             <Button
               type="submit"
               size="sm"
-              disabled={!token.trim() || isSubmitting || state === "success"}
+              disabled={!loginId.trim() || !password || submitting || success}
             >
-              {isSubmitting ? "저장 중…" : "확인"}
+              {submitting ? "로그인 중…" : "연동"}
             </Button>
           </div>
         </form>
