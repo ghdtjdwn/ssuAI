@@ -15,7 +15,9 @@ Copy-Item .env.example .env.local
 pnpm install
 ```
 
-`NEXT_PUBLIC_SSUAI_API_BASE` defaults to `http://localhost:8080`.
+`NEXT_PUBLIC_SSUAI_API_BASE` points the Next.js `/api/*` rewrite at the
+Spring Boot backend. Browser code calls same-origin `/api/*`, so auth cookies
+stay first-party in production.
 
 ## Commands
 
