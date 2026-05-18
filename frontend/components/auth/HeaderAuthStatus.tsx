@@ -12,7 +12,7 @@ import { getSsoInitUrl } from "@/lib/api/auth";
 
 export function HeaderAuthStatus() {
   const { isAuthenticated, isLoading } = useSaintAuth();
-  const { isConnected: libraryConnected } = useLibraryAuth();
+  const { isConnected: libraryConnected, logout: logoutLibrary } = useLibraryAuth();
   const [showLibraryModal, setShowLibraryModal] = useState(false);
 
   if (isLoading) return null;
@@ -34,11 +34,20 @@ export function HeaderAuthStatus() {
         )}
 
         {libraryConnected ? (
-          <span className="flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
-            <Library className="h-3 w-3" aria-hidden="true" />
-            <span className="hidden sm:inline">도서관 연결됨</span>
-            <span className="sm:hidden">도서관</span>
-          </span>
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+              <Library className="h-3 w-3" aria-hidden="true" />
+              <span className="hidden sm:inline">도서관 연결됨</span>
+              <span className="sm:hidden">도서관</span>
+            </span>
+            <button
+              type="button"
+              className="text-xs leading-none text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              onClick={() => void logoutLibrary()}
+            >
+              로그아웃
+            </button>
+          </div>
         ) : (
           <Button
             variant="outline"

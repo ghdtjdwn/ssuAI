@@ -33,3 +33,10 @@ export function searchLibraryBooks(query: string, page = 0, size = 10) {
 export function getLibraryLoans() {
   return fetchJson<LibraryLoansResponse>("/api/library/loans", { credentials: "include" });
 }
+
+export function logoutLibrary() {
+  return fetchJson<null>("/api/library/session", {
+    method: "DELETE",
+    credentials: "include",
+  });
+}
