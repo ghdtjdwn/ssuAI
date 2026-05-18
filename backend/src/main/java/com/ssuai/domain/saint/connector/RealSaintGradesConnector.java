@@ -68,6 +68,8 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
 
     private static final Logger log = LoggerFactory.getLogger(RealSaintGradesConnector.class);
 
+    private static final String BROWSER_UA =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
     private static final String PREV_TERM_BUTTON_ID = "WD01F0";
     private static final int MAX_PREV_HOPS = 20;
 
@@ -141,6 +143,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 .header("Cookie", cookieHeader)
                 .header("Accept", "text/html,application/xhtml+xml")
                 .header("Accept-Language", "ko")
+                .header("User-Agent", BROWSER_UA)
                 .timeout(properties.getTimeout())
                 .GET()
                 .build();
@@ -162,6 +165,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 .header("Accept", "application/xml,text/html")
                 .header("X-Requested-With", "XMLHttpRequest")
                 .header("X-XHR-Logon", "accept")
+                .header("User-Agent", BROWSER_UA)
                 .timeout(properties.getTimeout())
                 .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                 .build();
@@ -177,12 +181,17 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 return response;
             }
             if (status / 100 == 5) {
+                String snippet = response.body() == null ? "(null)"
+                        : response.body().substring(0, Math.min(300, response.body().length()));
+                log.warn("saint grades connector 5xx: status={} body='{}'", status, snippet);
                 throw new ConnectorUnavailableException();
             }
+            log.warn("saint grades connector unexpected status={}", status);
             throw new ConnectorParseException();
         } catch (java.net.http.HttpTimeoutException exception) {
             throw new ConnectorTimeoutException(exception);
         } catch (IOException exception) {
+            log.warn("saint grades connector IOException", exception);
             throw new ConnectorUnavailableException(exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
