@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Utensils } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -33,7 +35,7 @@ function TodayMealSkeleton() {
 export function TodayMealCard() {
   const { data, error, isLoading, refetch } = useTodayMeal();
   const errorState = getErrorStateDetails(error);
-  const groupedMeals = data ? groupByRestaurant(data.meals) : {};
+  const groupedMeals = useMemo(() => data ? groupByRestaurant(data.meals) : {}, [data]);
   const hasMeals = data ? data.meals.length > 0 : false;
   const hasClosures = data ? data.closures.length > 0 : false;
 
