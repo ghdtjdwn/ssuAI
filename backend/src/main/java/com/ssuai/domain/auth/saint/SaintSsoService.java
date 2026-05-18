@@ -3,12 +3,15 @@ package com.ssuai.domain.auth.saint;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -60,6 +63,8 @@ import com.ssuai.global.exception.SaintPortalUnavailableException;
 @Service
 public class SaintSsoService {
 
+    private static final Logger log = LoggerFactory.getLogger(SaintSsoService.class);
+
     private static final String PHASE1_SUCCESS_MARKER = "location.href = \"/irj/portal\"";
     private static final String IDENTITY_NAME_SELECTOR = ".top_user";
     // Live portal greets with "{이름}님 접속을 환영합니다." Keep the shorter
@@ -90,14 +95,19 @@ public class SaintSsoService {
         }
 
         ResponseEntity<String> phase1 = phase1Validate(sToken, sIdno);
-        String portalCookieHeader = buildCookieHeader(phase1.getHeaders().get(HttpHeaders.SET_COOKIE));
-        if (portalCookieHeader.isEmpty()) {
+        String phase1Cookies = buildCookieHeader(phase1.getHeaders().get(HttpHeaders.SET_COOKIE));
+        if (phase1Cookies.isEmpty()) {
             throw new SaintAuthFailedException("phase 1 returned no Set-Cookie headers");
         }
 
-        String portalHtml = phase2FetchPortal(portalCookieHeader);
-        UsaintAuthResult identity = parseIdentity(portalHtml, sIdno);
-        sessionStore.put(identity.studentId(), new PortalCookies(portalCookieHeader));
+        ResponseEntity<String> phase2 = phase2FetchPortal(phase1Cookies);
+        String phase2Cookies = buildCookieHeader(phase2.getHeaders().get(HttpHeaders.SET_COOKIE));
+        String mergedCookies = mergeCookieHeaders(phase1Cookies, phase2Cookies);
+
+        log.info("saint sso cookies stored: names={}", cookieNames(mergedCookies));
+
+        UsaintAuthResult identity = parseIdentity(phase2.getBody(), sIdno);
+        sessionStore.put(identity.studentId(), new PortalCookies(mergedCookies));
         return identity;
     }
 
@@ -126,13 +136,13 @@ public class SaintSsoService {
         return response;
     }
 
-    private String phase2FetchPortal(String portalCookieHeader) {
+    private ResponseEntity<String> phase2FetchPortal(String portalCookieHeader) {
         try {
             return restClient.get()
                     .uri(URI.create(properties.getPortalUrl()))
                     .header(HttpHeaders.COOKIE, portalCookieHeader)
                     .retrieve()
-                    .body(String.class);
+                    .toEntity(String.class);
         } catch (ResourceAccessException exception) {
             throw new SaintPortalUnavailableException("saint phase 2 timeout/io", exception);
         } catch (RestClientResponseException exception) {
@@ -143,7 +153,7 @@ public class SaintSsoService {
 
     private UsaintAuthResult parseIdentity(String portalHtml, String sIdno) {
         if (portalHtml == null || portalHtml.isBlank()) {
-            throw new SaintPortalUnavailableException("portal HTML is empty");
+            throw new SaintPortalUnavailableException("phase 2 portal HTML is empty");
         }
         Document document = Jsoup.parse(portalHtml);
         String name = extractName(document);
@@ -193,5 +203,39 @@ public class SaintSsoService {
         int semicolon = setCookieHeader.indexOf(';');
         String pair = semicolon < 0 ? setCookieHeader : setCookieHeader.substring(0, semicolon);
         return pair.trim();
+    }
+
+    private static String mergeCookieHeaders(String base, String overlay) {
+        if (overlay == null || overlay.isBlank()) {
+            return base;
+        }
+        // overlay wins on conflict (same name=value ordering as LinkedHashMap.put)
+        java.util.LinkedHashMap<String, String> jar = new java.util.LinkedHashMap<>();
+        for (String pair : base.split(";")) {
+            addPairToJar(jar, pair.trim());
+        }
+        for (String pair : overlay.split(";")) {
+            addPairToJar(jar, pair.trim());
+        }
+        return jar.entrySet().stream()
+                .map(e -> e.getKey() + "=" + e.getValue())
+                .collect(Collectors.joining("; "));
+    }
+
+    private static void addPairToJar(java.util.LinkedHashMap<String, String> jar, String pair) {
+        if (pair == null || pair.isEmpty()) return;
+        int eq = pair.indexOf('=');
+        if (eq <= 0) return;
+        jar.put(pair.substring(0, eq).trim(), pair.substring(eq + 1).trim());
+    }
+
+    private static String cookieNames(String cookieHeader) {
+        List<String> names = new ArrayList<>();
+        for (String pair : cookieHeader.split(";")) {
+            String trimmed = pair.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq > 0) names.add(trimmed.substring(0, eq).trim());
+        }
+        return String.join(",", names);
     }
 }
