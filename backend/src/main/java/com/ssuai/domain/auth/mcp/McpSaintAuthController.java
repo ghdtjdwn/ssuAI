@@ -98,7 +98,7 @@ public class McpSaintAuthController {
             identity = saintSsoService.authenticate(sToken, sIdno);
         } catch (SaintAuthFailedException e) {
             log.info("mcp saint callback: auth failed session={}", entry.mcpSessionId().fingerprint());
-            return completionPage(false, "u-SAINT 로그인 실패: " + e.getMessage());
+            return completionPage(false, "u-SAINT 로그인에 실패했습니다. 다시 시도해주세요.");
         } catch (SaintPortalUnavailableException e) {
             log.warn("mcp saint callback: portal unavailable session={}", entry.mcpSessionId().fingerprint());
             return completionPage(false, "u-SAINT 서버에 접속할 수 없습니다. 잠시 후 다시 시도해주세요.");
