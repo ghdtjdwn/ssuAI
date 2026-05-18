@@ -12,12 +12,17 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ActiveProfiles("test")
 @WebMvcTest(LibrarySessionController.class)
 @Import({LibrarySessionStore.class, LibrarySessionProperties.class})
 class LibrarySessionControllerTests {
+
+    @MockitoBean
+    @SuppressWarnings("unused")
+    private LibraryCredentialLoginService credentialLoginService;
 
     private final MockMvc mockMvc;
     private final LibrarySessionStore store;
