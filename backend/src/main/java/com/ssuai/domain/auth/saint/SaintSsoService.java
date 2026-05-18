@@ -1,7 +1,11 @@
 package com.ssuai.domain.auth.saint;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +16,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -24,40 +29,22 @@ import com.ssuai.global.exception.SaintAuthFailedException;
 import com.ssuai.global.exception.SaintPortalUnavailableException;
 
 /**
- * Confirms a SSU student's identity through the saint.ssu.ac.kr two-phase
- * handshake, modeled on {@code jonghokim27/ssutoday}'s
- * {@code AuthServiceImpl.uSaintAuth}.
+ * Confirms a SSU student's identity through the saint.ssu.ac.kr two-phase handshake.
  *
- * <p>Phase 1 — GET {@code saint.ssu.ac.kr/webSSO/sso.jsp?sToken=&sIdno=}
- * with the same tokens echoed in the {@code Cookie} header. saint validates
- * the one-shot tokens and, on success, responds with HTML containing
- * {@code location.href = "/irj/portal"} plus the real portal session
- * cookies in {@code Set-Cookie} headers.
+ * <p>Phase 1 — GET /webSSO/sso.jsp — validates the one-shot tokens and returns Set-Cookie
+ * headers with the initial portal session cookies.
  *
- * <p>Phase 2 — GET {@code saint.ssu.ac.kr/irj/portal} with the phase 1
- * cookies. The live portal is a SAP NetWeaver frameset wrapper: the
- * top-level HTML carries only a {@code <span class="top_user">{이름}님
- * 접속을 환영합니다.</span>} greeting (and the same학번 echoed in JS
- * config); the actual {@code .main_box09} student-info card is loaded
- * lazily into {@code <iframe id="contentAreaFrame">} by SAP portal JS,
- * so a static fetch cannot see 소속 / 과정·학기 / 학년·학기. We only
- * use phase 2 to (a) confirm the session is alive (HTTP 200 + greeting
- * span present) and (b) extract the display name. Student id is taken
- * from the {@code sIdno} that already proved itself in phase 1. 소속 /
- * 학적상태 stay null until a later u-SAINT data tool (Task 16
- * {@code get_my_schedule} / {@code get_my_grades}) fetches them from
- * the deep portal endpoints.
+ * <p>Phase 2 — GET /irj/portal — follows redirects manually using java.net.http.HttpClient
+ * with Redirect.NEVER so that Set-Cookie headers on intermediate 302 responses are captured.
+ * The SAP portal issues the authoritative MYSAPSSO2 on a redirect response; a client that
+ * silently follows redirects (e.g. HttpURLConnection) drops that cookie and stores an older,
+ * ECC-incompatible token instead.
  *
  * <p>Security invariants:
  * <ul>
- *   <li>{@code sToken} / {@code sIdno} are method-scoped locals — never logged,
- *       persisted, or returned past this method (Task 14 spec §1, §5).
- *   <li>Phase 1 portal cookies are handed off, encrypted, to
- *       {@link SaintSessionStore} once identity is confirmed (Task 16 PR 16a).
- *       Realtime u-SAINT data tools read them back from the store; they
- *       never live on a service field or in a log line.
- *   <li>Both upstream calls hit saint.ssu.ac.kr over HTTPS in prod; never
- *       echo the cookie or token values into responses or exceptions.
+ *   <li>sToken / sIdno are method-scoped locals — never logged, persisted, or returned.
+ *   <li>Portal cookies are stored encrypted in SaintSessionStore once identity is confirmed.
+ *   <li>Cookie and token values are never echoed into responses or log lines.
  * </ul>
  */
 @Service
@@ -67,23 +54,40 @@ public class SaintSsoService {
 
     private static final String PHASE1_SUCCESS_MARKER = "location.href = \"/irj/portal\"";
     private static final String IDENTITY_NAME_SELECTOR = ".top_user";
-    // Live portal greets with "{이름}님 접속을 환영합니다." Keep the shorter
-    // "님 환영합니다." variant + plain trailing "님" as fallbacks so a copy
-    // change on the SSU side does not break login.
+    // Live portal greets with "{이름}님 접속을 환영합니다." Keep shorter variants as fallbacks
+    // so a copy change on the SSU side does not break login.
     private static final List<String> NAME_GREETING_SUFFIXES = List.of(
             "님 접속을 환영합니다.", "님 환영합니다.", "님");
+    private static final String BROWSER_UA =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+    private static final int MAX_PHASE2_REDIRECTS = 10;
 
     private final SaintSsoProperties properties;
     private final RestClient restClient;
+    private final HttpClient httpClient;
     private final SaintSessionStore sessionStore;
 
+    @Autowired
     public SaintSsoService(
             SaintSsoProperties properties,
             @Qualifier("saintSsoRestClient") RestClient restClient,
             SaintSessionStore sessionStore) {
+        this(properties, restClient, sessionStore,
+                HttpClient.newBuilder()
+                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .connectTimeout(properties.getTimeout())
+                        .build());
+    }
+
+    SaintSsoService(
+            SaintSsoProperties properties,
+            RestClient restClient,
+            SaintSessionStore sessionStore,
+            HttpClient httpClient) {
         this.properties = properties;
         this.restClient = restClient;
         this.sessionStore = sessionStore;
+        this.httpClient = httpClient;
     }
 
     public UsaintAuthResult authenticate(String sToken, String sIdno) {
@@ -100,16 +104,18 @@ public class SaintSsoService {
             throw new SaintAuthFailedException("phase 1 returned no Set-Cookie headers");
         }
 
-        ResponseEntity<String> phase2 = phase2FetchPortal(phase1Cookies);
-        String phase2Cookies = buildCookieHeader(phase2.getHeaders().get(HttpHeaders.SET_COOKIE));
-        String mergedCookies = mergeCookieHeaders(phase1Cookies, phase2Cookies);
+        Phase2Result phase2 = phase2FetchPortal(phase1Cookies);
+        // phase2.cookieHeader() aggregates all Set-Cookie across the redirect chain.
+        // Overlay wins on conflict — the portal's fresh MYSAPSSO2 replaces the older
+        // /webSSO/sso.jsp token that would otherwise cause ECC 403.
+        String mergedCookies = mergeCookieHeaders(phase1Cookies, phase2.cookieHeader());
 
         log.info("saint sso cookies stored: names={}", cookieNames(mergedCookies));
         // Temporary diagnostic: log MYSAPSSO2 prefix to compare with browser value
         String mysapPrefix = extractCookiePrefix(mergedCookies, "MYSAPSSO2", 24);
         log.info("saint sso mysapsso2 prefix(24)={}", mysapPrefix);
 
-        UsaintAuthResult identity = parseIdentity(phase2.getBody(), sIdno);
+        UsaintAuthResult identity = parseIdentity(phase2.body(), sIdno);
         sessionStore.put(identity.studentId(), new PortalCookies(mergedCookies));
         return identity;
     }
@@ -139,20 +145,75 @@ public class SaintSsoService {
         return response;
     }
 
-    private ResponseEntity<String> phase2FetchPortal(String portalCookieHeader) {
-        try {
-            return restClient.get()
-                    .uri(URI.create(properties.getPortalUrl()))
-                    .header(HttpHeaders.COOKIE, portalCookieHeader)
-                    .retrieve()
-                    .toEntity(String.class);
-        } catch (ResourceAccessException exception) {
-            throw new SaintPortalUnavailableException("saint phase 2 timeout/io", exception);
-        } catch (RestClientResponseException exception) {
-            throw new SaintPortalUnavailableException(
-                    "saint phase 2 http " + exception.getStatusCode().value(), exception);
+    /**
+     * Fetches the SAP portal with manual redirect following so Set-Cookie headers on
+     * 302 responses are captured. HttpURLConnection silently follows redirects and drops
+     * intermediate Set-Cookie — that's why phase-2 must use HttpClient with Redirect.NEVER.
+     */
+    private Phase2Result phase2FetchPortal(String initialCookieHeader) {
+        String currentCookies = initialCookieHeader;
+        String currentUrl = properties.getPortalUrl();
+        String accumulatedNewCookies = "";
+
+        for (int hop = 0; hop <= MAX_PHASE2_REDIRECTS; hop++) {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(currentUrl))
+                    .header("Cookie", currentCookies)
+                    .header("User-Agent", BROWSER_UA)
+                    .header("Accept", "text/html,application/xhtml+xml")
+                    .header("Accept-Language", "ko")
+                    .timeout(properties.getTimeout())
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response;
+            try {
+                response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            } catch (java.net.http.HttpTimeoutException ex) {
+                throw new SaintPortalUnavailableException("saint phase 2 timeout/io", ex);
+            } catch (IOException ex) {
+                throw new SaintPortalUnavailableException("saint phase 2 io error", ex);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new SaintPortalUnavailableException("saint phase 2 interrupted", ex);
+            }
+
+            // Accumulate Set-Cookie from this hop (e.g. MYSAPSSO2 on the first 302).
+            String stepCookies = buildCookieHeader(response.headers().allValues("Set-Cookie"));
+            if (!stepCookies.isBlank()) {
+                accumulatedNewCookies = mergeCookieHeaders(accumulatedNewCookies, stepCookies);
+                currentCookies = mergeCookieHeaders(currentCookies, stepCookies);
+            }
+
+            int status = response.statusCode();
+            if (status == 200) {
+                return new Phase2Result(response.body(), accumulatedNewCookies);
+            }
+            if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
+                String location = response.headers().firstValue("Location").orElse(null);
+                if (location == null || location.isBlank()) {
+                    throw new SaintPortalUnavailableException("saint phase 2 redirect missing Location");
+                }
+                try {
+                    currentUrl = URI.create(currentUrl).resolve(location).toString();
+                } catch (IllegalArgumentException ex) {
+                    throw new SaintPortalUnavailableException("saint phase 2 malformed redirect location");
+                }
+                continue;
+            }
+            if (status / 100 == 5) {
+                String snippet = response.body() == null ? "(null)"
+                        : response.body().substring(0, Math.min(300, response.body().length()));
+                log.warn("saint phase 2 5xx: status={} snippet='{}'", status, snippet);
+                throw new SaintPortalUnavailableException("saint phase 2 http " + status);
+            }
+            log.warn("saint phase 2 unexpected status={}", status);
+            throw new SaintPortalUnavailableException("saint phase 2 http " + status);
         }
+        throw new SaintPortalUnavailableException("saint phase 2 redirect loop (>" + MAX_PHASE2_REDIRECTS + ")");
     }
+
+    private record Phase2Result(String body, String cookieHeader) {}
 
     private UsaintAuthResult parseIdentity(String portalHtml, String sIdno) {
         if (portalHtml == null || portalHtml.isBlank()) {
@@ -160,10 +221,8 @@ public class SaintSsoService {
         }
         Document document = Jsoup.parse(portalHtml);
         String name = extractName(document);
-        // sIdno survived phase 1's success-marker check and produced a usable
-        // portal session in phase 2 — trust it as the authoritative student
-        // id rather than re-parsing it out of the page. The portal main HTML
-        // only echoes 학번 inside JS config, not in a stable DOM element.
+        // sIdno survived phase 1's success-marker check — trust it as the authoritative
+        // student id. The portal main page only echoes 학번 inside JS config.
         return new UsaintAuthResult(sIdno.trim(), name, null, null);
     }
 
@@ -185,9 +244,6 @@ public class SaintSsoService {
                 }
             }
         }
-        // No known suffix matched; bail out rather than persisting a string
-        // that includes the greeting tail — caller will redirect with
-        // error=portal_unavailable and we keep a log line for diagnosis.
         throw new SaintPortalUnavailableException(
                 "portal HTML greeting did not match any known name suffix");
     }
@@ -212,7 +268,6 @@ public class SaintSsoService {
         if (overlay == null || overlay.isBlank()) {
             return base;
         }
-        // overlay wins on conflict (same name=value ordering as LinkedHashMap.put)
         java.util.LinkedHashMap<String, String> jar = new java.util.LinkedHashMap<>();
         for (String pair : base.split(";")) {
             addPairToJar(jar, pair.trim());
