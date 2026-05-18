@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SaintLoginButton } from "@/components/auth/SaintLoginButton";
 
 export const metadata = {
-  title: "유세인트로 로그인 · ssuAI",
+  title: "SmartID 로그인 · ssuAI",
 };
 
 export default function AuthLoginPage() {
@@ -12,11 +12,11 @@ export default function AuthLoginPage() {
       <header>
         <p className="text-sm font-medium text-muted-foreground">ssuAI 로그인</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-normal text-foreground">
-          유세인트로 로그인
+          SmartID 로그인
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          학교 SmartID 페이지에서 본인 확인 후 ssuAI 로 돌아옵니다. ssuAI 는
-          학생 비밀번호를 절대 저장하지 않아요.
+          학교 SmartID(유세인트) 페이지에서 본인 확인 후 ssuAI 로 돌아옵니다. 시간표·성적·LMS 과제를
+          한 번에 불러옵니다. ssuAI 는 학생 비밀번호를 절대 저장하지 않아요.
         </p>
       </header>
 
