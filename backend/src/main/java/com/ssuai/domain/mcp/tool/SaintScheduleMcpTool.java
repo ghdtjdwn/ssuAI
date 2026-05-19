@@ -38,7 +38,9 @@ public class SaintScheduleMcpTool {
             name = "get_my_schedule",
             description = "Returns the authenticated student's u-SAINT timetable for all enrolled semesters. "
                     + "Requires mcp_session_id with the SAINT provider linked via start_auth. "
-                    + "Returns AUTH_REQUIRED with a loginUrl if not authenticated — open loginUrl in a browser, then retry."
+                    + "Returns AUTH_REQUIRED with a loginUrl if SAINT is not authenticated — "
+                    + "show the loginUrl to the user and ask them to open it in a browser, "
+                    + "then retry this call with the returned mcp_session_id."
     )
     public McpPrivateToolResponse<ScheduleResponse> getMySchedule(String mcp_session_id) {
         return authHelper.principalKey(mcp_session_id, McpProviderType.SAINT)

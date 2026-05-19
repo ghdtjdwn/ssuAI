@@ -37,7 +37,9 @@ public class LmsAssignmentsMcpTool {
             name = "get_my_assignments",
             description = "Returns the authenticated student's pending LMS assignments and quizzes for the current term. "
                     + "Requires mcp_session_id with the LMS provider linked via start_auth. "
-                    + "Returns AUTH_REQUIRED with a loginUrl if not authenticated — open loginUrl in a browser, then retry."
+                    + "Returns AUTH_REQUIRED with a loginUrl if LMS is not authenticated — "
+                    + "show the loginUrl to the user and ask them to open it in a browser, "
+                    + "then retry this call with the returned mcp_session_id."
     )
     public McpPrivateToolResponse<AssignmentsResponse> getMyAssignments(String mcp_session_id) {
         return authHelper.principalKey(mcp_session_id, McpProviderType.LMS)
