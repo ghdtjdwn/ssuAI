@@ -118,6 +118,10 @@ slash command 없이 시작하고, 필요 시 `ssuai-deep` profile 명을 명시
   code comment 어디에도 "Claude", "Anthropic", "🤖 Generated with…",
   `Co-Authored-By: Claude` trailer 금지. 미머지 브랜치에 흔적 있으면
   amend/rebase 로 제거. 머지된 legacy 는 silent rewrite 금지.
+  GitHub contribution 이 사용자에게 잡히도록 commit author/committer 는
+  반드시 `git config user.name` / `git config user.email` 의 사용자 계정값을
+  사용하고, AI 계정·봇 계정·공유 계정으로 커밋하지 않는다. 커밋 전
+  `git log -1 --format='%an <%ae> | %cn <%ce>'` 로 확인.
   [[feedback-no-claude-coauthor]]
 - **Auto-merge safe PRs** — `mergeable: MERGEABLE` + tests pass +
   런타임 영향 OFF by default + 신규 파일 위주이면 confirm 없이
