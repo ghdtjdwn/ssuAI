@@ -5,6 +5,10 @@
 > `reserve_library_seat` action tool is Phase 4 and lives in a separate
 > task spec.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## 1. Goal / Scope / Non-goals
 
 ### Goal

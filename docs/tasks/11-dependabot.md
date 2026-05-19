@@ -3,6 +3,10 @@
 > Hand-off spec for Codex CLI. Reply using the **Required Output Format**
 > in `AGENTS.md`. Tiny single-PR task.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Enable Dependabot for automated dependency-update PRs across the three

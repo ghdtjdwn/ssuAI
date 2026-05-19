@@ -4,6 +4,10 @@
 > §3–§6, §10 and `docs/security.md` first. This task must not contradict
 > them. Reply using the Required Output Format in `AGENTS.md`.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Build the first domain slice — `GET /api/meals/today` — using a **mock

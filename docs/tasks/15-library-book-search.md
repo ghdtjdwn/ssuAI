@@ -4,6 +4,10 @@
 > 좌석 read-only 였다면 이건 도서 read-only. 책 *예약* / 대출 *액션* 은
 > Phase 4 별도 task. 본 task 는 인증 없는 공개 검색만 다룬다.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## 1. Goal / Scope / Non-goals
 
 ### Goal
