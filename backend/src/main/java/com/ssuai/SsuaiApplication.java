@@ -12,4 +12,3 @@ public class SsuaiApplication {
         SpringApplication.run(SsuaiApplication.class, args);
     }
 }
-
