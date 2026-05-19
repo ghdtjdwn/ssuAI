@@ -24,6 +24,10 @@ env:
   # reaches us. SaintSsoCallbackController fails fast on startup if this
   # env var is empty.
   apiBaseUrl: https://ssuai.vercel.app
+  # MCP auth callbacks should go directly to the backend ingress. MCP clients
+  # already connect to this origin for SSE, and this avoids relying on the
+  # Vercel /api proxy for SmartID returns.
+  mcpApiBaseUrl: https://ssumcp.duckdns.org
   javaOpts: "-XX:+UseG1GC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
   connectorMeal: real
   connectorDormMeal: real

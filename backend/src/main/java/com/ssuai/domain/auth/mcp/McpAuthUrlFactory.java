@@ -34,7 +34,7 @@ public class McpAuthUrlFactory {
             case LMS -> "/api/mcp/auth/lms/start";
             case LIBRARY -> "/api/mcp/auth/library/start";
         };
-        return authProperties.getApiBaseUrl() + path
+        return authProperties.getMcpApiBaseUrl() + path
                 + "?state=" + URLEncoder.encode(state, StandardCharsets.UTF_8);
     }
 
@@ -48,7 +48,7 @@ public class McpAuthUrlFactory {
             case LMS -> "/api/mcp/auth/lms/callback";
             case LIBRARY -> "/api/mcp/auth/library/callback";
         };
-        return authProperties.getApiBaseUrl() + path
+        return authProperties.getMcpApiBaseUrl() + path
                 + "?state=" + URLEncoder.encode(state, StandardCharsets.UTF_8);
     }
 }
