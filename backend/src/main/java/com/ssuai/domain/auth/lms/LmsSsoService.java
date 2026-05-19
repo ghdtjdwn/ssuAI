@@ -8,7 +8,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -67,9 +70,7 @@ public class LmsSsoService {
 
         // Phase 2: canvas dashboard → canvas session cookies (xn_api_token etc.)
         List<String> phase2Cookies = fetchCanvasDashboard(lmsCookieHeader, sIdno.trim());
-        String allCookies = phase2Cookies.isEmpty()
-                ? lmsCookieHeader
-                : lmsCookieHeader + "; " + buildCookieHeader(phase2Cookies);
+        String allCookies = mergeLmsCookies(lmsCookieHeader, phase2Cookies);
 
         sessionStore.put(sIdno.trim(), new LmsCookies(allCookies));
     }
@@ -99,22 +100,84 @@ public class LmsSsoService {
         String url = properties.getCanvasBaseUrl()
                 + "/learningx/dashboard?user_login="
                 + URLEncoder.encode(studentId, StandardCharsets.UTF_8);
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Cookie", lmsCookies)
-                .header("Referer", "https://lms.ssu.ac.kr/")
-                .timeout(properties.getTimeout())
-                .GET()
-                .build();
-        try {
-            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            return response.headers().allValues("set-cookie");
-        } catch (IOException exception) {
-            throw new LmsAuthFailedException("canvas dashboard io error", exception);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new LmsAuthFailedException("canvas dashboard interrupted", exception);
+        String cookieHeader = lmsCookies;
+        List<String> allSetCookies = new ArrayList<>();
+
+        for (int hop = 0; hop <= 10; hop++) {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Cookie", cookieHeader)
+                    .header("Referer", "https://lms.ssu.ac.kr/")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                    .timeout(properties.getTimeout())
+                    .GET()
+                    .build();
+            try {
+                HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+                List<String> stepCookies = response.headers().allValues("set-cookie");
+                allSetCookies.addAll(stepCookies);
+                if (!stepCookies.isEmpty()) {
+                    cookieHeader = mergeLmsCookies(cookieHeader, stepCookies);
+                }
+
+                int status = response.statusCode();
+                if (status / 100 == 2) {
+                    return allSetCookies;
+                }
+                if (status / 100 == 3) {
+                    String location = response.headers().firstValue("location").orElse(null);
+                    if (location == null || location.isBlank()) {
+                        return allSetCookies;
+                    }
+                    url = URI.create(url).resolve(location).toString();
+                    continue;
+                }
+                return allSetCookies;
+            } catch (IOException exception) {
+                throw new LmsAuthFailedException("canvas dashboard io error", exception);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new LmsAuthFailedException("canvas dashboard interrupted", exception);
+            }
         }
+        return allSetCookies;
+    }
+
+    private static String mergeLmsCookies(String base, List<String> setCookieHeaders) {
+        LinkedHashMap<String, String> jar = new LinkedHashMap<>();
+        if (base != null && !base.isBlank()) {
+            for (String pair : base.split(";")) {
+                addLmsCookiePair(jar, pair.trim());
+            }
+        }
+        for (String setCookie : setCookieHeaders) {
+            if (setCookie == null || setCookie.isBlank()) {
+                continue;
+            }
+            int semi = setCookie.indexOf(';');
+            String pair = semi < 0 ? setCookie : setCookie.substring(0, semi);
+            addLmsCookiePair(jar, pair.trim());
+        }
+        StringBuilder out = new StringBuilder();
+        for (Map.Entry<String, String> entry : jar.entrySet()) {
+            if (out.length() > 0) {
+                out.append("; ");
+            }
+            out.append(entry.getKey()).append('=').append(entry.getValue());
+        }
+        return out.toString();
+    }
+
+    private static void addLmsCookiePair(LinkedHashMap<String, String> jar, String pair) {
+        if (pair == null || pair.isEmpty()) {
+            return;
+        }
+        int eq = pair.indexOf('=');
+        if (eq <= 0) {
+            return;
+        }
+        jar.put(pair.substring(0, eq).trim(), pair.substring(eq + 1).trim());
     }
 
     private static String buildCookieHeader(List<String> setCookies) {
