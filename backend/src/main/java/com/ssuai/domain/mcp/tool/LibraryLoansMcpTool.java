@@ -38,7 +38,9 @@ public class LibraryLoansMcpTool {
             name = "get_my_library_loans",
             description = "Returns the authenticated user's current library loans including due dates. "
                     + "Requires mcp_session_id with the LIBRARY provider linked via start_auth. "
-                    + "Returns AUTH_REQUIRED with a loginUrl if not authenticated — open loginUrl in a browser, then retry."
+                    + "Returns AUTH_REQUIRED with a loginUrl if LIBRARY is not authenticated — "
+                    + "show the loginUrl to the user and ask them to open it in a browser, "
+                    + "then retry this call with the returned mcp_session_id."
     )
     public McpPrivateToolResponse<LibraryLoansResponse> getMyLibraryLoans(String mcp_session_id) {
         return authHelper.principalKey(mcp_session_id, McpProviderType.LIBRARY)
