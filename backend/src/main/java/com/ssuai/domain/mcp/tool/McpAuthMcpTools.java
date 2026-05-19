@@ -44,7 +44,8 @@ public class McpAuthMcpTools {
     @Tool(
             name = "get_auth_status",
             description = "Returns the current MCP auth session status for each provider (SAINT, LMS, LIBRARY). "
-                    + "If mcp_session_id is missing or invalid, all providers show as not linked."
+                    + "If mcp_session_id is missing or invalid, all providers show as not linked. "
+                    + "Sessions are stored in server memory and reset on server restart — call start_auth again if your session is lost."
     )
     public McpAuthStatusResponse getAuthStatus(String mcp_session_id) {
         McpAuthSession session = mcpAuthService.find(mcp_session_id).orElse(null);
