@@ -31,6 +31,30 @@
 
 ---
 
+## 2026-05-18 — MCP auth tools 구현 후 서버 등록 누락
+
+- 맥락: Task 18에서 외부 MCP 클라이언트용 인증 흐름을 추가했다.
+  `get_auth_status`, `start_auth`, `logout_provider`, `logout_all` 구현과 문서는
+  완료됐지만 실제 MCP tool list smoke 전 코드 리뷰에서 누락을 발견했다.
+- 증상: `McpAuthMcpTools` 클래스와 테스트는 존재하지만 `McpServerConfig`의
+  `MethodToolCallbackProvider.toolObjects(...)`에 등록되지 않았다. 이 상태로 배포하면
+  Claude Desktop/Cursor 같은 MCP 클라이언트에서 인증 시작 도구가 보이지 않아 private tool
+  사용자가 `AUTH_REQUIRED` 이후 로그인 흐름을 시작할 수 없다.
+- 원인: Spring AI MCP tool 등록은 component scan만으로 끝나지 않고, 현재 프로젝트에서는
+  `McpServerConfig`가 명시적으로 tool object 목록을 구성한다. 새 tool class를 만들면서
+  설정 파일과 tool-list regression test를 함께 갱신하지 않았다.
+- 해결: `McpServerConfig.ssuaiMcpTools(...)`에 `McpAuthMcpTools`를 주입하고
+  `toolObjects(...)` 목록에 추가했다. `McpServerConfigTests`의 expected tool names도 기존
+  10개에서 auth tools 4개를 포함한 14개로 갱신했다.
+- 검증: `McpServerConfigTests.registersSsuaiMcpTools`가 auth tools 4개
+  (`get_auth_status`, `start_auth`, `logout_provider`, `logout_all`)와 기존 tool 10개를
+  모두 확인하도록 고정했다.
+- 포트폴리오 포인트: MCP 서버는 "구현된 class"가 아니라 "클라이언트가 발견 가능한 tool
+  contract"가 제품 표면이다. 새 도구를 추가할 때는 service/tool unit test뿐 아니라 MCP
+  registry smoke 또는 config regression test를 acceptance criteria에 포함해야 한다.
+
+---
+
 ## 2026-05-18 — RestClient 302 redirect 중간 Set-Cookie 누락 → HttpClient Redirect.NEVER로 전환
 
 - 맥락: u-SAINT portal phase 2 에서 SAP ECC 커넥터가 403 을 계속 반환. SmartID 로그인 자체는
