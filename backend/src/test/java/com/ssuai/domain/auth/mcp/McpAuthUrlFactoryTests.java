@@ -14,6 +14,13 @@ class McpAuthUrlFactoryTests {
         return new McpAuthUrlFactory(props);
     }
 
+    private static McpAuthUrlFactory factory(String baseUrl, String mcpBaseUrl) {
+        AuthProperties props = new AuthProperties();
+        props.setApiBaseUrl(baseUrl);
+        props.setMcpApiBaseUrl(mcpBaseUrl);
+        return new McpAuthUrlFactory(props);
+    }
+
     @Test
     void buildLoginUrlSaintIncludesCorrectPath() {
         McpAuthUrlFactory factory = factory("https://api.example.com");
@@ -42,6 +49,20 @@ class McpAuthUrlFactoryTests {
         String url = factory.buildCallbackUrl(McpProviderType.SAINT, "xyz789");
         assertThat(url).startsWith("https://api.example.com/api/mcp/auth/saint/callback?state=");
         assertThat(url).contains("xyz789");
+    }
+
+    @Test
+    void buildLoginUrlUsesMcpBaseUrlWhenConfigured() {
+        McpAuthUrlFactory factory = factory("https://web.example.com", "https://mcp.example.com");
+        String url = factory.buildLoginUrl(McpProviderType.SAINT, "abc123");
+        assertThat(url).startsWith("https://mcp.example.com/api/mcp/auth/saint/start?state=");
+    }
+
+    @Test
+    void buildCallbackUrlFallsBackToApiBaseUrlWhenMcpBaseUrlIsBlank() {
+        McpAuthUrlFactory factory = factory("https://web.example.com", " ");
+        String url = factory.buildCallbackUrl(McpProviderType.SAINT, "xyz789");
+        assertThat(url).startsWith("https://web.example.com/api/mcp/auth/saint/callback?state=");
     }
 
     @Test

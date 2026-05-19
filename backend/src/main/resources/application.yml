@@ -130,6 +130,9 @@ ssuai:
     # apiReturnUrl in /api/auth/saint/sso-init. In prod this MUST be
     # the HTTPS origin SmartID is whitelisted to redirect to.
     api-base-url: ${SSUAI_API_BASE_URL:http://localhost:8080}
+    # MCP auth does not need the Vercel cookie domain. Point this directly
+    # to the backend origin in prod so SmartID returns to k3s, not Vercel.
+    mcp-api-base-url: ${SSUAI_MCP_API_BASE_URL:}
     smartid-sso-url: ${SSUAI_SMARTID_SSO_URL:https://smartid.ssu.ac.kr/Symtra_sso/smln.asp}
     refresh-cookie:
       name: ssuai_refresh
