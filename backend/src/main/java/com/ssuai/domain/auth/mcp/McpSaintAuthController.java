@@ -83,6 +83,22 @@ public class McpSaintAuthController {
             @RequestParam(required = false) String sIdno,
             @RequestParam(required = false) String state) {
 
+        // SmartID appends ?sToken=...&sIdno=... with ? instead of & when our URL already
+        // contains ?state=..., so state param becomes "<uuid>?sToken=<token>" and sToken is null.
+        if (state != null && state.contains("?")) {
+            int q = state.indexOf('?');
+            String suffix = state.substring(q + 1);
+            state = state.substring(0, q);
+            if (sToken == null) {
+                for (String pair : suffix.split("&")) {
+                    if (pair.startsWith("sToken=")) {
+                        sToken = pair.substring("sToken=".length());
+                        break;
+                    }
+                }
+            }
+        }
+
         McpAuthStateEntry entry = mcpAuthService.consumeState(state).orElse(null);
         if (entry == null) {
             log.warn("mcp saint callback: state invalid or expired");

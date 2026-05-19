@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -85,6 +86,42 @@ class McpSaintAuthControllerTests {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("로그인 실패")));
 
         verify(saintSsoService, never()).authenticate(any(), any());
+    }
+
+    @Test
+    void doubleQuestionMarkStateIsHandled() throws Exception {
+        McpAuthStateEntry entry = new McpAuthStateEntry("valid-state", SESSION_ID, McpProviderType.SAINT, EXPIRES);
+        when(mcpAuthService.consumeState("valid-state")).thenReturn(Optional.of(entry));
+        when(saintSsoService.authenticate("tok", "20231234"))
+                .thenReturn(new UsaintAuthResult("20231234", "홍길동", "CS", "재학"));
+
+        mockMvc.perform(get("/api/mcp/auth/saint/callback")
+                        .param("sIdno", "20231234")
+                        .param("state", "valid-state?sToken=tok"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<String> stateCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mcpAuthService).consumeState(stateCaptor.capture());
+        org.assertj.core.api.Assertions.assertThat(stateCaptor.getValue()).isEqualTo("valid-state");
+        verify(saintSsoService).authenticate("tok", "20231234");
+        verify(mcpAuthService).linkProvider(SESSION_ID, McpProviderType.SAINT, "20231234");
+    }
+
+    @Test
+    void normalStateIsHandled() throws Exception {
+        McpAuthStateEntry entry = new McpAuthStateEntry("normal-state", SESSION_ID, McpProviderType.SAINT, EXPIRES);
+        when(mcpAuthService.consumeState("normal-state")).thenReturn(Optional.of(entry));
+        when(saintSsoService.authenticate("tok", "20231234"))
+                .thenReturn(new UsaintAuthResult("20231234", "홍길동", "CS", "재학"));
+
+        mockMvc.perform(get("/api/mcp/auth/saint/callback")
+                        .param("sToken", "tok").param("sIdno", "20231234").param("state", "normal-state"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<String> stateCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mcpAuthService).consumeState(stateCaptor.capture());
+        org.assertj.core.api.Assertions.assertThat(stateCaptor.getValue()).isEqualTo("normal-state");
+        verify(saintSsoService).authenticate("tok", "20231234");
     }
 
     @Test
