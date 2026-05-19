@@ -12,6 +12,7 @@ import com.ssuai.domain.mcp.tool.LibraryLoansMcpTool;
 import com.ssuai.domain.mcp.tool.LibrarySeatMcpTool;
 import com.ssuai.domain.mcp.tool.LmsAssignmentsMcpTool;
 import com.ssuai.domain.mcp.tool.MealMcpTools;
+import com.ssuai.domain.mcp.tool.McpAuthMcpTools;
 import com.ssuai.domain.mcp.tool.SaintGradesMcpTool;
 import com.ssuai.domain.mcp.tool.SaintScheduleMcpTool;
 
@@ -23,6 +24,7 @@ class McpServerConfig {
             MealMcpTools mealMcpTools,
             DormMcpTools dormMcpTools,
             CampusMcpTools campusMcpTools,
+            McpAuthMcpTools mcpAuthMcpTools,
             LibrarySeatMcpTool libraryMcpTool,
             LibraryBookMcpTool libraryBookMcpTool,
             LibraryLoansMcpTool libraryLoansMcpTool,
@@ -35,6 +37,7 @@ class McpServerConfig {
                         mealMcpTools,
                         dormMcpTools,
                         campusMcpTools,
+                        mcpAuthMcpTools,
                         libraryMcpTool,
                         libraryBookMcpTool,
                         libraryLoansMcpTool,
