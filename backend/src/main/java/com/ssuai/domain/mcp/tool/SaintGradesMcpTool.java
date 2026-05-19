@@ -36,7 +36,9 @@ public class SaintGradesMcpTool {
             name = "get_my_grades",
             description = "Returns the authenticated student's cumulative u-SAINT grades including semester GPA history. "
                     + "Requires mcp_session_id with the SAINT provider linked via start_auth. "
-                    + "Returns AUTH_REQUIRED with a loginUrl if not authenticated — open loginUrl in a browser, then retry."
+                    + "Returns AUTH_REQUIRED with a loginUrl if SAINT is not authenticated — "
+                    + "show the loginUrl to the user and ask them to open it in a browser, "
+                    + "then retry this call with the returned mcp_session_id."
     )
     public McpPrivateToolResponse<GradesResponse> getMyGrades(String mcp_session_id) {
         return authHelper.principalKey(mcp_session_id, McpProviderType.SAINT)
