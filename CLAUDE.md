@@ -130,6 +130,10 @@ slash command 없이 시작하고, 필요 시 `ssuai-deep` profile 명을 명시
 구체 routine 은 `docs/handoff/runbook.md`. trigger 시 거기 가서 절차
 실행.
 
+- **트러블슈팅 누적** — Claude/Codex 모두 포트폴리오에 설명하기 좋은
+  실전 문제(원인 분석, 재현 조건, 해결책, 검증)가 생기면 프로젝트 루트
+  `TROUBLESHOOTING.md` 에 날짜별로 짧게 누적. 단순 오타/일회성 명령 실패는
+  제외하고, 다음 agent 가 같은 문제를 피할 수 있는 내용만 기록.
 - **"내가 알려줄게" / "끝나면 알려줄게"** 한 외부 작업 → 폴링/언급/옵션
   매트릭스 포함 금지. 사용자가 결과 통지. [[feedback-user-will-notify]]
 - **"토큰 끝났어" / "다른 AI 로 갈게" / "claude2·codex 로 넘길게"** →
