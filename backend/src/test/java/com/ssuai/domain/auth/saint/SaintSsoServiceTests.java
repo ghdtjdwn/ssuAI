@@ -6,6 +6,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.io.IOException;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -109,6 +111,31 @@ class SaintSsoServiceTests {
                 .as("phase 1 portal cookies should be persisted under the sIdno-derived studentId")
                 .hasValueSatisfying(cookies -> assertThat(cookies.rawCookieHeader())
                         .isEqualTo("MYSAPSSO2=portal-session-abc; JSESSIONID=jsess-xyz"));
+        mockServer.verify();
+    }
+
+    @Test
+    void phase1RedirectToPortalUsesLocationAsPhase2StartUrl() throws InterruptedException {
+        HttpHeaders phase1Headers = new HttpHeaders();
+        phase1Headers.add(HttpHeaders.LOCATION, phase2Server.url("/irj/portal-from-phase1").toString());
+        phase1Headers.add(HttpHeaders.SET_COOKIE, "MYSAPSSO2=portal-session-abc; Path=/; HttpOnly");
+
+        mockServer.expect(requestTo(phase1Uri("redirect-token", "20231234")))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.FOUND).headers(phase1Headers));
+
+        phase2Server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .addHeader("Content-Type", "text/html;charset=UTF-8")
+                .setBody(loadFixture("saint/portal-success.html")));
+
+        UsaintAuthResult result = service.authenticate("redirect-token", "20231234");
+
+        assertThat(result.studentId()).isEqualTo("20231234");
+        assertThat(phase2Server.takeRequest().getPath()).isEqualTo("/irj/portal-from-phase1");
+        assertThat(sessionStore.cookies("20231234"))
+                .hasValueSatisfying(cookies -> assertThat(cookies.rawCookieHeader())
+                        .isEqualTo("MYSAPSSO2=portal-session-abc"));
         mockServer.verify();
     }
 
