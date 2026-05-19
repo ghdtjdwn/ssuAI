@@ -2,8 +2,9 @@
 
 ## Status
 
-- Draft / design review needed.
-- 구현 전 사용자 승인 필요.
+- ✅ Done — PR #148 merged (feat/mcp-auth-session)
+- 구현: McpAuthSessionStore / McpAuthStateStore / McpAuthMcpTools (4 auth tools)
+- private tools 4개 mcp_session_id 기반 인증으로 전환 완료
 
 ## Problem
 
