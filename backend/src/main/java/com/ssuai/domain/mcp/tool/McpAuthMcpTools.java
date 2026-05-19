@@ -70,9 +70,13 @@ public class McpAuthMcpTools {
 
     @Tool(
             name = "start_auth",
-            description = "Generates a login URL for the specified provider (SAINT, LMS, or LIBRARY). "
-                    + "Creates a new MCP session if mcp_session_id is not provided. "
-                    + "Open loginUrl in a browser to complete login, then pass the returned mcp_session_id to private tool calls."
+            description = "Generates a browser login URL for the specified provider (SAINT, LMS, or LIBRARY). "
+                    + "Use this tool when a private tool returns AUTH_REQUIRED. "
+                    + "Steps: 1) Call this tool to get loginUrl and mcpSessionId. "
+                    + "2) Show the user: 'Please open this link to log in: [loginUrl]'. "
+                    + "3) Wait for the user to confirm login is complete. "
+                    + "4) Retry the original private tool call with mcp_session_id=[mcpSessionId]. "
+                    + "Creates a new MCP session if mcp_session_id is not provided."
     )
     public McpAuthStartResponse startAuth(String provider, String mcp_session_id) {
         McpProviderType providerType = parseProvider(provider);

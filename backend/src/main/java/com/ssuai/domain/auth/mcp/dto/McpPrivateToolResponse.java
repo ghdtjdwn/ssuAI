@@ -30,14 +30,19 @@ public record McpPrivateToolResponse<T>(
             String mcpSessionId, String provider, String loginUrl, Instant expiresAt) {
         return new McpPrivateToolResponse<>(
                 "AUTH_REQUIRED", provider, mcpSessionId, loginUrl, expiresAt,
-                "Authentication required. Open loginUrl in a browser, then retry with the same mcp_session_id.",
+                "AUTHENTICATION REQUIRED. Action needed: "
+                        + "1) Open the loginUrl in a browser and complete login. "
+                        + "2) Tell the user: 'Please open this link to log in: [loginUrl]'. "
+                        + "3) After the user confirms login is complete, retry this exact tool call with mcp_session_id set to the mcpSessionId value shown here.",
                 null);
     }
 
     public static <T> McpPrivateToolResponse<T> invalidSession(String mcpSessionId, String provider) {
         return new McpPrivateToolResponse<>(
                 "INVALID_SESSION", provider, mcpSessionId, null, null,
-                "No valid MCP session found. Call start_auth without mcp_session_id to create a new session.",
+                "SESSION NOT FOUND. The provided mcp_session_id does not match any active session "
+                        + "(it may have expired after server restart). "
+                        + "Call start_auth with the appropriate provider to begin a new session.",
                 null);
     }
 }
