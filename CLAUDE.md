@@ -28,6 +28,9 @@ read** — 전체 read 는 task 범위가 정말 넓을 때만.
 다른 agent 기다리지 마라. State 는 `docs/handoff/latest.md`,
 `docs/tasks/`, `docs/dev-log.md`, git history 로 인계.
 
+**Codex 세션 픽업**: `.codex/current-task.md` 가 있으면 세션 시작 직후
+먼저 읽어 현재 task 파악. Claude 가 여기에 task 를 써두고 넘긴다.
+
 비자명 feature 는 design (Goal/API/data flow/security/test) → 사용자
 승인 → 구현. 작은 fix 는 그냥 구현. multi-step 작업은 `TaskCreate` 로
 내부 추적.
@@ -80,7 +83,7 @@ context 에서 작업.
 
 ## Model / planning workflow
 - **Claude 설계·아키텍처 결정** (`/plan` 진입) → Opus 4.7. 비자명 feature 설계, security 판단, 아키텍처 트레이드오프
-- **Claude 구현·테스트·커밋** (일반 모드) → Sonnet. 파일 편집, 테스트 실행, git 커밋, PR 열기
+- **Claude 구현·테스트·커밋** (일반 모드) → Opus 4.7 (`/model opusplan` 세팅 유지). 파일 편집, 테스트 실행, git 커밋, PR 열기. 토큰 한도에 다가오면 Codex 또는 claude2 로 교대.
 - **Codex 기본 구현 세션** → `~/.codex/config.toml` 의 `ssuai` profile:
   GPT-5.5, `model_reasoning_effort=medium`,
   `plan_mode_reasoning_effort=xhigh`, `approval_policy=never`,
