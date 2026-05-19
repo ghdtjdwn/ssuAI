@@ -26,6 +26,12 @@ public interface McpAuthService {
     McpAuthSession getOrCreate(String idValue);
 
     /**
+     * Creates a fresh MCP auth session without trying to resolve a caller-supplied
+     * session id first. Use this when the caller supplied no session id at all.
+     */
+    McpAuthSession createSession();
+
+    /**
      * Generates a one-time login state token for the given session and provider.
      * The state is stored and will be consumed by the callback controller.
      */

@@ -32,6 +32,11 @@ class McpAuthServiceImpl implements McpAuthService {
     }
 
     @Override
+    public McpAuthSession createSession() {
+        return sessionStore.create();
+    }
+
+    @Override
     public McpAuthStateEntry generateState(McpAuthSessionId sessionId, McpProviderType provider) {
         return stateStore.generate(sessionId, provider);
     }

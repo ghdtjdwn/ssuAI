@@ -11,6 +11,9 @@ Thumbs.db
 # Claude Code local settings
 .claude/
 
+# Codex local handoff scratch
+.codex/
+
 # Local env
 .env
 .env.*

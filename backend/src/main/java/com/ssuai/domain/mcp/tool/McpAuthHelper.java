@@ -43,7 +43,15 @@ public class McpAuthHelper {
      * constructs the login URL.
      */
     public <T> McpPrivateToolResponse<T> buildAuthRequired(String idValue, McpProviderType provider) {
-        McpAuthSession session = mcpAuthService.getOrCreate(idValue);
+        McpAuthSession session;
+        if (idValue == null || idValue.isBlank()) {
+            session = mcpAuthService.createSession();
+        } else {
+            session = mcpAuthService.find(idValue).orElse(null);
+            if (session == null) {
+                return McpPrivateToolResponse.invalidSession(idValue, provider.name());
+            }
+        }
         McpAuthStateEntry state = mcpAuthService.generateState(session.id(), provider);
         String loginUrl = urlFactory.buildLoginUrl(provider, state.state());
         return McpPrivateToolResponse.authRequired(

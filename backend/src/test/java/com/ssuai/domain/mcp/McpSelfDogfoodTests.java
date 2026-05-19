@@ -1,8 +1,10 @@
 package com.ssuai.domain.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import io.modelcontextprotocol.client.McpClient;
@@ -10,9 +12,17 @@ import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
+
+import com.ssuai.domain.auth.mcp.McpAuthService;
+import com.ssuai.domain.auth.mcp.McpAuthSession;
+import com.ssuai.domain.auth.mcp.McpProviderType;
+import com.ssuai.domain.saint.dto.ScheduleResponse;
+import com.ssuai.domain.saint.service.SaintScheduleService;
 
 /**
  * End-to-end check that the chatbot's "talk to my own MCP server over SSE" claim
@@ -34,6 +44,12 @@ class McpSelfDogfoodTests {
 
     @LocalServerPort
     private int serverPort;
+
+    @Autowired
+    private McpAuthService mcpAuthService;
+
+    @MockitoBean
+    private SaintScheduleService saintScheduleService;
 
     @Test
     void clientCanListEveryToolExposedByServer() {
@@ -74,11 +90,7 @@ class McpSelfDogfoodTests {
                             Map.of("floor", 2)));
 
             assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
-            String text = result.content().stream()
-                    .filter(content -> content instanceof McpSchema.TextContent)
-                    .map(content -> ((McpSchema.TextContent) content).text())
-                    .findFirst()
-                    .orElseThrow();
+            String text = extractText(result);
             assertThat(text)
                     .contains("\"floor\"")
                     .contains("\"availableSeats\"")
@@ -95,14 +107,51 @@ class McpSelfDogfoodTests {
                     new McpSchema.CallToolRequest("get_today_meal", Map.of()));
 
             assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
-            String text = result.content().stream()
-                    .filter(content -> content instanceof McpSchema.TextContent)
-                    .map(content -> ((McpSchema.TextContent) content).text())
-                    .findFirst()
-                    .orElseThrow();
+            String text = extractText(result);
             assertThat(text)
                     .contains("\"date\"")
                     .contains("\"meals\"");
+        }
+    }
+
+    @Test
+    void privateToolWithoutSessionReturnsAuthRequiredOverSse() {
+        try (McpSyncClient client = openClient()) {
+            client.initialize();
+
+            McpSchema.CallToolResult result = client.callTool(
+                    new McpSchema.CallToolRequest("get_my_schedule", Map.of()));
+
+            assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+            String text = extractText(result);
+            assertThat(text)
+                    .contains("\"AUTH_REQUIRED\"")
+                    .contains("\"loginUrl\"")
+                    .contains("\"mcpSessionId\"");
+        }
+    }
+
+    @Test
+    void privateToolWithValidSessionReturnsOkOverSse() {
+        McpAuthSession session = mcpAuthService.createSession();
+        mcpAuthService.linkProvider(session.id(), McpProviderType.SAINT, "20221528");
+        when(saintScheduleService.fetchSchedule("20221528"))
+                .thenReturn(new ScheduleResponse(2022, 2025, 2, List.of()));
+
+        try (McpSyncClient client = openClient()) {
+            client.initialize();
+
+            McpSchema.CallToolResult result = client.callTool(
+                    new McpSchema.CallToolRequest(
+                            "get_my_schedule",
+                            Map.of("mcp_session_id", session.id().value())));
+
+            assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+            String text = extractText(result);
+            assertThat(text)
+                    .contains("\"OK\"")
+                    .contains("\"mcpSessionId\"")
+                    .contains(session.id().value());
         }
     }
 
@@ -117,11 +166,7 @@ class McpSelfDogfoodTests {
                             Map.of("query", "파이썬")));
 
             assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
-            String text = result.content().stream()
-                    .filter(content -> content instanceof McpSchema.TextContent)
-                    .map(content -> ((McpSchema.TextContent) content).text())
-                    .findFirst()
-                    .orElseThrow();
+            String text = extractText(result);
             assertThat(text)
                     .contains("\"total\"")
                     .contains("\"items\"")
@@ -140,13 +185,17 @@ class McpSelfDogfoodTests {
                             Map.of("query", "카페")));
 
             assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
-            String text = result.content().stream()
-                    .filter(content -> content instanceof McpSchema.TextContent)
-                    .map(content -> ((McpSchema.TextContent) content).text())
-                    .findFirst()
-                    .orElseThrow();
+            String text = extractText(result);
             assertThat(text).contains("\"facilities\"");
         }
+    }
+
+    private static String extractText(McpSchema.CallToolResult result) {
+        return result.content().stream()
+                .filter(content -> content instanceof McpSchema.TextContent)
+                .map(content -> ((McpSchema.TextContent) content).text())
+                .findFirst()
+                .orElseThrow();
     }
 
     private McpSyncClient openClient() {
