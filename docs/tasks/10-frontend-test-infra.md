@@ -3,6 +3,10 @@
 > Hand-off spec for Codex CLI. Reply using the **Required Output Format**
 > in `AGENTS.md`. Single small PR.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Bring real component-level testing to the frontend. Today, vitest runs

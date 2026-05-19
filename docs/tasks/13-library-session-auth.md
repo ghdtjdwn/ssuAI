@@ -23,6 +23,10 @@
 > - **PR 13c (frontend capture flow) is blocked** pending user decision
 >   on the popup alternative. Options on the table — see §12.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## 1. Goal / Scope / Non-goals
 
 ### Goal

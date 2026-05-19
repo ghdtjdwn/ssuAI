@@ -5,6 +5,10 @@
 > (this task is the production counterpart of 05's local-only deploy).
 > Reply using the Required Output Format in `AGENTS.md`.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Get a **live demo URL** of ssuAI online — backend on a Kubernetes cluster

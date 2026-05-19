@@ -3,6 +3,10 @@
 > Hand-off spec for Codex CLI. Reply using the **Required Output Format**
 > in `AGENTS.md`. Small, single-PR task.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Expose a typed OpenAPI 3 spec at `/v3/api-docs` and a Swagger UI at

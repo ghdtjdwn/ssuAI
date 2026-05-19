@@ -7,6 +7,10 @@
 > decision.
 > Reply using the Required Output Format in `AGENTS.md`.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Replace the manual `kubectl apply -f deploy/k8s/` workflow with **Pull a

@@ -7,6 +7,10 @@
 > host with its own auth — that auth shape is the central unknown this
 > task pins down.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## 1. Goal / Scope / Non-goals
 
 ### Goal

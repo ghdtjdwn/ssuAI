@@ -5,6 +5,10 @@
 > into actual academic data tools (`get_my_schedule`, `get_my_grades`) by
 > retaining the saint portal cookies that Task 14 currently throws away.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## 1. Goal / Scope / Non-goals
 
 ### Goal
