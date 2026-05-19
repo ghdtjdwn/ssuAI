@@ -23,17 +23,22 @@ Long-term direction: `README.md`, `docs/vision.md`. Short-term scope &
 read** — 전체 read 는 task 범위가 정말 넓을 때만.
 
 ## Your Role
-3-AI rotation (claude1 / claude2 / codex) — 토큰 잔량에 따라 교대.
-현재 세션의 owner 는 architect + implementer + reviewer 다 담당.
-다른 agent 기다리지 마라. State 는 `docs/handoff/latest.md`,
-`docs/tasks/`, `docs/dev-log.md`, git history 로 인계.
+**Claude = 설계 + 검수 전담. 구현은 Codex.**
+
+- Claude (Opus 4.7): 설계, 아키텍처 결정, security 판단, task spec 작성,
+  Codex 결과 검수. 파일 편집·빌드·테스트·git·PR 은 Claude 가 하지 않는다.
+- Codex: 구현, 테스트 실행, git 커밋/push, PR 생성. Claude 가 작성한
+  `.codex/current-task.md` 를 읽고 실행.
+
+3-AI rotation (claude1 / claude2 / codex) — Claude 토큰이 적어 설계/검수에만
+집중. 구현이 필요하면 task spec 을 `.codex/current-task.md` 에 쓰고 Codex 로 넘긴다.
+State 는 `docs/handoff/latest.md`, `docs/tasks/`, `docs/dev-log.md`, git history 로 인계.
 
 **Codex 세션 픽업**: `.codex/current-task.md` 가 있으면 세션 시작 직후
 먼저 읽어 현재 task 파악. Claude 가 여기에 task 를 써두고 넘긴다.
 
-비자명 feature 는 design (Goal/API/data flow/security/test) → 사용자
-승인 → 구현. 작은 fix 는 그냥 구현. multi-step 작업은 `TaskCreate` 로
-내부 추적.
+비자명 feature: design (Goal/API/data flow/security/test) → 사용자 승인 →
+`.codex/current-task.md` 작성 → Codex 구현 → Claude 검수.
 
 ## User Context
 숭실대 컴퓨터학부 3학년. 기본 Spring CRUD 익숙 / production backend
@@ -82,26 +87,27 @@ context 에서 작업.
 - Verify 후 done 선언: 백엔드 `.\gradlew.bat test`, 프론트 `pnpm --dir frontend test|lint|typecheck`
 
 ## Model / planning workflow
-- **Claude 설계·아키텍처 결정** (`/plan` 진입) → Opus 4.7. 비자명 feature 설계, security 판단, 아키텍처 트레이드오프
-- **Claude 구현·테스트·커밋** (일반 모드) → Opus 4.7 (`/model opusplan` 세팅 유지). 파일 편집, 테스트 실행, git 커밋, PR 열기. 토큰 한도에 다가오면 Codex 또는 claude2 로 교대.
+- **Claude 설계·아키텍처 결정** (`/plan` 진입) → Opus 4.7. 비자명 feature
+  설계, security 판단, 아키텍처 트레이드오프. 결과를 `docs/tasks/<NN>-*.md`
+  와 `.codex/current-task.md` 에 기록 후 Codex 에 넘긴다.
+- **Claude 검수** → Codex 결과를 `Read` 로 파일 확인. 통째 diff/log 금지.
+  acceptance criteria 충족 여부만 판단. 수정 필요 시 `.codex/current-task.md`
+  에 재작업 지시를 쓰고 넘긴다.
 - **Codex 기본 구현 세션** → `~/.codex/config.toml` 의 `ssuai` profile:
   GPT-5.5, `model_reasoning_effort=medium`,
   `plan_mode_reasoning_effort=xhigh`, `approval_policy=never`,
-  `sandbox_mode=danger-full-access`. 단순 구현/테스트/커밋은 기본 구현
-  reasoning 을 사용하고, Codex Plan mode 는 자동으로 xhigh 사용.
-- **Codex 설계 세션** → `/plan` 트리거와 같은 조건이면 새 세션을
-  `codex --profile ssuai-deep -C C:/Users/akftj/ssuAI` 로 시작하거나
-  동등하게 GPT-5.5 `xhigh` reasoning 으로 진행. 끝나면 구현은 기본
-  `ssuai` profile 로 돌아간다.
+  `sandbox_mode=danger-full-access`. 구현/테스트/커밋/push/PR 전부 Codex.
+- **Codex 설계 보조** → 필요 시 `codex --profile ssuai-deep -C C:/Users/akftj/ssuAI`.
+  끝나면 구현은 기본 `ssuai` profile 로 돌아간다.
 
 `/plan` 트리거 — **아래 중 하나여야 함:**
 - 외부 시스템 auth shape / 연동 방식이 spike 로 불명확한 상황
 - 새 도메인 패키지 신설 (클래스 책임·data flow·security policy 미결)
 - `docs/security.md` 관련 trade-off 결정
 
-**`/plan` / `ssuai-deep` 스킵 (일반 구현 직행):**
-- 해당 task 의 `docs/tasks/<NN>-*.md` spec 이 설계를 이미 커버 → 구현만
-- 단순 fix / 커밋 / 테스트 실행 / PR 열기 / spec 에 없는 사소한 판단
+**`/plan` 스킵 (task spec 작성 후 Codex 직행):**
+- 해당 task 의 `docs/tasks/<NN>-*.md` spec 이 설계를 이미 커버
+- 단순 fix / 커밋 / 테스트 / PR / spec 에 없는 사소한 판단
 
 Claude handoff opener 의 첫 줄은 `/model opusplan`. Codex handoff 는
 slash command 없이 시작하고, 필요 시 `ssuai-deep` profile 명을 명시한다.
