@@ -92,7 +92,7 @@ public class McpAuthMcpTools {
                 session.id().value(),
                 loginUrl,
                 state.expiresAt(),
-                "Open loginUrl in a browser to complete login, then call private tools with mcpSessionId.");
+                "Open loginUrl in a browser to complete login, then call private tools with mcp_session_id.");
     }
 
     @Tool(
