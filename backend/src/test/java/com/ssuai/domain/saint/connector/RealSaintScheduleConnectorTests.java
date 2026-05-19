@@ -93,8 +93,8 @@ class RealSaintScheduleConnectorTests {
         RecordedRequest getReq = server.takeRequest();
         assertThat(getReq.getMethod()).isEqualTo("GET");
         assertThat(getReq.getHeader("Cookie")).contains("MYSAPSSO2=abc");
-        assertThat(getReq.getHeader("Cookie")).doesNotContain("WAF=portal");
-        assertThat(getReq.getHeader("Cookie")).doesNotContain("JSESSIONID=saint-only");
+        assertThat(getReq.getHeader("Cookie")).contains("WAF=portal");
+        assertThat(getReq.getHeader("Cookie")).contains("JSESSIONID=saint-only");
     }
 
     @Test

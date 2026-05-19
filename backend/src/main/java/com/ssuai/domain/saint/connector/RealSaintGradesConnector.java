@@ -7,6 +7,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -223,6 +224,8 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 continue;
             }
             if (status / 100 == 2) {
+                log.info("{} connector GET final: status={} url={} cookieNames={}",
+                        logPrefix, status, url, cookieNames(cookieHeader));
                 return new InitGetResult(response.body(), cookieHeader);
             }
             if (status / 100 == 5) {
@@ -367,28 +370,22 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
     }
 
     static String eccBootstrapCookieHeader(String portalCookieHeader) {
-        LinkedHashMap<String, String> jar = new LinkedHashMap<>();
-        if (portalCookieHeader != null && !portalCookieHeader.isBlank()) {
-            for (String pair : portalCookieHeader.split(";")) {
-                String trimmed = pair.trim();
-                int eq = trimmed.indexOf('=');
-                if (eq <= 0) {
-                    continue;
-                }
-                String name = trimmed.substring(0, eq).trim();
-                if ("MYSAPSSO2".equals(name)) {
-                    addPair(jar, trimmed);
-                }
+        return portalCookieHeader != null ? portalCookieHeader.trim() : "";
+    }
+
+    private static String cookieNames(String cookieHeader) {
+        if (cookieHeader == null || cookieHeader.isBlank()) {
+            return "(none)";
+        }
+        List<String> names = new ArrayList<>();
+        for (String pair : cookieHeader.split(";")) {
+            String trimmed = pair.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq > 0) {
+                names.add(trimmed.substring(0, eq).trim());
             }
         }
-        StringBuilder out = new StringBuilder();
-        for (Map.Entry<String, String> entry : jar.entrySet()) {
-            if (out.length() > 0) {
-                out.append("; ");
-            }
-            out.append(entry.getKey()).append('=').append(entry.getValue());
-        }
-        return out.toString();
+        return String.join(",", names);
     }
 
     private static void addPair(LinkedHashMap<String, String> jar, String pair) {
