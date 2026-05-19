@@ -104,16 +104,25 @@ public class SaintSsoService {
             throw new SaintAuthFailedException("phase 1 returned no Set-Cookie headers");
         }
 
-        Phase2Result phase2 = phase2FetchPortal(phase1Cookies);
+        String portalEntryUrl = properties.getPortalUrl();
+        if (isPhase1Redirect(phase1.getStatusCode().value())) {
+            String location = phase1.getHeaders().getFirst(HttpHeaders.LOCATION);
+            if (location != null && !location.isBlank()) {
+                try {
+                    portalEntryUrl = URI.create(properties.getSsoUrl()).resolve(location).toString();
+                } catch (IllegalArgumentException ignored) {
+                    // Keep the configured portal URL if the upstream Location is malformed.
+                }
+            }
+        }
+
+        Phase2Result phase2 = phase2FetchPortal(phase1Cookies, portalEntryUrl);
         // phase2.cookieHeader() aggregates all Set-Cookie across the redirect chain.
         // Overlay wins on conflict — the portal's fresh MYSAPSSO2 replaces the older
         // /webSSO/sso.jsp token that would otherwise cause ECC 403.
         String mergedCookies = mergeCookieHeaders(phase1Cookies, phase2.cookieHeader());
 
         log.info("saint sso cookies stored: names={}", cookieNames(mergedCookies));
-        // Temporary diagnostic: log MYSAPSSO2 prefix to compare with browser value
-        String mysapPrefix = extractCookiePrefix(mergedCookies, "MYSAPSSO2", 24);
-        log.info("saint sso mysapsso2 prefix(24)={}", mysapPrefix);
 
         UsaintAuthResult identity = parseIdentity(phase2.body(), sIdno);
         sessionStore.put(identity.studentId(), new PortalCookies(mergedCookies));
@@ -129,6 +138,8 @@ public class SaintSsoService {
             response = restClient.get()
                     .uri(uri)
                     .header(HttpHeaders.COOKIE, "sToken=" + sToken + "; sIdno=" + sIdno)
+                    .header("Referer", "https://smartid.ssu.ac.kr/Symtra_sso/smln.asp")
+                    .header(HttpHeaders.USER_AGENT, BROWSER_UA)
                     .retrieve()
                     .toEntity(String.class);
         } catch (ResourceAccessException exception) {
@@ -138,7 +149,22 @@ public class SaintSsoService {
                     "saint phase 1 http " + exception.getStatusCode().value(), exception);
         }
 
+        int status = response.getStatusCode().value();
         String body = response.getBody();
+
+        log.info("saint sso phase1: status={} body_prefix='{}'",
+                status,
+                bodyPrefix(body));
+
+        if (isPhase1Redirect(status)) {
+            String location = response.getHeaders().getFirst(HttpHeaders.LOCATION);
+            log.info("saint sso phase1: redirect location={}", location);
+            if (location != null && location.contains("irj/portal")) {
+                return response;
+            }
+            throw new SaintAuthFailedException("saint phase 1 unexpected redirect: " + location);
+        }
+
         if (body == null || !body.contains(PHASE1_SUCCESS_MARKER)) {
             throw new SaintAuthFailedException("saint phase 1 success marker missing");
         }
@@ -150,9 +176,9 @@ public class SaintSsoService {
      * 302 responses are captured. HttpURLConnection silently follows redirects and drops
      * intermediate Set-Cookie — that's why phase-2 must use HttpClient with Redirect.NEVER.
      */
-    private Phase2Result phase2FetchPortal(String initialCookieHeader) {
+    private Phase2Result phase2FetchPortal(String initialCookieHeader, String startUrl) {
         String currentCookies = initialCookieHeader;
-        String currentUrl = properties.getPortalUrl();
+        String currentUrl = startUrl;
         String accumulatedNewCookies = "";
 
         for (int hop = 0; hop <= MAX_PHASE2_REDIRECTS; hop++) {
@@ -211,6 +237,19 @@ public class SaintSsoService {
             throw new SaintPortalUnavailableException("saint phase 2 http " + status);
         }
         throw new SaintPortalUnavailableException("saint phase 2 redirect loop (>" + MAX_PHASE2_REDIRECTS + ")");
+    }
+
+    private static boolean isPhase1Redirect(int status) {
+        return status == 301 || status == 302;
+    }
+
+    private static String bodyPrefix(String body) {
+        if (body == null) {
+            return "(null)";
+        }
+        return body.substring(0, Math.min(400, body.length()))
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private record Phase2Result(String body, String cookieHeader) {}
@@ -297,15 +336,4 @@ public class SaintSsoService {
         return String.join(",", names);
     }
 
-    private static String extractCookiePrefix(String cookieHeader, String name, int prefixLen) {
-        for (String pair : cookieHeader.split(";")) {
-            String trimmed = pair.trim();
-            int eq = trimmed.indexOf('=');
-            if (eq > 0 && trimmed.substring(0, eq).trim().equals(name)) {
-                String value = trimmed.substring(eq + 1).trim();
-                return value.substring(0, Math.min(prefixLen, value.length()));
-            }
-        }
-        return "(not found)";
-    }
 }
