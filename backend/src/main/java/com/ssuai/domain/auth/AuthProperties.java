@@ -16,6 +16,15 @@ public class AuthProperties {
     /** Public origin of THIS backend, used to build the SmartID apiReturnUrl. */
     private String apiBaseUrl = "http://localhost:8080";
 
+    /**
+     * Public origin for MCP auth callbacks (login URL + SmartID return URL).
+     * Defaults to apiBaseUrl when blank. Set to the k3s backend URL directly
+     * so MCP auth bypasses the Vercel proxy; MCP SSE is already on
+     * ssumcp.duckdns.org, and unlike the web auth flow there are no cookies
+     * that need to land on the Vercel domain.
+     */
+    private String mcpApiBaseUrl = "";
+
     /** SmartID SSO entry point. SSU's central SSO. */
     private String smartidSsoUrl = "https://smartid.ssu.ac.kr/Symtra_sso/smln.asp";
 
@@ -27,6 +36,14 @@ public class AuthProperties {
 
     public void setApiBaseUrl(String apiBaseUrl) {
         this.apiBaseUrl = apiBaseUrl;
+    }
+
+    public String getMcpApiBaseUrl() {
+        return (mcpApiBaseUrl != null && !mcpApiBaseUrl.isBlank()) ? mcpApiBaseUrl : apiBaseUrl;
+    }
+
+    public void setMcpApiBaseUrl(String mcpApiBaseUrl) {
+        this.mcpApiBaseUrl = mcpApiBaseUrl;
     }
 
     public String getSmartidSsoUrl() {
