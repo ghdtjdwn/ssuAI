@@ -115,8 +115,8 @@ class RealSaintGradesConnectorTests {
         RecordedRequest first = server.takeRequest();
         assertThat(first.getMethod()).isEqualTo("GET");
         assertThat(first.getHeader("Cookie")).contains("MYSAPSSO2=abc");
-        assertThat(first.getHeader("Cookie")).doesNotContain("WAF=portal");
-        assertThat(first.getHeader("Cookie")).doesNotContain("JSESSIONID=saint-only");
+        assertThat(first.getHeader("Cookie")).contains("WAF=portal");
+        assertThat(first.getHeader("Cookie")).contains("JSESSIONID=saint-only");
         RecordedRequest firstPrevPost = server.takeRequest();
         assertThat(firstPrevPost.getMethod()).isEqualTo("POST");
         assertThat(firstPrevPost.getBody().readUtf8())
