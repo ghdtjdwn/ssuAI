@@ -6,6 +6,10 @@
 > one-shot-token based). Together they unlock Phase 3's personal-data
 > tool plane.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## 1. Goal / Scope / Non-goals
 
 ### Goal

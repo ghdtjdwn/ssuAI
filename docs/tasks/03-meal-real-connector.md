@@ -4,6 +4,10 @@
 > §5, §6, §9, §10 and `docs/security.md` §4, §10, §11 first. This task must
 > not contradict them. Reply using the Required Output Format in `AGENTS.md`.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Task 02에서 만든 mock 슬라이스 위에 **`RealMealConnector` (Jsoup 기반)**을

@@ -4,6 +4,10 @@
 > because it assumed a different Spring AI/Anthropic shape. This revision
 > documents the implementation now living on `feat/chatbot-slice`.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Add the MVP text chatbot:

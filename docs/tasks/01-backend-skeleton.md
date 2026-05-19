@@ -4,6 +4,10 @@
 > `docs/architecture.md` and `docs/security.md` first — this task must not
 > contradict them.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Stand up the Spring Boot backend skeleton that every later feature will

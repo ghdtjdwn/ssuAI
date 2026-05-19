@@ -4,6 +4,10 @@
 > §6, §12, §13 and `docs/security.md` first. This task must not contradict
 > them. Reply using the Required Output Format in `AGENTS.md`.
 
+## Status
+
+- ✅ Done — main 머지 완료
+
 ## Goal
 
 Build the first frontend slice — a Next.js dashboard with **four cards**
