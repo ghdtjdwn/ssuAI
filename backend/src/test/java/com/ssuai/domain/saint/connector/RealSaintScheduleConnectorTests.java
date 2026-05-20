@@ -57,7 +57,9 @@ class RealSaintScheduleConnectorTests {
         // Chrome UA → SAP WDA returns JS bootstrap on GET, then serves the
         // real timetable HTML on the initial Form_Request POST.
         // Pinned fixture shows (2026, 1학기). Enrolled 2026 → no PREV needed.
-        server.enqueue(htmlOk(withSecureId("<html><body></body></html>", "CSRF-BOOT")));
+        server.enqueue(htmlOk(withSecureId("<html><body>"
+                + "<input type=\"hidden\" name=\"sap-wd-cltwndid\" value=\"WID-123\"/>"
+                + "</body></html>", "CSRF-BOOT")));
         server.enqueue(xmlOk(wrap(loadFixture()))); // initial load response
 
         ScheduleResponse response = connector.fetchSchedule("20261234",
@@ -95,7 +97,9 @@ class RealSaintScheduleConnectorTests {
         server.enqueue(new MockResponse()
                 .setResponseCode(302)
                 .setHeader("Location", "/hana-zcmw2102?sap-client=100&sap-language=KO"));
-        server.enqueue(htmlOk(withSecureId("<html><body></body></html>", "CSRF-BOOT")));
+        server.enqueue(htmlOk(withSecureId("<html><body>"
+                + "<input type=\"hidden\" name=\"sap-wd-cltwndid\" value=\"WID-123\"/>"
+                + "</body></html>", "CSRF-BOOT")));
         server.enqueue(xmlOk(wrap(withSecureId(synthFixture(2026, "1학기"), "CSRF-0"))));
         server.enqueue(xmlOk(wrap(synthFixture(2025, "겨울학기"))));
 
@@ -112,12 +116,16 @@ class RealSaintScheduleConnectorTests {
         RecordedRequest initPost = server.takeRequest();
         assertThat(initPost.getMethod()).isEqualTo("POST");
         assertThat(initPost.getPath()).isEqualTo("/hana-zcmw2102?sap-client=100&sap-language=KO");
-        assertThat(initPost.getBody().readUtf8()).contains("sap-wd-secure-id=CSRF-BOOT");
+        String initBody = initPost.getBody().readUtf8();
+        assertThat(initBody).contains("sap-wd-secure-id=CSRF-BOOT");
+        assertThat(initBody).contains("sap-wd-cltwndid=WID-123");
 
         RecordedRequest prevPost = server.takeRequest();
         assertThat(prevPost.getMethod()).isEqualTo("POST");
         assertThat(prevPost.getPath()).isEqualTo("/hana-zcmw2102?sap-client=100&sap-language=KO");
-        assertThat(prevPost.getBody().readUtf8()).contains("sap-wd-secure-id=CSRF-0");
+        String prevBody = prevPost.getBody().readUtf8();
+        assertThat(prevBody).contains("sap-wd-secure-id=CSRF-0");
+        assertThat(prevBody).contains("sap-wd-cltwndid=WID-123");
     }
 
     @Test
