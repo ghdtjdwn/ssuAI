@@ -413,7 +413,17 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
     }
 
     static String eccBootstrapCookieHeader(String portalCookieHeader) {
-        return portalCookieHeader != null ? portalCookieHeader.trim() : "";
+        if (portalCookieHeader == null || portalCookieHeader.isBlank()) {
+            return "";
+        }
+        for (String pair : portalCookieHeader.split(";")) {
+            String trimmed = pair.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq > 0 && "MYSAPSSO2".equals(trimmed.substring(0, eq).trim())) {
+                return trimmed;
+            }
+        }
+        return "";
     }
 
     private static String cookieNames(String cookieHeader) {
