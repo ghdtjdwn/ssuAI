@@ -141,6 +141,32 @@ class RealSaintGradesConnectorTests {
     }
 
     @Test
+    void sessionCorrelationFieldsPassedThroughExceptCltwndid() throws Exception {
+        String bootstrapHtml =
+                "<html><body>"
+                        + "<form id=\"sap.client.SsrClient.form\" action=\"/zcmb3w0017\">"
+                        + "<input type=\"hidden\" name=\"_external_session_\" value=\"EXT-999\"/>"
+                        + "<input type=\"hidden\" name=\"_popup_url_\" value=\"POP\"/>"
+                        + "<input type=\"hidden\" name=\"sap-wd-cltwndid\" value=\"WID-EXCLUDED\"/>"
+                        + "<input type=\"hidden\" name=\"sap-wd-secure-id\" value=\"CSRF-G\"/>"
+                        + "</form></body></html>";
+        String htmlOnly = "<TABLE><tbody id=\"WD65-contentTBody\"><tr rt=\"2\"></tr></tbody></TABLE>"
+                + "<input id=\"sap-wd-secure-id\" name=\"sap-wd-secure-id\" value=\"CSRF-1\"/>";
+        server.enqueue(htmlOk(bootstrapHtml));
+        server.enqueue(xmlOk(wrap(htmlOnly)));
+
+        connector.fetchGrades("20261234", new PortalCookies("MYSAPSSO2=abc"));
+
+        server.takeRequest(); // GET
+        RecordedRequest initPost = server.takeRequest();
+        String body = initPost.getBody().readUtf8();
+        assertThat(body).contains("_external_session_=EXT-999");
+        assertThat(body).contains("_popup_url_=POP");
+        assertThat(body).doesNotContain("sap-wd-cltwndid");
+        assertThat(body).contains("sap-wd-secure-id=CSRF-G");
+    }
+
+    @Test
     void firstGetWithRenderedGradesDoesNotSendInitialPost() throws Exception {
         String firstFixture = loadFixture("grades-success.html");
         String prevFixture = loadFixture("grades-prev-success.html");

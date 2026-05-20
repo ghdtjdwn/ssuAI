@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.ssuai.global.exception.LmsAuthFailedException;
@@ -39,6 +41,8 @@ import com.ssuai.global.exception.LmsAuthFailedException;
  */
 @Service
 public class LmsSsoService {
+
+    private static final Logger log = LoggerFactory.getLogger(LmsSsoService.class);
 
     private final LmsSsoProperties properties;
     private final LmsSessionStore sessionStore;
@@ -67,10 +71,12 @@ public class LmsSsoService {
             throw new LmsAuthFailedException("gw-cb.php returned no Set-Cookie headers");
         }
         String lmsCookieHeader = buildCookieHeader(phase1Cookies);
+        log.info("lms auth phase1 cookie names: {}", cookieNameList(lmsCookieHeader));
 
         // Phase 2: canvas dashboard → canvas session cookies (xn_api_token etc.)
         List<String> phase2Cookies = fetchCanvasDashboard(lmsCookieHeader, sIdno.trim());
         String allCookies = mergeLmsCookies(lmsCookieHeader, phase2Cookies);
+        log.info("lms auth phase2 merged cookie names: {}", cookieNameList(allCookies));
 
         sessionStore.put(sIdno.trim(), new LmsCookies(allCookies));
     }
@@ -185,6 +191,21 @@ public class LmsSsoService {
                 .map(LmsSsoService::stripCookieAttributes)
                 .filter(s -> !s.isBlank())
                 .collect(Collectors.joining("; "));
+    }
+
+    private static String cookieNameList(String cookieHeader) {
+        if (cookieHeader == null || cookieHeader.isBlank()) {
+            return "(none)";
+        }
+        List<String> names = new ArrayList<>();
+        for (String pair : cookieHeader.split(";")) {
+            String trimmed = pair.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq > 0) {
+                names.add(trimmed.substring(0, eq).trim());
+            }
+        }
+        return String.join(",", names);
     }
 
     private static String stripCookieAttributes(String setCookieHeader) {
