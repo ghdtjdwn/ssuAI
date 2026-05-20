@@ -114,7 +114,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         this.httpClientNoRedirect = httpClientNoRedirect;
     }
 
-    private record InitGetResult(String html, String cookieHeader) {}
+    private record InitGetResult(String html, String cookieHeader, String finalUrl) {}
 
     @Override
     public ScheduleResponse fetchSchedule(String studentId, PortalCookies cookies) {
@@ -142,7 +142,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         String currentHtml = firstRenderableHtml(bootstrapHtml);
         if (!containsTimetable(currentHtml)) {
             String initXml = httpPostInitialLoad(mergedCookieHeader, bootstrapSecureId.get(), "ZCMW2102",
-                    properties.getTimetableUrl());
+                    initGet.finalUrl());
             try {
                 currentHtml = WebDynproResponseUnwrapper.extractHtml(initXml);
             } catch (IllegalArgumentException ex) {
@@ -179,7 +179,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
             String xmlEnvelope;
             try {
                 xmlEnvelope = httpPostButtonPress(mergedCookieHeader, secureId.get(),
-                        PREV_TERM_BUTTON_ID);
+                        PREV_TERM_BUTTON_ID, initGet.finalUrl());
             } catch (SaintSessionExpiredException ex) {
                 log.info("saint schedule iterate halted: studentFp={} reason=session-expired year={} term={}",
                         SaintSessionStore.fingerprint(studentId), displayedYear, displayedTerm);
@@ -260,7 +260,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
             if (status / 100 == 2) {
                 log.info("{} connector GET final: status={} url={} cookieNames={}",
                         logPrefix, status, url, cookieNames(cookieHeader));
-                return new InitGetResult(response.body(), cookieHeader);
+                return new InitGetResult(response.body(), cookieHeader, url);
             }
             if (status / 100 == 5) {
                 log.warn("{} connector 5xx on GET: status={}", logPrefix, status);
@@ -273,7 +273,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         throw new ConnectorUnavailableException();
     }
 
-    private String httpPostButtonPress(String cookieHeader, String secureId, String buttonId) {
+    private String httpPostButtonPress(String cookieHeader, String secureId, String buttonId, String postUrl) {
         String queue = WebDynproSapEventEncoder.encodeButtonPress(buttonId);
         String body = formEncoded(Map.of(
                 "sap-charset", "utf-8",
@@ -283,7 +283,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
                 "SAPEVENTQUEUE", queue
         ));
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(properties.getTimetableUrl()))
+                .uri(URI.create(postUrl))
                 .header("Cookie", cookieHeader)
                 .header("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
                 .header("Accept", "application/xml,text/html")
