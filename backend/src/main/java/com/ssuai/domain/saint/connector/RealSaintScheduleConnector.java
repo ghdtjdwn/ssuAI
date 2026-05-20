@@ -126,6 +126,11 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         String mergedCookieHeader = initGet.cookieHeader();
 
         Optional<String> bootstrapSecureId = WebDynproResponseUnwrapper.extractSecureIdFromAny(bootstrapHtml);
+        log.info("saint schedule bootstrap: secureIdPresent={} snippet='{}'",
+                bootstrapSecureId.isPresent(),
+                bootstrapHtml == null ? "(null)"
+                        : bootstrapHtml.substring(0, Math.min(300, bootstrapHtml.length()))
+                                .replaceAll("\\s+", " "));
         if (bootstrapSecureId.isEmpty()) {
             String snippet = bootstrapHtml == null ? "(null)"
                     : bootstrapHtml.substring(0, Math.min(300, bootstrapHtml.length())).replaceAll("\\s+", " ");
@@ -323,7 +328,10 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
                 return response;
             }
             if (status == 401 || status == 403) {
-                log.info("saint schedule connector auth rejected: status={}", status);
+                String bodySnippet4xx = response.body() == null ? "(null)"
+                        : response.body().substring(0, Math.min(400, response.body().length()))
+                                .replaceAll("\\s+", " ");
+                log.info("saint schedule connector auth rejected: status={} body='{}'", status, bodySnippet4xx);
                 throw new SaintSessionExpiredException("ecc rejected WebDynpro request with " + status);
             }
             if (status / 100 == 5) {
