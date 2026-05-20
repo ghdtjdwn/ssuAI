@@ -60,6 +60,7 @@ public final class WebDynproSapEventEncoder {
         String svgBase = origin
                 + "/sap/public/bc/ur/nw5/themes/~cache-20230801062755"
                 + "/Base/baseLib/sap_fiori_3/svg/libs";
+        String clientUrl = pageUrl.contains("#") ? pageUrl : pageUrl + "#";
 
         String data1 = "ClientWidth:935px;ClientHeight:869px;ScreenWidth:1536px;ScreenHeight:864px;"
                 + "ScreenOrientation:landscape;ThemedTableRowHeight:33px;ThemedFormLayoutRowHeight:32px;"
@@ -67,7 +68,7 @@ public final class WebDynproSapEventEncoder {
                 + "\"SAPWeb-icons\":\"" + svgBase + "/SAPWeb-icons.svg\"};"
                 + "ThemeTags:Fiori_3,Touch;ThemeID:sap_fiori_3;SapThemeID:sap_fiori_3;"
                 + "DeviceType:DESKTOP;DocumentDomain:" + domain + ";"
-                + "ClientURL:" + pageUrl + ";IsTopWindow:TRUE;ParentAccessible:TRUE";
+                + "ClientURL:" + clientUrl + ";IsTopWindow:TRUE;ParentAccessible:TRUE";
         String data2 = "ThemedTableRowHeight:25px";
 
         SapEvent formRequest = SapEvent.builder("Form_Request")

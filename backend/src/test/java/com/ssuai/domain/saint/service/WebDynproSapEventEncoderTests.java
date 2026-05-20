@@ -64,7 +64,7 @@ class WebDynproSapEventEncoderTests {
         assertThat(queue).contains("ResponseData~E004delta");
         assertThat(queue).doesNotContain("Button_Press");
         assertThat(queue).contains("DocumentDomain~003Ahana-prd-ap-4.ssu.ac.kr");
-        assertThat(queue).contains("ClientURL~003A" + WebDynproSapEventEncoder.escape(PAGE_URL));
+        assertThat(queue).contains("ClientURL~003A" + WebDynproSapEventEncoder.escape(PAGE_URL + "#"));
         assertThat(queue).contains("~007Ecache-20230801062755");
         assertThat(queue).contains("ClientAction~E004submit");
     }
