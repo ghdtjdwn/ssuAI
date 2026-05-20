@@ -846,3 +846,37 @@
   바인딩 토큰이다. "최소한의 필드만 보내면 안전하다"는 직관이 stateful 프로토콜에서는
   틀릴 수 있다. 어떤 필드가 403 의 원인인지 개별적으로 특정하지 않고 묶어서 제거하면
   다른 문제가 생긴다 — 하나씩 제거하며 테스트해야 한다.
+
+---
+
+## 2026-05-20 SAINT direct HANA URL created ANON sessions
+
+- Mistake: PR #156 changed WebDynpro defaults from `ecc.ssu.ac.kr` to
+  `hana-prd-ap-4.ssu.ac.kr:8443` to bypass an assumed JavaScript redirect issue.
+- Symptom: production logs showed `sap-contextid: SID:ANON:hana-prd-ap-4_SSP_00:...-NEW`.
+  Schedule POST responses looked like a logon redirect and grades returned 500.
+- Cause: direct HANA does not trust the MYSAPSSO2 ticket issued by the u-SAINT
+  portal path, so it creates an anonymous SAP session. `ecc.ssu.ac.kr` on standard
+  HTTPS accepts that ticket and creates the authenticated USER session.
+- Fix: restore `SaintScheduleProperties.timetableUrl` and
+  `SaintGradesProperties.gradesUrl` defaults to
+  `https://ecc.ssu.ac.kr/sap/bc/webdynpro/SAP/...`.
+- Verify: deployment logs should include `SAP_SESSIONID_SSP_100` plus successful
+  `saint schedule fetched` and `saint grades fetched` lines.
+
+---
+
+## 2026-05-20 LMS gw-cb.php Location must start the Canvas auth chain
+
+- Symptom: LMS assignment API calls returned 401 and auth logs showed merged
+  cookies such as `WAF,laravel_session` without `xn_api_token`.
+- Cause: `callGwCallback()` captured only Set-Cookie headers from the gw-cb.php
+  302 response and discarded its Location header. Starting phase 2 directly at
+  `/learningx/dashboard?user_login=...` skips the one-time auth callback that
+  issues `xn_api_token`.
+- Fix: return both cookies and Location from `callGwCallback()`. When Location is
+  present, use it as the first Canvas URL; otherwise fall back to the dashboard
+  URL for old flows.
+- Verify: `gwCbLocationIsFollowedAsCanvasAuthStartUrl` covers the auth callback
+  path, and production logs should show `xn_api_token` in
+  `lms auth phase2 merged cookie names`.
