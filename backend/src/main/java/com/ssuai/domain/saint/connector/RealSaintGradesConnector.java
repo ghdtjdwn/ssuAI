@@ -245,7 +245,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
     }
 
     private String httpPostInitialLoad(String cookieHeader, String secureId, String appName, String url) {
-        String queue = WebDynproSapEventEncoder.encodeInitialLoad();
+        String queue = WebDynproSapEventEncoder.encodeInitialLoad(url);
         String body = formEncoded(Map.of(
                 "sap-charset", "utf-8",
                 "sap-wd-secure-id", secureId,
