@@ -100,7 +100,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         this.httpClientNoRedirect = httpClientNoRedirect;
     }
 
-    private record InitGetResult(String html, String cookieHeader) {}
+    private record InitGetResult(String html, String cookieHeader, String finalUrl) {}
 
     @Override
     public GradesResponse fetchGrades(String studentId, PortalCookies cookies) {
@@ -126,7 +126,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         String firstHtml = firstRenderableHtml(rawFirstResponse);
         if (!containsGradesTables(firstHtml)) {
             String initXml = httpPostInitialLoad(mergedCookieHeader, bootstrapSecureId.get(), "ZCMB3W0017",
-                    properties.getGradesUrl());
+                    initGet.finalUrl());
             try {
                 firstHtml = WebDynproResponseUnwrapper.extractHtml(initXml);
             } catch (IllegalArgumentException ex) {
@@ -161,7 +161,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
             String xmlEnvelope;
             try {
                 xmlEnvelope = httpPostButtonPress(mergedCookieHeader, secureId.get(),
-                        PREV_TERM_BUTTON_ID);
+                        PREV_TERM_BUTTON_ID, initGet.finalUrl());
             } catch (SaintSessionExpiredException exception) {
                 log.info("saint grades iterate halted: studentFp={} reason=session-expired index={}",
                         SaintSessionStore.fingerprint(studentId), i);
@@ -231,7 +231,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
             if (status / 100 == 2) {
                 log.info("{} connector GET final: status={} url={} cookieNames={}",
                         logPrefix, status, url, cookieNames(cookieHeader));
-                return new InitGetResult(response.body(), cookieHeader);
+                return new InitGetResult(response.body(), cookieHeader, url);
             }
             if (status / 100 == 5) {
                 log.warn("{} connector 5xx on GET: status={}", logPrefix, status);
@@ -266,7 +266,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         return send(request).body();
     }
 
-    private String httpPostButtonPress(String cookieHeader, String secureId, String buttonId) {
+    private String httpPostButtonPress(String cookieHeader, String secureId, String buttonId, String postUrl) {
         String queue = WebDynproSapEventEncoder.encodeButtonPress(buttonId);
         String body = formEncoded(Map.of(
                 "sap-charset", "utf-8",
@@ -275,7 +275,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 "fesrUseBeacon", "true",
                 "SAPEVENTQUEUE", queue));
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(properties.getGradesUrl()))
+                .uri(URI.create(postUrl))
                 .header("Cookie", cookieHeader)
                 .header("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
                 .header("Accept", "application/xml,text/html")

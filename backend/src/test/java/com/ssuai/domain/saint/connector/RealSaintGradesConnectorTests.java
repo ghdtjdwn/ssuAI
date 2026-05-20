@@ -95,6 +95,43 @@ class RealSaintGradesConnectorTests {
     }
 
     @Test
+    void initialPostUsesFinalGetUrlAfterRedirect() throws Exception {
+        SaintGradesProperties properties = new SaintGradesProperties();
+        properties.setGradesUrl(server.url("/router").toString());
+        properties.setTimeout(Duration.ofSeconds(5));
+        HttpClient postClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+        HttpClient noRedirectClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
+        connector = new RealSaintGradesConnector(properties, postClient, noRedirectClient);
+
+        String htmlOnly = "<TABLE><tbody id=\"WD65-contentTBody\"><tr rt=\"2\"></tr></tbody></TABLE>";
+        server.enqueue(new MockResponse()
+                .setResponseCode(302)
+                .setHeader("Location", "/hana-zcmb3w0017?sap-client=100&sap-language=KO"));
+        server.enqueue(bootstrapOk("CSRF-BOOT"));
+        server.enqueue(xmlOk(wrap(htmlOnly
+                + "<input id=\"sap-wd-secure-id\" name=\"sap-wd-secure-id\" value=\"CSRF\"/>")));
+
+        connector.fetchGrades("20221528", new PortalCookies("MYSAPSSO2=abc"));
+
+        RecordedRequest routerGet = server.takeRequest();
+        assertThat(routerGet.getMethod()).isEqualTo("GET");
+        assertThat(routerGet.getPath()).isEqualTo("/router");
+
+        RecordedRequest finalGet = server.takeRequest();
+        assertThat(finalGet.getMethod()).isEqualTo("GET");
+        assertThat(finalGet.getPath()).isEqualTo("/hana-zcmb3w0017?sap-client=100&sap-language=KO");
+
+        RecordedRequest initPost = server.takeRequest();
+        assertThat(initPost.getMethod()).isEqualTo("POST");
+        assertThat(initPost.getPath()).isEqualTo("/hana-zcmb3w0017?sap-client=100&sap-language=KO");
+        assertThat(initPost.getBody().readUtf8()).contains("sap-wd-secure-id=CSRF-BOOT");
+    }
+
+    @Test
     void firstGetWithRenderedGradesDoesNotSendInitialPost() throws Exception {
         String firstFixture = loadFixture("grades-success.html");
         String prevFixture = loadFixture("grades-prev-success.html");
