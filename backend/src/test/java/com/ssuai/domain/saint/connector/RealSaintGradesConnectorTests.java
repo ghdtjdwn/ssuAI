@@ -167,6 +167,21 @@ class RealSaintGradesConnectorTests {
     }
 
     @Test
+    void eccBootstrapCookieHeaderExtractsOnlyMysapsso2() {
+        String portal = "WAF=waf; MYSAPSSO2=token; JSESSIONID=jsession; PortalAlias=pa; saplb_0=lb";
+
+        assertThat(RealSaintGradesConnector.eccBootstrapCookieHeader(portal))
+                .isEqualTo("MYSAPSSO2=token");
+    }
+
+    @Test
+    void eccBootstrapCookieHeaderReturnsEmptyWhenNoMysapsso2() {
+        String portal = "WAF=waf; JSESSIONID=jsession";
+
+        assertThat(RealSaintGradesConnector.eccBootstrapCookieHeader(portal)).isEmpty();
+    }
+
+    @Test
     void firstGetWithRenderedGradesDoesNotSendInitialPost() throws Exception {
         String firstFixture = loadFixture("grades-success.html");
         String prevFixture = loadFixture("grades-prev-success.html");
@@ -187,8 +202,8 @@ class RealSaintGradesConnectorTests {
         RecordedRequest first = server.takeRequest();
         assertThat(first.getMethod()).isEqualTo("GET");
         assertThat(first.getHeader("Cookie")).contains("MYSAPSSO2=abc");
-        assertThat(first.getHeader("Cookie")).contains("WAF=portal");
-        assertThat(first.getHeader("Cookie")).contains("JSESSIONID=saint-only");
+        assertThat(first.getHeader("Cookie")).doesNotContain("WAF=portal");
+        assertThat(first.getHeader("Cookie")).doesNotContain("JSESSIONID=saint-only");
         RecordedRequest firstPrevPost = server.takeRequest();
         assertThat(firstPrevPost.getMethod()).isEqualTo("POST");
         assertThat(firstPrevPost.getBody().readUtf8())

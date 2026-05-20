@@ -124,4 +124,41 @@ class LmsSsoServiceTests {
                         .contains("xn_api_token=api-token-val")
                         .contains("_normandy_session=normandy-val"));
     }
+
+    @Test
+    void lmsLoginCallbackFollowedThenCanvasDashboardFetchesXnApiToken() throws Exception {
+        lmsServer.enqueue(new MockResponse()
+                .setResponseCode(302)
+                .addHeader("Set-Cookie", "WAF=waf-val; Path=/; HttpOnly")
+                .addHeader("Location", lmsServer.url("/login/callback?result=FAKE").toString()));
+        lmsServer.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .addHeader("Set-Cookie", "xn_coursecatalog_api_token=lms-token; Path=/; HttpOnly"));
+
+        canvasServer.enqueue(new MockResponse()
+                .setResponseCode(302)
+                .addHeader("Location", "/learningx/dashboard")
+                .addHeader("Set-Cookie", "xn_api_token=canvas-token; Path=/; HttpOnly"));
+        canvasServer.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .addHeader("Set-Cookie", "_normandy_session=norm-val; Path=/; HttpOnly"));
+
+        service.authenticate("sso-token", "20231234");
+
+        lmsServer.takeRequest();
+        lmsServer.takeRequest();
+
+        RecordedRequest canvasReq = canvasServer.takeRequest();
+        assertThat(canvasReq.getPath()).startsWith("/learningx/dashboard?user_login=20231234");
+        assertThat(canvasReq.getHeader("Cookie"))
+                .contains("WAF=waf-val")
+                .contains("xn_coursecatalog_api_token=lms-token");
+
+        assertThat(sessionStore.cookies("20231234"))
+                .hasValueSatisfying(cookies -> assertThat(cookies.rawCookieHeader())
+                        .contains("WAF=waf-val")
+                        .contains("xn_coursecatalog_api_token=lms-token")
+                        .contains("xn_api_token=canvas-token")
+                        .contains("_normandy_session=norm-val"));
+    }
 }
