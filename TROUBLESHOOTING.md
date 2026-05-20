@@ -780,3 +780,45 @@
 
 상세 historical writeup:
 [`docs/troubleshooting/cafeteria-connector.md`](docs/troubleshooting/cafeteria-connector.md).
+
+## 2026-05-20 — u-SAINT WebDynpro URL이 실제 앱 서버가 아니라 JS redirect 라우터였음
+
+- 맥락: schedule/grades connector가 `ecc.ssu.ac.kr:8443`을 GET/POST 대상으로
+  쓰고 있었습니다.
+- 증상: GET은 200을 반환하지만 POST SAPEVENTQUEUE가 403 empty body로 거절됐습니다.
+  진단 로그를 추가해도 bootstrap HTML이 정상이고 POST만 실패하는 패턴이 반복됐습니다.
+- 원인: `ecc.ssu.ac.kr`은 SAP 포털 라우터로, 실제 WebDynpro 앱은 JavaScript로
+  `hana-prd-ap-4.ssu.ac.kr:8443`으로 redirect합니다. Java `HttpClient`는 HTTP
+  redirect는 따라가지만 JS redirect는 따라가지 않으므로, GET 응답은 라우터의 HTML
+  (200)이고 POST는 라우터가 CSRF 세션을 모르므로 403을 냈습니다.
+- 해결: `SaintScheduleProperties.timetableUrl`과 `SaintGradesProperties.gradesUrl`
+  기본값을 `https://hana-prd-ap-4.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMW2102?sap-client=100&sap-language=KO`
+  등 실제 앱 서버 URL로 교체했습니다. GET 최종 도달 URL을 `InitGetResult.finalUrl`로
+  보존해 POST에 일관성 있게 전달했습니다. (PR #156)
+- 검증: pod log에서 `saint schedule bootstrap: secureIdPresent=true` 확인.
+- 포트폴리오 포인트: 외부 시스템 통합 시 HTTP 응답 코드만 믿으면 안 됩니다.
+  JS redirect는 HTTP 레벨에서 투명하므로, DevTools Network 탭으로 최종 도달 호스트를
+  직접 확인해야 합니다.
+
+## 2026-05-20 — SAP Lightspeed Form_Request 전 초기화 이벤트 3개 누락으로 403
+
+- 맥락: URL을 올바른 앱 서버로 바꿨지만 POST가 여전히 403 empty body였습니다.
+- 증상: 브라우저는 성공하는데 서버 코드는 같은 URL로 같은 MYSAPSSO2 쿠키를
+  보내도 403이 반복됐습니다.
+- 원인: SAP NetWeaver WebDynpro Lightspeed(runtimeVersion 10.30.x)는 첫 번째
+  Form_Request 앞에 반드시 `ClientInspector_Notify(WD01)` — 클라이언트 화면/테마 정보,
+  `ClientInspector_Notify(WD02)` — 테이블 row 높이, `LoadingPlaceHolder_Load` 3개 이벤트를
+  같은 POST에 포함해야 세션 상태 머신이 정상으로 진행합니다. 이 이벤트 없이
+  Form_Request만 보내면 서버가 CSRF/상태 불일치로 판단해 403 empty body를 냅니다.
+  기존 `encodeInitialLoad()`는 Form_Request 단독으로만 조립하고 있었습니다.
+- 해결: `WebDynproSapEventEncoder.encodeInitialLoad(String pageUrl)`를 4-event 구조로
+  재작성했습니다. `escape()`에 `~(맨 먼저), ;, /, ,, #, ?, =, &` 처리를 추가해
+  ClientInspector Data 필드의 URL/JSON 값이 SAP 토큰과 충돌하지 않게 했습니다.
+  schedule/grades connector 모두 현재 WebDynpro URL을 `encodeInitialLoad(url)`에
+  전달하도록 수정했습니다. (PR #157)
+- 검증: `WebDynproSapEventEncoderTests`에서 4-event 구조 assert 추가 후 통과.
+  prod 배포 후 실제 schedule/grades API 동작 확인 예정.
+- 포트폴리오 포인트: SAP WebDynpro 프로토콜은 공개 문서가 없습니다. 브라우저
+  DevTools → Network → SAPEVENTQUEUE payload 캡처 → 하나씩 역분석하는 것이
+  유일한 방법입니다. 403 empty body는 SAP에서 "CSRF 또는 세션 상태 불일치"를
+  의미하므로, body가 비어있을수록 서버가 요청 자체를 거부한 것입니다.
