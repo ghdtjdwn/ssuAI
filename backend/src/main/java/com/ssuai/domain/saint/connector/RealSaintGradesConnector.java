@@ -110,6 +110,11 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         String mergedCookieHeader = initGet.cookieHeader();
 
         Optional<String> bootstrapSecureId = WebDynproResponseUnwrapper.extractSecureIdFromAny(rawFirstResponse);
+        log.info("saint grades bootstrap: secureIdPresent={} snippet='{}'",
+                bootstrapSecureId.isPresent(),
+                rawFirstResponse == null ? "(null)"
+                        : rawFirstResponse.substring(0, Math.min(300, rawFirstResponse.length()))
+                                .replaceAll("\\s+", " "));
         if (bootstrapSecureId.isEmpty()) {
             String snippet = rawFirstResponse == null ? "(null)"
                     : rawFirstResponse.substring(0, Math.min(300, rawFirstResponse.length())).replaceAll("\\s+", " ");
@@ -292,7 +297,10 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 return response;
             }
             if (status == 401 || status == 403) {
-                log.info("saint grades connector auth rejected: status={}", status);
+                String bodySnippet4xx = response.body() == null ? "(null)"
+                        : response.body().substring(0, Math.min(400, response.body().length()))
+                                .replaceAll("\\s+", " ");
+                log.info("saint grades connector auth rejected: status={} body='{}'", status, bodySnippet4xx);
                 throw new SaintSessionExpiredException("ecc rejected WebDynpro request with " + status);
             }
             if (status / 100 == 5) {
