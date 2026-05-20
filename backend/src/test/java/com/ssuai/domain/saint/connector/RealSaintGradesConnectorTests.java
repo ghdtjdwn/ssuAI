@@ -111,7 +111,7 @@ class RealSaintGradesConnectorTests {
         server.enqueue(new MockResponse()
                 .setResponseCode(302)
                 .setHeader("Location", "/hana-zcmb3w0017?sap-client=100&sap-language=KO"));
-        server.enqueue(bootstrapOk("CSRF-BOOT"));
+        server.enqueue(bootstrapOk("CSRF-BOOT", "<input type=\"hidden\" name=\"sap-wd-cltwndid\" value=\"WID-GR\"/>"));
         server.enqueue(xmlOk(wrap(htmlOnly
                 + "<input id=\"sap-wd-secure-id\" name=\"sap-wd-secure-id\" value=\"CSRF\"/>")));
 
@@ -128,7 +128,9 @@ class RealSaintGradesConnectorTests {
         RecordedRequest initPost = server.takeRequest();
         assertThat(initPost.getMethod()).isEqualTo("POST");
         assertThat(initPost.getPath()).isEqualTo("/hana-zcmb3w0017?sap-client=100&sap-language=KO");
-        assertThat(initPost.getBody().readUtf8()).contains("sap-wd-secure-id=CSRF-BOOT");
+        String initBody = initPost.getBody().readUtf8();
+        assertThat(initBody).contains("sap-wd-secure-id=CSRF-BOOT");
+        assertThat(initBody).contains("sap-wd-cltwndid=WID-GR");
     }
 
     @Test
@@ -196,11 +198,16 @@ class RealSaintGradesConnectorTests {
     }
 
     private static MockResponse bootstrapOk(String secureId) {
+        return bootstrapOk(secureId, "");
+    }
+
+    private static MockResponse bootstrapOk(String secureId, String extraHiddenInputs) {
         return new MockResponse()
                 .setResponseCode(200)
                 .setHeader("Content-Type", "text/html; charset=utf-8")
                 .setBody("<html><body><form id=\"sap.client.SsrClient.form\">"
                         + "<input type=\"hidden\" name=\"sap-wd-secure-id\" value=\"" + secureId + "\"/>"
+                        + extraHiddenInputs
                         + "</form></body></html>");
     }
 

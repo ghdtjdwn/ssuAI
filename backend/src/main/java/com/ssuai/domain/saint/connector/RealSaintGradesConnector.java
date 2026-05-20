@@ -108,6 +108,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 properties.getGradesUrl(), "saint grades");
         String rawFirstResponse = initGet.html();
         String mergedCookieHeader = initGet.cookieHeader();
+        Map<String, String> bootstrapFormFields = hiddenFormFields(rawFirstResponse);
 
         Optional<String> bootstrapSecureId = WebDynproResponseUnwrapper.extractSecureIdFromAny(rawFirstResponse);
         log.info("saint grades bootstrap: secureIdPresent={} snippet='{}'",
@@ -126,7 +127,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         String firstHtml = firstRenderableHtml(rawFirstResponse);
         if (!containsGradesTables(firstHtml)) {
             String initXml = httpPostInitialLoad(mergedCookieHeader, bootstrapSecureId.get(), "ZCMB3W0017",
-                    initGet.finalUrl());
+                    initGet.finalUrl(), bootstrapFormFields);
             try {
                 firstHtml = WebDynproResponseUnwrapper.extractHtml(initXml);
             } catch (IllegalArgumentException ex) {
@@ -161,7 +162,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
             String xmlEnvelope;
             try {
                 xmlEnvelope = httpPostButtonPress(mergedCookieHeader, secureId.get(),
-                        PREV_TERM_BUTTON_ID, initGet.finalUrl());
+                        PREV_TERM_BUTTON_ID, initGet.finalUrl(), bootstrapFormFields);
             } catch (SaintSessionExpiredException exception) {
                 log.info("saint grades iterate halted: studentFp={} reason=session-expired index={}",
                         SaintSessionStore.fingerprint(studentId), i);
@@ -244,14 +245,10 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         throw new ConnectorUnavailableException();
     }
 
-    private String httpPostInitialLoad(String cookieHeader, String secureId, String appName, String url) {
+    private String httpPostInitialLoad(
+            String cookieHeader, String secureId, String appName, String url, Map<String, String> formFields) {
         String queue = WebDynproSapEventEncoder.encodeInitialLoad(url);
-        String body = formEncoded(Map.of(
-                "sap-charset", "utf-8",
-                "sap-wd-secure-id", secureId,
-                "fesrAppName", appName,
-                "fesrUseBeacon", "true",
-                "SAPEVENTQUEUE", queue));
+        String body = formEncoded(webDynproForm(formFields, secureId, appName, queue));
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Cookie", cookieHeader)
@@ -266,14 +263,10 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         return send(request).body();
     }
 
-    private String httpPostButtonPress(String cookieHeader, String secureId, String buttonId, String postUrl) {
+    private String httpPostButtonPress(
+            String cookieHeader, String secureId, String buttonId, String postUrl, Map<String, String> formFields) {
         String queue = WebDynproSapEventEncoder.encodeButtonPress(buttonId);
-        String body = formEncoded(Map.of(
-                "sap-charset", "utf-8",
-                "sap-wd-secure-id", secureId,
-                "fesrAppName", "ZCMB3W0017",
-                "fesrUseBeacon", "true",
-                "SAPEVENTQUEUE", queue));
+        String body = formEncoded(webDynproForm(formFields, secureId, "ZCMB3W0017", queue));
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(postUrl))
                 .header("Cookie", cookieHeader)
@@ -423,6 +416,34 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                     .append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
         }
         return out.toString();
+    }
+
+    private static Map<String, String> hiddenFormFields(String html) {
+        LinkedHashMap<String, String> fields = new LinkedHashMap<>();
+        if (html == null || html.isBlank()) {
+            return fields;
+        }
+        org.jsoup.Jsoup.parse(html).select("input[name]").forEach(input -> {
+            String name = input.attr("name");
+            if (!name.isBlank()) {
+                fields.put(name, input.attr("value"));
+            }
+        });
+        return fields;
+    }
+
+    private static Map<String, String> webDynproForm(
+            Map<String, String> formFields, String secureId, String appName, String queue) {
+        LinkedHashMap<String, String> form = new LinkedHashMap<>();
+        form.put("sap-charset", "utf-8");
+        if (formFields != null) {
+            form.putAll(formFields);
+        }
+        form.put("sap-wd-secure-id", secureId);
+        form.put("fesrAppName", appName);
+        form.put("fesrUseBeacon", "true");
+        form.put("SAPEVENTQUEUE", queue);
+        return form;
     }
 
     private static HttpClient defaultHttpClient(SaintGradesProperties properties) {
