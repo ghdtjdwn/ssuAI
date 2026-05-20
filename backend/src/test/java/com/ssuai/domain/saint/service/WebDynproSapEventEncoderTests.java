@@ -90,6 +90,17 @@ class WebDynproSapEventEncoderTests {
     }
 
     @Test
+    void encodeButtonPressWithPageUrlIncludesCustomClientInfosAsFirstEvent() {
+        String queue = WebDynproSapEventEncoder.encodeButtonPress("WDA7",
+                "https://hana-prd-ap-4.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMW2102");
+
+        assertThat(queue).startsWith("Custom_ClientInfos");
+        assertThat(queue).contains("DocumentDomain~E004ssu.ac.kr");
+        assertThat(queue).contains("~E001Button_Press");
+        assertThat(queue).contains("~E001Form_Request");
+    }
+
+    @Test
     void escapeReplacesStructuralCharactersWithSapHexForms() {
         assertThat(WebDynproSapEventEncoder.escape("\"")).isEqualTo("~0022");
         assertThat(WebDynproSapEventEncoder.escape(":")).isEqualTo("~003A");
