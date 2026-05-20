@@ -131,6 +131,29 @@ class RealSaintScheduleConnectorTests {
     }
 
     @Test
+    void sessionCorrelationFieldsPassedThroughExceptCltwndid() throws Exception {
+        server.enqueue(htmlOk(
+                "<html><body>"
+                        + "<form id=\"sap.client.SsrClient.form\" action=\"/zcmw2102\">"
+                        + "<input type=\"hidden\" name=\"_external_session_\" value=\"EXT-999\"/>"
+                        + "<input type=\"hidden\" name=\"_popup_url_\" value=\"POP\"/>"
+                        + "<input type=\"hidden\" name=\"sap-wd-cltwndid\" value=\"WID-EXCLUDED\"/>"
+                        + "<input type=\"hidden\" name=\"sap-wd-secure-id\" value=\"CSRF-S\"/>"
+                        + "</form></body></html>"));
+        server.enqueue(xmlOk(wrap(loadFixture())));
+
+        connector.fetchSchedule("20261234", new PortalCookies("MYSAPSSO2=abc"));
+
+        server.takeRequest(); // GET
+        RecordedRequest initPost = server.takeRequest();
+        String body = initPost.getBody().readUtf8();
+        assertThat(body).contains("_external_session_=EXT-999");
+        assertThat(body).contains("_popup_url_=POP");
+        assertThat(body).doesNotContain("sap-wd-cltwndid");
+        assertThat(body).contains("sap-wd-secure-id=CSRF-S");
+    }
+
+    @Test
     void firstGetWithRenderedTimetableDoesNotSendInitialPost() throws Exception {
         server.enqueue(htmlOk(withSecureId(loadFixture(), "CSRF-GET")));
 

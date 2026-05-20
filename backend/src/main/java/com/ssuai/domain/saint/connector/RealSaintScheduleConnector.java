@@ -490,6 +490,13 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
     private static Map<String, String> webDynproForm(
             Map<String, String> formFields, String secureId, String appName, String queue) {
         LinkedHashMap<String, String> form = new LinkedHashMap<>();
+        if (formFields != null) {
+            formFields.forEach((key, value) -> {
+                if (!"sap-wd-cltwndid".equals(key)) {
+                    form.put(key, value);
+                }
+            });
+        }
         form.put("sap-charset", "utf-8");
         form.put("sap-wd-secure-id", secureId);
         form.put("fesrAppName", appName);

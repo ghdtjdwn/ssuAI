@@ -822,3 +822,27 @@
   DevTools → Network → SAPEVENTQUEUE payload 캡처 → 하나씩 역분석하는 것이
   유일한 방법입니다. 403 empty body는 SAP에서 "CSRF 또는 세션 상태 불일치"를
   의미하므로, body가 비어있을수록 서버가 요청 자체를 거부한 것입니다.
+
+---
+
+## 2026-05-20 — webDynproForm() SAP 세션 필드 과잉 제거 → HTTP 500
+
+- 맥락: SAINT 403 fix(PR #159)에서 Fix 2가 `sap-wd-cltwndid`(403 원인)를 제거하면서
+  SAP 세션 상관관계 필드 `_external_session_`, `_popup_url_`, `_main_window_id_`,
+  `_environment_`도 함께 제거됐다.
+- 증상: prod 배포 후 `get_my_schedule` / `get_my_grades` 에서
+  `saint schedule connector 5xx: status=500 body='...Application Server Error...'`.
+  Fix 1(form action URL) 은 pod log 에서 hana URL 확인됐지만 initial POST 에서 500 발생.
+- 원인: SAP WebDynpro Lightspeed 서버는 bootstrap HTML 의 숨겨진 입력 필드 중
+  `_external_session_`(서버 세션 바인딩 토큰), `_popup_url_`, `_main_window_id_`,
+  `_environment_` 를 POST body 로 받아야 세션 상태 머신이 올바르게 이어진다.
+  이 필드들이 없으면 서버는 세션 컨텍스트를 잃고 500 을 반환한다.
+  `sap-wd-cltwndid` 는 제외가 맞지만, 나머지 SAP 세션 필드는 그대로 전달해야 한다.
+- 해결: `webDynproForm()` 에서 `formFields` 를 필터링할 때 `sap-wd-cltwndid` 만 제외하고
+  나머지 필드는 POST body 에 포함. schedule/grades connector 양쪽 동일하게 수정.
+- 검증: `sessionCorrelationFieldsPassedThroughExceptCltwndid` 테스트 2개 추가.
+  prod 배포 후 `saint schedule fetched` / `saint grades fetched` 로그 확인 예정.
+- 포트폴리오 포인트: SAP WebDynpro 의 hidden input 은 단순한 UI 상태가 아니라 서버 세션
+  바인딩 토큰이다. "최소한의 필드만 보내면 안전하다"는 직관이 stateful 프로토콜에서는
+  틀릴 수 있다. 어떤 필드가 403 의 원인인지 개별적으로 특정하지 않고 묶어서 제거하면
+  다른 문제가 생긴다 — 하나씩 제거하며 테스트해야 한다.
