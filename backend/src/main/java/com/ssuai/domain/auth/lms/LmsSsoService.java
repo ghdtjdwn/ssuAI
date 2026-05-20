@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 import com.ssuai.global.exception.LmsAuthFailedException;
 
 /**
- * LMS two-phase auth after SmartID SSO.
+ * LMS auth after SmartID SSO.
  *
  * <p>Phase 1 — GET {@code lms.ssu.ac.kr/xn-sso/gw-cb.php?sToken=&sIdno=}
  * with the one-shot SmartID tokens. gw-cb.php validates with SmartID,
@@ -29,12 +29,13 @@ import com.ssuai.global.exception.LmsAuthFailedException;
  * We do NOT auto-follow the redirect so the 302's Set-Cookie and Location
  * headers are captured.
  *
- * <p>Phase 2 — GET the Canvas start URL with the phase 1 cookies. In production
- * this starts at the gw-cb.php Location when present, with a dashboard URL
+ * <p>Phase 2 — GET the gw-cb.php Location when present, with a dashboard URL
  * fallback for older flows.
- * Canvas issues its own session cookies including {@code xn_api_token}
- * (JWT, 2h TTL), {@code _legacy_normandy_session}, and
- * {@code _normandy_session}. These are the auth credentials the
+ *
+ * <p>Phase 3 — if phase 2 did not issue {@code xn_api_token}, visit the Canvas
+ * dashboard with the LMS cookies. Canvas issues its own session cookies
+ * including {@code xn_api_token} (JWT, 2h TTL), {@code _legacy_normandy_session},
+ * and {@code _normandy_session}. These are the auth credentials the
  * {@code RealLmsAssignmentsConnector} sends to the Canvas API.
  *
  * <p>Both sets of cookies are merged and stored encrypted in
@@ -85,10 +86,20 @@ public class LmsSsoService {
                 : properties.getCanvasBaseUrl() + "/learningx/dashboard?user_login="
                         + URLEncoder.encode(sIdno.trim(), StandardCharsets.UTF_8);
 
-        // Phase 2: canvas dashboard → canvas session cookies (xn_api_token etc.)
+        // Phase 2: follow gw-cb.php redirect or fallback dashboard.
         List<String> phase2Cookies = fetchCanvasDashboard(lmsCookieHeader, canvasStartUrl);
-        String allCookies = mergeLmsCookies(lmsCookieHeader, phase2Cookies);
-        log.info("lms auth phase2 merged cookie names: {}", cookieNameList(allCookies));
+        String phase2Merged = mergeLmsCookies(lmsCookieHeader, phase2Cookies);
+        log.info("lms auth phase2 merged cookie names: {}", cookieNameList(phase2Merged));
+
+        String allCookies = phase2Merged;
+        if (!hasCookieName(phase2Merged, "xn_api_token")) {
+            String canvasDashboardUrl = properties.getCanvasBaseUrl()
+                    + "/learningx/dashboard?user_login="
+                    + URLEncoder.encode(sIdno.trim(), StandardCharsets.UTF_8);
+            List<String> phase3Cookies = fetchCanvasDashboard(phase2Merged, canvasDashboardUrl);
+            allCookies = mergeLmsCookies(phase2Merged, phase3Cookies);
+        }
+        log.info("lms auth final cookie names: {}", cookieNameList(allCookies));
 
         sessionStore.put(sIdno.trim(), new LmsCookies(allCookies));
     }
@@ -221,6 +232,20 @@ public class LmsSsoService {
             }
         }
         return String.join(",", names);
+    }
+
+    private static boolean hasCookieName(String cookieHeader, String expectedName) {
+        if (cookieHeader == null || cookieHeader.isBlank()) {
+            return false;
+        }
+        for (String pair : cookieHeader.split(";")) {
+            String trimmed = pair.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq > 0 && expectedName.equals(trimmed.substring(0, eq).trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String sanitizeRedirectLocation(String location) {
