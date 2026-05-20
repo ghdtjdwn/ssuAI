@@ -98,7 +98,9 @@ class RealSaintScheduleConnectorTests {
                 .setResponseCode(302)
                 .setHeader("Location", "/hana-zcmw2102?sap-client=100&sap-language=KO"));
         server.enqueue(htmlOk(withSecureId("<html><body>"
+                + "<form id=\"sap.client.SsrClient.form\" action=\"/hana-zcmw2102?sap-client=100&amp;sap-language=KO\">"
                 + "<input type=\"hidden\" name=\"sap-wd-cltwndid\" value=\"WID-123\"/>"
+                + "</form>"
                 + "</body></html>", "CSRF-BOOT")));
         server.enqueue(xmlOk(wrap(withSecureId(synthFixture(2026, "1학기"), "CSRF-0"))));
         server.enqueue(xmlOk(wrap(synthFixture(2025, "겨울학기"))));
@@ -118,14 +120,14 @@ class RealSaintScheduleConnectorTests {
         assertThat(initPost.getPath()).isEqualTo("/hana-zcmw2102?sap-client=100&sap-language=KO");
         String initBody = initPost.getBody().readUtf8();
         assertThat(initBody).contains("sap-wd-secure-id=CSRF-BOOT");
-        assertThat(initBody).contains("sap-wd-cltwndid=WID-123");
+        assertThat(initBody).doesNotContain("sap-wd-cltwndid");
 
         RecordedRequest prevPost = server.takeRequest();
         assertThat(prevPost.getMethod()).isEqualTo("POST");
         assertThat(prevPost.getPath()).isEqualTo("/hana-zcmw2102?sap-client=100&sap-language=KO");
         String prevBody = prevPost.getBody().readUtf8();
         assertThat(prevBody).contains("sap-wd-secure-id=CSRF-0");
-        assertThat(prevBody).contains("sap-wd-cltwndid=WID-123");
+        assertThat(prevBody).doesNotContain("sap-wd-cltwndid");
     }
 
     @Test
