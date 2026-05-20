@@ -111,7 +111,14 @@ class RealSaintGradesConnectorTests {
         server.enqueue(new MockResponse()
                 .setResponseCode(302)
                 .setHeader("Location", "/hana-zcmb3w0017?sap-client=100&sap-language=KO"));
-        server.enqueue(bootstrapOk("CSRF-BOOT", "<input type=\"hidden\" name=\"sap-wd-cltwndid\" value=\"WID-GR\"/>"));
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "text/html; charset=utf-8")
+                .setBody("<html><body>"
+                        + "<form id=\"sap.client.SsrClient.form\" action=\"/hana-zcmb3w0017?sap-client=100&amp;sap-language=KO\">"
+                        + "<input type=\"hidden\" name=\"sap-wd-secure-id\" value=\"CSRF-BOOT\"/>"
+                        + "</form>"
+                        + "</body></html>"));
         server.enqueue(xmlOk(wrap(htmlOnly
                 + "<input id=\"sap-wd-secure-id\" name=\"sap-wd-secure-id\" value=\"CSRF\"/>")));
 
@@ -130,7 +137,7 @@ class RealSaintGradesConnectorTests {
         assertThat(initPost.getPath()).isEqualTo("/hana-zcmb3w0017?sap-client=100&sap-language=KO");
         String initBody = initPost.getBody().readUtf8();
         assertThat(initBody).contains("sap-wd-secure-id=CSRF-BOOT");
-        assertThat(initBody).contains("sap-wd-cltwndid=WID-GR");
+        assertThat(initBody).doesNotContain("sap-wd-cltwndid");
     }
 
     @Test

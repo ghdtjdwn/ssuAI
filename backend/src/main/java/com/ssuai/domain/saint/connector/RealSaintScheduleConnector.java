@@ -126,6 +126,16 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         String mergedCookieHeader = initGet.cookieHeader();
         Map<String, String> bootstrapFormFields = hiddenFormFields(bootstrapHtml);
 
+        String actionRaw = extractFormActionUrl(bootstrapHtml, initGet.finalUrl());
+        String postUrl;
+        if (actionRaw.startsWith("http")) {
+            postUrl = actionRaw;
+        } else {
+            URI base = URI.create(initGet.finalUrl());
+            postUrl = base.getScheme() + "://" + base.getAuthority() + actionRaw;
+        }
+        log.info("saint schedule init POST url='{}'", postUrl);
+
         Optional<String> bootstrapSecureId = WebDynproResponseUnwrapper.extractSecureIdFromAny(bootstrapHtml);
         log.info("saint schedule bootstrap: secureIdPresent={} snippet='{}'",
                 bootstrapSecureId.isPresent(),
@@ -143,7 +153,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         String currentHtml = firstRenderableHtml(bootstrapHtml);
         if (!containsTimetable(currentHtml)) {
             String initXml = httpPostInitialLoad(mergedCookieHeader, bootstrapSecureId.get(), "ZCMW2102",
-                    initGet.finalUrl(), bootstrapFormFields);
+                    initGet.finalUrl(), postUrl, bootstrapFormFields);
             try {
                 currentHtml = WebDynproResponseUnwrapper.extractHtml(initXml);
             } catch (IllegalArgumentException ex) {
@@ -180,7 +190,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
             String xmlEnvelope;
             try {
                 xmlEnvelope = httpPostButtonPress(mergedCookieHeader, secureId.get(),
-                        PREV_TERM_BUTTON_ID, initGet.finalUrl(), bootstrapFormFields);
+                        PREV_TERM_BUTTON_ID, postUrl, bootstrapFormFields);
             } catch (SaintSessionExpiredException ex) {
                 log.info("saint schedule iterate halted: studentFp={} reason=session-expired year={} term={}",
                         SaintSessionStore.fingerprint(studentId), displayedYear, displayedTerm);
@@ -276,7 +286,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
 
     private String httpPostButtonPress(
             String cookieHeader, String secureId, String buttonId, String postUrl, Map<String, String> formFields) {
-        String queue = WebDynproSapEventEncoder.encodeButtonPress(buttonId);
+        String queue = WebDynproSapEventEncoder.encodeButtonPress(buttonId, postUrl);
         String body = formEncoded(webDynproForm(formFields, secureId, "ZCMW2102", queue));
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(postUrl))
@@ -294,12 +304,13 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
     }
 
     private String httpPostInitialLoad(
-            String cookieHeader, String secureId, String appName, String url, Map<String, String> formFields) {
-        String queue = WebDynproSapEventEncoder.encodeInitialLoad(url);
+            String cookieHeader, String secureId, String appName,
+            String pageUrl, String postUrl, Map<String, String> formFields) {
+        String queue = WebDynproSapEventEncoder.encodeInitialLoad(pageUrl);
         log.info("saint schedule init POST form fields: names={}", formFields == null ? List.of() : formFields.keySet());
         String body = formEncoded(webDynproForm(formFields, secureId, appName, queue));
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
+                .uri(URI.create(postUrl))
                 .header("Cookie", cookieHeader)
                 .header("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
                 .header("Accept", "application/xml,text/html")
@@ -467,13 +478,19 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         return fields;
     }
 
+    private static String extractFormActionUrl(String bootstrapHtml, String fallbackUrl) {
+        if (bootstrapHtml == null || bootstrapHtml.isBlank()) return fallbackUrl;
+        var form = Jsoup.parse(bootstrapHtml).selectFirst("form[id=sap.client.SsrClient.form]");
+        if (form == null) return fallbackUrl;
+        String action = form.attr("action");
+        if (action == null || action.isBlank()) return fallbackUrl;
+        return action;
+    }
+
     private static Map<String, String> webDynproForm(
             Map<String, String> formFields, String secureId, String appName, String queue) {
         LinkedHashMap<String, String> form = new LinkedHashMap<>();
         form.put("sap-charset", "utf-8");
-        if (formFields != null) {
-            form.putAll(formFields);
-        }
         form.put("sap-wd-secure-id", secureId);
         form.put("fesrAppName", appName);
         form.put("fesrUseBeacon", "true");

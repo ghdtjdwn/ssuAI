@@ -140,6 +140,53 @@ public final class WebDynproSapEventEncoder {
         return encode(List.of(buttonPress, formRequest));
     }
 
+    /**
+     * Same as {@link #encodeButtonPress(String)} but prepends a
+     * {@code Custom_ClientInfos} event that rusaint sends before every
+     * PREV-button POST. SAP's server uses this for client-state tracking;
+     * omitting it causes a 403 on real sessions.
+     */
+    public static String encodeButtonPress(String elementId, String pageUrl) {
+        if (elementId == null || elementId.isBlank()) {
+            throw new IllegalArgumentException("elementId is required");
+        }
+        if (pageUrl == null || pageUrl.isBlank()) {
+            throw new IllegalArgumentException("pageUrl is required");
+        }
+        String clientUrl = pageUrl.contains("#") ? pageUrl : pageUrl + "#";
+        SapEvent customClientInfos = SapEvent.builder("Custom_ClientInfos")
+                .meta(meta -> {
+                    meta.put("Id", "WD01");
+                    meta.put("WindowOpenerExists", "false");
+                    meta.put("ClientURL", clientUrl);
+                    meta.put("ClientWidth", "935px");
+                    meta.put("ClientHeight", "869px");
+                    meta.put("DocumentDomain", "ssu.ac.kr");
+                    meta.put("IsTopWindow", "TRUE");
+                    meta.put("ParentAccessible", "TRUE");
+                })
+                .build();
+        SapEvent buttonPress = SapEvent.builder("Button_Press")
+                .meta(meta -> meta.put("Id", elementId))
+                .meta(meta -> {
+                    meta.put("ResponseData", "delta");
+                    meta.put("ClientAction", "submit");
+                })
+                .build();
+        SapEvent formRequest = SapEvent.builder("Form_Request")
+                .meta(meta -> {
+                    meta.put("Id", "sap.client.SsrClient.form");
+                    meta.put("Async", "false");
+                    meta.put("FocusInfo", "@{\"sFocussedId\":\"" + elementId + "\"}");
+                    meta.put("Hash", "");
+                    meta.put("DomChanged", "false");
+                    meta.put("IsDirty", "false");
+                })
+                .meta(meta -> meta.put("ResponseData", "delta"))
+                .build();
+        return encode(List.of(customClientInfos, buttonPress, formRequest));
+    }
+
     public static String encode(List<SapEvent> events) {
         if (events == null || events.isEmpty()) {
             throw new IllegalArgumentException("events is required");
