@@ -25,14 +25,17 @@ import com.ssuai.global.exception.LmsAuthFailedException;
  *
  * <p>Phase 1 — GET {@code lms.ssu.ac.kr/xn-sso/gw-cb.php?sToken=&sIdno=}
  * with the one-shot SmartID tokens. gw-cb.php validates with SmartID,
- * issues LMS session cookies, and 302-redirects to the LMS homepage. We
- * do NOT follow the redirect so the 302's Set-Cookie headers are captured.
+ * issues LMS session cookies, and 302-redirects to the Canvas auth callback.
+ * We do NOT auto-follow the redirect so the 302's Set-Cookie and Location
+ * headers are captured.
  *
- * <p>Phase 2 — GET {@code canvas.ssu.ac.kr/learningx/dashboard?user_login={sIdno}}
- * with the phase 1 cookies. Canvas issues its own session cookies including
- * {@code xn_api_token} (JWT, 2h TTL), {@code _legacy_normandy_session},
- * and {@code _normandy_session}. These are the auth credentials the
- * {@code RealLmsAssignmentsConnector} sends to the canvas API.
+ * <p>Phase 2 — GET the Canvas start URL with the phase 1 cookies. In production
+ * this starts at the gw-cb.php Location when present, with a dashboard URL
+ * fallback for older flows.
+ * Canvas issues its own session cookies including {@code xn_api_token}
+ * (JWT, 2h TTL), {@code _legacy_normandy_session}, and
+ * {@code _normandy_session}. These are the auth credentials the
+ * {@code RealLmsAssignmentsConnector} sends to the Canvas API.
  *
  * <p>Both sets of cookies are merged and stored encrypted in
  * {@link LmsSessionStore} keyed by {@code sIdno} (= ssuAI studentId).
@@ -47,6 +50,8 @@ public class LmsSsoService {
     private final LmsSsoProperties properties;
     private final LmsSessionStore sessionStore;
     private final HttpClient httpClient;
+
+    private record GwCallbackResult(List<String> cookies, String location) {}
 
     public LmsSsoService(LmsSsoProperties properties, LmsSessionStore sessionStore) {
         this.properties = properties;
@@ -66,22 +71,29 @@ public class LmsSsoService {
         }
 
         // Phase 1: gw-cb.php → lms session cookies (in 302 Set-Cookie)
-        List<String> phase1Cookies = callGwCallback(sToken, sIdno);
-        if (phase1Cookies.isEmpty()) {
-            throw new LmsAuthFailedException("gw-cb.php returned no Set-Cookie headers");
+        GwCallbackResult callbackResult = callGwCallback(sToken, sIdno);
+        if (callbackResult.cookies().isEmpty() && callbackResult.location() == null) {
+            throw new LmsAuthFailedException("gw-cb.php returned no Set-Cookie headers and no redirect location");
         }
-        String lmsCookieHeader = buildCookieHeader(phase1Cookies);
+        String lmsCookieHeader = buildCookieHeader(callbackResult.cookies());
         log.info("lms auth phase1 cookie names: {}", cookieNameList(lmsCookieHeader));
+        log.info("lms auth phase1 redirect: {}",
+                callbackResult.location() != null ? sanitizeRedirectLocation(callbackResult.location()) : "(none)");
+
+        String canvasStartUrl = callbackResult.location() != null && !callbackResult.location().isBlank()
+                ? callbackResult.location()
+                : properties.getCanvasBaseUrl() + "/learningx/dashboard?user_login="
+                        + URLEncoder.encode(sIdno.trim(), StandardCharsets.UTF_8);
 
         // Phase 2: canvas dashboard → canvas session cookies (xn_api_token etc.)
-        List<String> phase2Cookies = fetchCanvasDashboard(lmsCookieHeader, sIdno.trim());
+        List<String> phase2Cookies = fetchCanvasDashboard(lmsCookieHeader, canvasStartUrl);
         String allCookies = mergeLmsCookies(lmsCookieHeader, phase2Cookies);
         log.info("lms auth phase2 merged cookie names: {}", cookieNameList(allCookies));
 
         sessionStore.put(sIdno.trim(), new LmsCookies(allCookies));
     }
 
-    private List<String> callGwCallback(String sToken, String sIdno) {
+    private GwCallbackResult callGwCallback(String sToken, String sIdno) {
         String url = properties.getGwCallbackUrl()
                 + "?sToken=" + URLEncoder.encode(sToken, StandardCharsets.UTF_8)
                 + "&sIdno=" + URLEncoder.encode(sIdno, StandardCharsets.UTF_8);
@@ -93,7 +105,12 @@ public class LmsSsoService {
                 .build();
         try {
             HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            return response.headers().allValues("set-cookie");
+            List<String> cookies = response.headers().allValues("set-cookie");
+            String location = response.headers().firstValue("location")
+                    .filter(value -> !value.isBlank())
+                    .map(value -> URI.create(url).resolve(value).toString())
+                    .orElse(null);
+            return new GwCallbackResult(cookies, location);
         } catch (IOException exception) {
             throw new LmsAuthFailedException("gw-cb.php io error", exception);
         } catch (InterruptedException exception) {
@@ -102,10 +119,8 @@ public class LmsSsoService {
         }
     }
 
-    private List<String> fetchCanvasDashboard(String lmsCookies, String studentId) {
-        String url = properties.getCanvasBaseUrl()
-                + "/learningx/dashboard?user_login="
-                + URLEncoder.encode(studentId, StandardCharsets.UTF_8);
+    private List<String> fetchCanvasDashboard(String lmsCookies, String startUrl) {
+        String url = startUrl;
         String cookieHeader = lmsCookies;
         List<String> allSetCookies = new ArrayList<>();
 
@@ -206,6 +221,10 @@ public class LmsSsoService {
             }
         }
         return String.join(",", names);
+    }
+
+    private static String sanitizeRedirectLocation(String location) {
+        return location.replaceAll("(?i)(token|sToken)=[^&]*", "$1=REDACTED");
     }
 
     private static String stripCookieAttributes(String setCookieHeader) {

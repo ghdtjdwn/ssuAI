@@ -9,9 +9,12 @@ import org.springframework.stereotype.Component;
  * Configuration for the realtime u-SAINT schedule fetcher (Task 16 PR 16b).
  *
  * <p>{@code timetableUrl} points at the SAP WebDynpro ZCMW2102 component
- * on {@code hana-prd-ap-4.ssu.ac.kr:8443} (the HANA application server).
- * {@code ecc.ssu.ac.kr} is a portal router that uses JavaScript redirect,
- * not an HTTP redirect, so the connector must target the app server directly.
+ * on {@code ecc.ssu.ac.kr} (port 443 / standard HTTPS). MYSAPSSO2 from the
+ * u-SAINT portal is trusted by the ECC system, which creates an authenticated
+ * USER session. Direct access to {@code hana-prd-ap-4.ssu.ac.kr:8443} was
+ * tried previously but HANA does not trust the portal's SSO2 ticket and
+ * creates an anonymous session instead. rusaint confirms the correct URL:
+ * {@code https://ecc.ssu.ac.kr/sap/bc/webdynpro/SAP/ZCMW2102}.
  *
  * <p>{@code timeout} caps both connect and read for a single SAP hop.
  * The cumulative-year iterate can fire up to ~5 POSTs back-to-back, so
@@ -23,7 +26,7 @@ import org.springframework.stereotype.Component;
 public class SaintScheduleProperties {
 
     private String timetableUrl =
-            "https://hana-prd-ap-4.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMW2102?sap-client=100&sap-language=KO";
+            "https://ecc.ssu.ac.kr/sap/bc/webdynpro/SAP/ZCMW2102?sap-client=100&sap-language=KO";
     private Duration timeout = Duration.ofSeconds(15);
 
     public String getTimetableUrl() {
