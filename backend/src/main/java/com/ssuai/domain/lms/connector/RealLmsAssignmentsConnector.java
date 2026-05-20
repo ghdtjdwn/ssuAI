@@ -15,6 +15,8 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -44,6 +46,8 @@ import com.ssuai.global.exception.LmsSessionExpiredException;
 @Component
 @ConditionalOnProperty(name = "ssuai.connector.lms-assignments", havingValue = "real")
 class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
+
+    private static final Logger log = LoggerFactory.getLogger(RealLmsAssignmentsConnector.class);
 
     private final LmsSsoProperties properties;
     private final ObjectMapper objectMapper;
@@ -135,6 +139,10 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
             HttpResponse<String> response = httpClient.send(
                     request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() == 401) {
+                String bodySnippet = response.body() == null ? "(null)"
+                        : response.body().substring(0, Math.min(400, response.body().length()))
+                                .replaceAll("\\s+", " ");
+                log.warn("lms canvas 401: url={} body='{}'", url, bodySnippet);
                 throw new LmsSessionExpiredException("canvas returned 401 — session expired");
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
