@@ -1,5 +1,6 @@
 package com.ssuai.domain.saint.service;
 
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +49,27 @@ public final class WebDynproSapEventEncoder {
      * would have sent if auth were done server-side). Without this POST the
      * server only returns the JS bootstrap and never the application HTML.
      */
-    public static String encodeInitialLoad() {
+    public static String encodeInitialLoad(String pageUrl) {
+        if (pageUrl == null || pageUrl.isBlank()) {
+            throw new IllegalArgumentException("pageUrl is required");
+        }
+        URI uri = URI.create(pageUrl);
+        String origin = uri.getScheme() + "://" + uri.getHost()
+                + (uri.getPort() > 0 ? ":" + uri.getPort() : "");
+        String domain = uri.getHost();
+        String svgBase = origin
+                + "/sap/public/bc/ur/nw5/themes/~cache-20230801062755"
+                + "/Base/baseLib/sap_fiori_3/svg/libs";
+
+        String data1 = "ClientWidth:935px;ClientHeight:869px;ScreenWidth:1536px;ScreenHeight:864px;"
+                + "ScreenOrientation:landscape;ThemedTableRowHeight:33px;ThemedFormLayoutRowHeight:32px;"
+                + "ThemedSvgLibUrls:{\"SAPGUI-icons\":\"" + svgBase + "/SAPGUI-icons.svg\","
+                + "\"SAPWeb-icons\":\"" + svgBase + "/SAPWeb-icons.svg\"};"
+                + "ThemeTags:Fiori_3,Touch;ThemeID:sap_fiori_3;SapThemeID:sap_fiori_3;"
+                + "DeviceType:DESKTOP;DocumentDomain:" + domain + ";"
+                + "ClientURL:" + pageUrl + ";IsTopWindow:TRUE;ParentAccessible:TRUE";
+        String data2 = "ThemedTableRowHeight:25px";
+
         SapEvent formRequest = SapEvent.builder("Form_Request")
                 .meta(meta -> {
                     meta.put("Id", "sap.client.SsrClient.form");
@@ -60,7 +81,19 @@ public final class WebDynproSapEventEncoder {
                 })
                 .meta(meta -> meta.put("ResponseData", "delta"))
                 .build();
-        return encode(List.of(formRequest));
+        return "ClientInspector_Notify"
+                + "~E002Id~E004WD01~E005Data~E004" + escape(data1)
+                + "~E003~E002ResponseData~E004delta~E005EnqueueCardinality~E004single~E003~E002~E003"
+                + EVENT_SEPARATOR
+                + "ClientInspector_Notify"
+                + "~E002Id~E004WD02~E005Data~E004" + escape(data2)
+                + "~E003~E002ResponseData~E004delta~E005EnqueueCardinality~E004single~E003~E002~E003"
+                + EVENT_SEPARATOR
+                + "LoadingPlaceHolder_Load"
+                + "~E002Id~E004_loadingPlaceholder_"
+                + "~E003~E002ResponseData~E004delta~E005ClientAction~E004submit~E003~E002~E003"
+                + EVENT_SEPARATOR
+                + encode(List.of(formRequest));
     }
 
     /**
@@ -146,10 +179,10 @@ public final class WebDynproSapEventEncoder {
      * they can't collide with the event-queue tokens or with the
      * {@code @{...}} JSON-literal sentinel SAP uses for nested values.
      *
-     * <p>The captured cURL escapes {@code "} {@code :} {@code @} {@code {}
-     * {@code }} (used inside {@code FocusInfo}). We use the same minimal
-     * set; widening the table preemptively risks breaking valid input
-     * (e.g. a literal {@code ~} in a value would need its own escape).
+     * <p>The captured cURL escapes {@code ~} {@code "} {@code :} {@code @}
+     * {@code {}} {@code }} and URL/data delimiters. Because this method
+     * walks the original input one character at a time, escaping {@code ~}
+     * cannot recursively escape the {@code ~XXXX} sequences we emit.
      */
     static String escape(String value) {
         if (value == null || value.isEmpty()) {
@@ -164,6 +197,14 @@ public final class WebDynproSapEventEncoder {
                 case '@' -> out.append("~0040");
                 case '{' -> out.append("~007B");
                 case '}' -> out.append("~007D");
+                case '~' -> out.append("~007E");
+                case ';' -> out.append("~003B");
+                case '/' -> out.append("~002F");
+                case ',' -> out.append("~002C");
+                case '#' -> out.append("~0023");
+                case '?' -> out.append("~003F");
+                case '=' -> out.append("~003D");
+                case '&' -> out.append("~0026");
                 default -> out.append(c);
             }
         }

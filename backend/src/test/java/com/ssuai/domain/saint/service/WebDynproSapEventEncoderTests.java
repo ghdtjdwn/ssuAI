@@ -7,6 +7,9 @@ import org.junit.jupiter.api.Test;
 
 class WebDynproSapEventEncoderTests {
 
+    private static final String PAGE_URL =
+            "https://hana-prd-ap-4.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMW2102?sap-client=100&sap-language=KO";
+
     /**
      * Expected wire shape for "press the previous-year button" (WDA7) as
      * captured from a logged-in browser session against the ZCMW2102
@@ -48,13 +51,32 @@ class WebDynproSapEventEncoderTests {
     }
 
     @Test
-    void encodeInitialLoadPostsOnlyFormRequestForBootstrapRender() {
-        String queue = WebDynproSapEventEncoder.encodeInitialLoad();
+    void encodeInitialLoadMatchesClientInspectorBootstrapShape() {
+        String queue = WebDynproSapEventEncoder.encodeInitialLoad(PAGE_URL);
 
-        assertThat(queue).startsWith("Form_Request");
+        assertThat(queue.split("~E001")).hasSize(4);
+        assertThat(queue).startsWith("ClientInspector_Notify");
+        assertThat(queue).contains("ClientInspector_Notify~E002Id~E004WD01~E005Data~E004");
+        assertThat(queue).contains("ClientInspector_Notify~E002Id~E004WD02~E005Data~E004");
+        assertThat(queue).contains("LoadingPlaceHolder_Load~E002Id~E004_loadingPlaceholder_");
+        assertThat(queue).contains("Form_Request");
         assertThat(queue).contains("Id~E004sap.client.SsrClient.form");
         assertThat(queue).contains("ResponseData~E004delta");
         assertThat(queue).doesNotContain("Button_Press");
+        assertThat(queue).contains("DocumentDomain~003Ahana-prd-ap-4.ssu.ac.kr");
+        assertThat(queue).contains("ClientURL~003A" + WebDynproSapEventEncoder.escape(PAGE_URL));
+        assertThat(queue).contains("~007Ecache-20230801062755");
+        assertThat(queue).contains("ClientAction~E004submit");
+    }
+
+    @Test
+    void encodeInitialLoadRejectsBlankPageUrl() {
+        assertThatThrownBy(() -> WebDynproSapEventEncoder.encodeInitialLoad(null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> WebDynproSapEventEncoder.encodeInitialLoad(""))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> WebDynproSapEventEncoder.encodeInitialLoad("  "))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -74,6 +96,14 @@ class WebDynproSapEventEncoderTests {
         assertThat(WebDynproSapEventEncoder.escape("@")).isEqualTo("~0040");
         assertThat(WebDynproSapEventEncoder.escape("{")).isEqualTo("~007B");
         assertThat(WebDynproSapEventEncoder.escape("}")).isEqualTo("~007D");
+        assertThat(WebDynproSapEventEncoder.escape("~")).isEqualTo("~007E");
+        assertThat(WebDynproSapEventEncoder.escape(";")).isEqualTo("~003B");
+        assertThat(WebDynproSapEventEncoder.escape("/")).isEqualTo("~002F");
+        assertThat(WebDynproSapEventEncoder.escape(",")).isEqualTo("~002C");
+        assertThat(WebDynproSapEventEncoder.escape("#")).isEqualTo("~0023");
+        assertThat(WebDynproSapEventEncoder.escape("?")).isEqualTo("~003F");
+        assertThat(WebDynproSapEventEncoder.escape("=")).isEqualTo("~003D");
+        assertThat(WebDynproSapEventEncoder.escape("&")).isEqualTo("~0026");
     }
 
     @Test
@@ -93,5 +123,11 @@ class WebDynproSapEventEncoderTests {
     void escapeAppliesToEveryOccurrenceWithinAString() {
         assertThat(WebDynproSapEventEncoder.escape("@{\"k\":\"v\"}"))
                 .isEqualTo("~0040~007B~0022k~0022~003A~0022v~0022~007D");
+    }
+
+    @Test
+    void escapeDoesNotDoubleEscapeEmittedSapHexSequences() {
+        assertThat(WebDynproSapEventEncoder.escape("~003A"))
+                .isEqualTo("~007E003A");
     }
 }
