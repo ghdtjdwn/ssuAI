@@ -9,12 +9,11 @@ import org.springframework.stereotype.Component;
  * Configuration for the realtime u-SAINT schedule fetcher (Task 16 PR 16b).
  *
  * <p>{@code timetableUrl} points at the SAP WebDynpro ZCMW2102 component
- * — note that this lives on {@code ecc.ssu.ac.kr:8443}, not on
- * {@code saint.ssu.ac.kr}. The cross-subdomain {@code MYSAPSSO2} cookie
- * captured during the SSO callback authenticates against ecc with no
- * extra round-trip (spec §3.1).
+ * on {@code hana-prd-ap-4.ssu.ac.kr:8443} (the HANA application server).
+ * {@code ecc.ssu.ac.kr} is a portal router that uses JavaScript redirect,
+ * not an HTTP redirect, so the connector must target the app server directly.
  *
- * <p>{@code timeout} caps both connect and read for a single ecc hop.
+ * <p>{@code timeout} caps both connect and read for a single SAP hop.
  * The cumulative-year iterate can fire up to ~5 POSTs back-to-back, so
  * we set this lower than the {@code ssuai.saint.session.ttl} (30 m) by
  * a wide margin to avoid stranding a half-finished iterate.
@@ -23,7 +22,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "ssuai.saint.schedule")
 public class SaintScheduleProperties {
 
-    private String timetableUrl = "https://ecc.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMW2102";
+    private String timetableUrl =
+            "https://hana-prd-ap-4.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMW2102?sap-client=100&sap-language=KO";
     private Duration timeout = Duration.ofSeconds(15);
 
     public String getTimetableUrl() {

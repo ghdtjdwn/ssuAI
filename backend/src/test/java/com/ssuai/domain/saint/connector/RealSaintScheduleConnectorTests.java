@@ -80,6 +80,47 @@ class RealSaintScheduleConnectorTests {
     }
 
     @Test
+    void initialAndPrevPostsUseFinalGetUrlAfterRedirect() throws Exception {
+        SaintScheduleProperties properties = new SaintScheduleProperties();
+        properties.setTimetableUrl(server.url("/router").toString());
+        properties.setTimeout(Duration.ofSeconds(5));
+        HttpClient postClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+        HttpClient noRedirectClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
+        connector = new RealSaintScheduleConnector(properties, CLOCK_2026_05_16, postClient, noRedirectClient);
+
+        server.enqueue(new MockResponse()
+                .setResponseCode(302)
+                .setHeader("Location", "/hana-zcmw2102?sap-client=100&sap-language=KO"));
+        server.enqueue(htmlOk(withSecureId("<html><body></body></html>", "CSRF-BOOT")));
+        server.enqueue(xmlOk(wrap(withSecureId(synthFixture(2026, "1학기"), "CSRF-0"))));
+        server.enqueue(xmlOk(wrap(synthFixture(2025, "겨울학기"))));
+
+        connector.fetchSchedule("20251234", new PortalCookies("MYSAPSSO2=abc"));
+
+        RecordedRequest routerGet = server.takeRequest();
+        assertThat(routerGet.getMethod()).isEqualTo("GET");
+        assertThat(routerGet.getPath()).isEqualTo("/router");
+
+        RecordedRequest finalGet = server.takeRequest();
+        assertThat(finalGet.getMethod()).isEqualTo("GET");
+        assertThat(finalGet.getPath()).isEqualTo("/hana-zcmw2102?sap-client=100&sap-language=KO");
+
+        RecordedRequest initPost = server.takeRequest();
+        assertThat(initPost.getMethod()).isEqualTo("POST");
+        assertThat(initPost.getPath()).isEqualTo("/hana-zcmw2102?sap-client=100&sap-language=KO");
+        assertThat(initPost.getBody().readUtf8()).contains("sap-wd-secure-id=CSRF-BOOT");
+
+        RecordedRequest prevPost = server.takeRequest();
+        assertThat(prevPost.getMethod()).isEqualTo("POST");
+        assertThat(prevPost.getPath()).isEqualTo("/hana-zcmw2102?sap-client=100&sap-language=KO");
+        assertThat(prevPost.getBody().readUtf8()).contains("sap-wd-secure-id=CSRF-0");
+    }
+
+    @Test
     void firstGetWithRenderedTimetableDoesNotSendInitialPost() throws Exception {
         server.enqueue(htmlOk(withSecureId(loadFixture(), "CSRF-GET")));
 
