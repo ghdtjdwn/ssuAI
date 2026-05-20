@@ -93,4 +93,35 @@ class LmsSsoServiceTests {
                         .contains("xn_api_token=token-one")
                         .contains("_legacy_normandy_session=legacy-one"));
     }
+
+    @Test
+    void gwCbLocationIsFollowedAsCanvasAuthStartUrl() throws Exception {
+        String authCallbackPath = "/learningx/auth/callback?token=one-time-auth-token";
+        lmsServer.enqueue(new MockResponse()
+                .setResponseCode(302)
+                .addHeader("Set-Cookie", "WAF=waf-val; Path=/; HttpOnly")
+                .addHeader("Location", canvasServer.url(authCallbackPath).toString()));
+
+        canvasServer.enqueue(new MockResponse()
+                .setResponseCode(302)
+                .addHeader("Location", "/learningx/dashboard")
+                .addHeader("Set-Cookie", "xn_api_token=api-token-val; Path=/; HttpOnly"));
+        canvasServer.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .addHeader("Set-Cookie", "_normandy_session=normandy-val; Path=/; HttpOnly"));
+
+        service.authenticate("sso-token", "20231234");
+
+        lmsServer.takeRequest();
+
+        RecordedRequest authCallbackReq = canvasServer.takeRequest();
+        assertThat(authCallbackReq.getPath()).startsWith(authCallbackPath);
+        assertThat(authCallbackReq.getHeader("Cookie")).contains("WAF=waf-val");
+
+        assertThat(sessionStore.cookies("20231234"))
+                .hasValueSatisfying(cookies -> assertThat(cookies.rawCookieHeader())
+                        .contains("WAF=waf-val")
+                        .contains("xn_api_token=api-token-val")
+                        .contains("_normandy_session=normandy-val"));
+    }
 }
