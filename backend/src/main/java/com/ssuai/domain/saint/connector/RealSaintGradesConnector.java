@@ -1,6 +1,8 @@
 package com.ssuai.domain.saint.connector;
 
 import java.io.IOException;
+import java.net.CookieManager;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -102,20 +104,85 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
 
     private record InitGetResult(String html, String cookieHeader, String finalUrl) {}
 
+    private CookieManager createCookieManager(String rawCookieHeader, String targetUrl) {
+        CookieManager cookieManager = new CookieManager();
+        if (rawCookieHeader == null || rawCookieHeader.isBlank()) {
+            return cookieManager;
+        }
+        URI targetUri = URI.create(targetUrl);
+        String host = targetUri.getHost();
+        String cookieDomain = (host != null && host.endsWith("ssu.ac.kr")) ? ".ssu.ac.kr" : host;
+
+        for (String pair : rawCookieHeader.split(";")) {
+            String trimmed = pair.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq > 0) {
+                String name = trimmed.substring(0, eq).trim();
+                String value = trimmed.substring(eq + 1).trim();
+                if (!name.isEmpty()) {
+                    if ("MYSAPSSO2".equals(name) || "sToken".equals(name) || "WAF".equals(name)) {
+                        HttpCookie cookie = new HttpCookie(name, value);
+                        if (cookieDomain != null) {
+                            cookie.setDomain(cookieDomain);
+                        }
+                        cookie.setPath("/");
+                        cookie.setVersion(0);
+                        cookieManager.getCookieStore().add(targetUri, cookie);
+                    }
+                }
+            }
+        }
+        return cookieManager;
+    }
+
     @Override
     public GradesResponse fetchGrades(String studentId, PortalCookies cookies) {
-        InitGetResult initGet = httpGetFollowCookies(eccBootstrapCookieHeader(cookies.rawCookieHeader()),
-                properties.getGradesUrl(), "saint grades");
-        String rawFirstResponse = initGet.html();
-        String mergedCookieHeader = initGet.cookieHeader();
+        CookieManager cookieManager = createCookieManager(cookies.rawCookieHeader(), properties.getGradesUrl());
+        HttpClient.Redirect initRedirectPolicy = httpClient.followRedirects();
+        HttpClient client = HttpClient.newBuilder()
+                .cookieHandler(cookieManager)
+                .followRedirects(initRedirectPolicy)
+                .connectTimeout(properties.getTimeout())
+                .build();
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(properties.getGradesUrl()))
+                .header("Accept", "text/html,application/xhtml+xml")
+                .header("Accept-Language", "ko")
+                .header("User-Agent", BROWSER_UA)
+                .timeout(properties.getTimeout())
+                .GET()
+                .build();
+
+        HttpResponse<String> response;
+        try {
+            response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (java.net.http.HttpTimeoutException e) {
+            throw new ConnectorTimeoutException(e);
+        } catch (IOException e) {
+            log.warn("saint grades connector IOException on GET", e);
+            throw new ConnectorUnavailableException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ConnectorUnavailableException(e);
+        }
+
+        int status = response.statusCode();
+        if (status / 100 != 2) {
+            log.warn("saint grades connector unexpected status on GET: status={}", status);
+            throw new ConnectorUnavailableException();
+        }
+
+        String rawFirstResponse = response.body();
+        String finalUrl = response.uri().toString();
         Map<String, String> bootstrapFormFields = hiddenFormFields(rawFirstResponse);
 
-        String actionRaw = extractFormActionUrl(rawFirstResponse, initGet.finalUrl());
+        String actionRaw = extractFormActionUrl(rawFirstResponse, finalUrl);
         String postUrl;
         if (actionRaw.startsWith("http")) {
             postUrl = actionRaw;
         } else {
-            URI base = URI.create(initGet.finalUrl());
+            URI base = URI.create(finalUrl);
             postUrl = base.getScheme() + "://" + base.getAuthority() + actionRaw;
         }
         log.info("saint grades init POST url='{}'", postUrl);
@@ -136,8 +203,8 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
 
         String firstHtml = firstRenderableHtml(rawFirstResponse);
         if (!containsGradesTables(firstHtml)) {
-            String initXml = httpPostInitialLoad(mergedCookieHeader, bootstrapSecureId.get(), "ZCMB3W0017",
-                    initGet.finalUrl(), postUrl, bootstrapFormFields);
+            String initXml = httpPostInitialLoad(client, bootstrapSecureId.get(), "ZCMB3W0017",
+                    finalUrl, postUrl, bootstrapFormFields);
             try {
                 firstHtml = WebDynproResponseUnwrapper.extractHtml(initXml);
             } catch (IllegalArgumentException ex) {
@@ -171,7 +238,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
             }
             String xmlEnvelope;
             try {
-                xmlEnvelope = httpPostButtonPress(mergedCookieHeader, secureId.get(),
+                xmlEnvelope = httpPostButtonPress(client, secureId.get(),
                         PREV_TERM_BUTTON_ID, postUrl, bootstrapFormFields);
             } catch (SaintSessionExpiredException exception) {
                 log.info("saint grades iterate halted: studentFp={} reason=session-expired index={}",
@@ -256,13 +323,12 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
     }
 
     private String httpPostInitialLoad(
-            String cookieHeader, String secureId, String appName,
+            HttpClient client, String secureId, String appName,
             String pageUrl, String postUrl, Map<String, String> formFields) {
         String queue = WebDynproSapEventEncoder.encodeInitialLoad(pageUrl);
         String body = formEncoded(webDynproForm(formFields, secureId, appName, queue));
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(postUrl))
-                .header("Cookie", cookieHeader)
                 .header("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
                 .header("Accept", "application/xml,text/html")
                 .header("X-Requested-With", "XMLHttpRequest")
@@ -271,16 +337,15 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 .timeout(properties.getTimeout())
                 .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                 .build();
-        return send(request).body();
+        return send(client, request).body();
     }
 
     private String httpPostButtonPress(
-            String cookieHeader, String secureId, String buttonId, String postUrl, Map<String, String> formFields) {
+            HttpClient client, String secureId, String buttonId, String postUrl, Map<String, String> formFields) {
         String queue = WebDynproSapEventEncoder.encodeButtonPress(buttonId, postUrl);
         String body = formEncoded(webDynproForm(formFields, secureId, "ZCMB3W0017", queue));
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(postUrl))
-                .header("Cookie", cookieHeader)
                 .header("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
                 .header("Accept", "application/xml,text/html")
                 .header("X-Requested-With", "XMLHttpRequest")
@@ -289,12 +354,12 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 .timeout(properties.getTimeout())
                 .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                 .build();
-        return send(request).body();
+        return send(client, request).body();
     }
 
-    private HttpResponse<String> send(HttpRequest request) {
+    private HttpResponse<String> send(HttpClient client, HttpRequest request) {
         try {
-            HttpResponse<String> response = httpClient.send(request,
+            HttpResponse<String> response = client.send(request,
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int status = response.statusCode();
             if (status / 100 == 2) {
