@@ -1,6 +1,7 @@
 package com.ssuai.domain.saint.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
@@ -256,6 +257,29 @@ class RealSaintScheduleConnectorTests {
         assertThat(response.terms().get(0).year()).isEqualTo(2026);
         assertThat(response.terms().get(0).term()).isEqualTo(1);
         assertThat(server.getRequestCount()).isEqualTo(2); // GET + initial POST only
+    }
+
+    @Test
+    void guardAuthOrThrowPassesWhenOnlyDropdownsPresent() {
+        String html = """
+                <html><body>
+                  <label for="WD01">학년도</label>
+                  <input id="WD01" value="2026학년도"/>
+                  <label for="WD02">학기</label>
+                  <input id="WD02" value="여름학기"/>
+                </body></html>
+                """;
+
+        assertThatNoException().isThrownBy(() -> connector.guardAuthOrThrow(html, "20221528"));
+    }
+
+    @Test
+    void guardAuthOrThrowFailsWhenNoDropdowns() {
+        String html = "<html><body><h1>SAP Logon</h1></body></html>";
+
+        assertThatThrownBy(() -> connector.guardAuthOrThrow(html, "20221528"))
+                .isInstanceOf(SaintSessionExpiredException.class)
+                .hasMessageContaining("did not render the term dropdowns");
     }
 
     @Test
