@@ -154,16 +154,16 @@ class RealSaintScheduleConnectorTests {
     }
 
     @Test
-    void eccBootstrapCookieHeaderExtractsOnlyMysapsso2() {
+    void eccBootstrapCookieHeaderExtractsOnlyMysapsso2AndWaf() {
         String portal = "WAF=waf; MYSAPSSO2=token; JSESSIONID=jsession; PortalAlias=pa; saplb_0=lb";
 
         assertThat(RealSaintScheduleConnector.eccBootstrapCookieHeader(portal))
-                .isEqualTo("MYSAPSSO2=token");
+                .isEqualTo("WAF=waf; MYSAPSSO2=token");
     }
 
     @Test
-    void eccBootstrapCookieHeaderReturnsEmptyWhenNoMysapsso2() {
-        String portal = "WAF=waf; JSESSIONID=jsession";
+    void eccBootstrapCookieHeaderReturnsEmptyWhenNoMysapsso2AndWaf() {
+        String portal = "JSESSIONID=jsession; PortalAlias=pa";
 
         assertThat(RealSaintScheduleConnector.eccBootstrapCookieHeader(portal)).isEmpty();
     }
@@ -182,7 +182,7 @@ class RealSaintScheduleConnectorTests {
         RecordedRequest getReq = server.takeRequest();
         assertThat(getReq.getMethod()).isEqualTo("GET");
         assertThat(getReq.getHeader("Cookie")).contains("MYSAPSSO2=abc");
-        assertThat(getReq.getHeader("Cookie")).doesNotContain("WAF=portal");
+        assertThat(getReq.getHeader("Cookie")).contains("WAF=portal");
         assertThat(getReq.getHeader("Cookie")).doesNotContain("JSESSIONID=saint-only");
     }
 

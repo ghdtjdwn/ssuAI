@@ -1,6 +1,9 @@
 package com.ssuai.domain.auth.lms;
 
 import java.io.IOException;
+import java.net.CookieManager;
+import java.net.CookiePolicy;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -9,9 +12,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -50,17 +51,10 @@ public class LmsSsoService {
 
     private final LmsSsoProperties properties;
     private final LmsSessionStore sessionStore;
-    private final HttpClient httpClient;
-
-    private record GwCallbackResult(List<String> cookies, String location) {}
 
     public LmsSsoService(LmsSsoProperties properties, LmsSessionStore sessionStore) {
         this.properties = properties;
         this.sessionStore = sessionStore;
-        this.httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
     }
 
     public void authenticate(String sToken, String sIdno) {
@@ -71,40 +65,45 @@ public class LmsSsoService {
             throw new LmsAuthFailedException("sIdno is required");
         }
 
-        // Phase 1: gw-cb.php → lms session cookies (in 302 Set-Cookie)
-        GwCallbackResult callbackResult = callGwCallback(sToken, sIdno);
-        if (callbackResult.cookies().isEmpty() && callbackResult.location() == null) {
-            throw new LmsAuthFailedException("gw-cb.php returned no Set-Cookie headers and no redirect location");
-        }
-        String lmsCookieHeader = buildCookieHeader(callbackResult.cookies());
-        log.info("lms auth phase1 cookie names: {}", cookieNameList(lmsCookieHeader));
-        log.info("lms auth phase1 redirect: {}",
-                callbackResult.location() != null ? sanitizeRedirectLocation(callbackResult.location()) : "(none)");
+        // Thread-safe isolated CookieManager & HttpClient for this session
+        CookieManager cookieManager = new CookieManager();
+        cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL);
 
-        String canvasStartUrl = callbackResult.location() != null && !callbackResult.location().isBlank()
-                ? callbackResult.location()
+        HttpClient sessionClient = HttpClient.newBuilder()
+                .cookieHandler(cookieManager)
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(properties.getTimeout())
+                .build();
+
+        // Phase 1: gw-cb.php → lms session cookies
+        String location = callGwCallback(sessionClient, sToken, sIdno);
+        log.info("lms auth phase1 cookies: {}", getCookieNames(cookieManager));
+        log.info("lms auth phase1 redirect: {}",
+                location != null ? sanitizeRedirectLocation(location) : "(none)");
+
+        String canvasStartUrl = location != null && !location.isBlank()
+                ? location
                 : properties.getCanvasBaseUrl() + "/learningx/dashboard?user_login="
                         + URLEncoder.encode(sIdno.trim(), StandardCharsets.UTF_8);
 
         // Phase 2: follow gw-cb.php redirect or fallback dashboard.
-        List<String> phase2Cookies = fetchCanvasDashboard(lmsCookieHeader, canvasStartUrl);
-        String phase2Merged = mergeLmsCookies(lmsCookieHeader, phase2Cookies);
-        log.info("lms auth phase2 merged cookie names: {}", cookieNameList(phase2Merged));
+        fetchCanvasDashboard(sessionClient, canvasStartUrl);
+        log.info("lms auth phase2 cookies: {}", getCookieNames(cookieManager));
 
-        String allCookies = phase2Merged;
-        if (!hasCookieName(phase2Merged, "xn_api_token")) {
+        // Phase 3: if phase 2 did not issue xn_api_token, visit the Canvas dashboard.
+        if (!hasCookie(cookieManager, "xn_api_token")) {
             String canvasDashboardUrl = properties.getCanvasBaseUrl()
                     + "/learningx/dashboard?user_login="
                     + URLEncoder.encode(sIdno.trim(), StandardCharsets.UTF_8);
-            List<String> phase3Cookies = fetchCanvasDashboard(phase2Merged, canvasDashboardUrl);
-            allCookies = mergeLmsCookies(phase2Merged, phase3Cookies);
+            fetchCanvasDashboard(sessionClient, canvasDashboardUrl);
         }
-        log.info("lms auth final cookie names: {}", cookieNameList(allCookies));
+        log.info("lms auth final cookies: {}", getCookieNames(cookieManager));
 
-        sessionStore.put(sIdno.trim(), new LmsCookies(allCookies));
+        String allCookiesHeader = serializeCookies(cookieManager);
+        sessionStore.put(sIdno.trim(), new LmsCookies(allCookiesHeader));
     }
 
-    private GwCallbackResult callGwCallback(String sToken, String sIdno) {
+    private String callGwCallback(HttpClient sessionClient, String sToken, String sIdno) {
         String url = properties.getGwCallbackUrl()
                 + "?sToken=" + URLEncoder.encode(sToken, StandardCharsets.UTF_8)
                 + "&sIdno=" + URLEncoder.encode(sIdno, StandardCharsets.UTF_8);
@@ -115,13 +114,11 @@ public class LmsSsoService {
                 .GET()
                 .build();
         try {
-            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            List<String> cookies = response.headers().allValues("set-cookie");
-            String location = response.headers().firstValue("location")
+            HttpResponse<Void> response = sessionClient.send(request, HttpResponse.BodyHandlers.discarding());
+            return response.headers().firstValue("location")
                     .filter(value -> !value.isBlank())
                     .map(value -> URI.create(url).resolve(value).toString())
                     .orElse(null);
-            return new GwCallbackResult(cookies, location);
         } catch (IOException exception) {
             throw new LmsAuthFailedException("gw-cb.php io error", exception);
         } catch (InterruptedException exception) {
@@ -130,15 +127,11 @@ public class LmsSsoService {
         }
     }
 
-    private List<String> fetchCanvasDashboard(String lmsCookies, String startUrl) {
+    private void fetchCanvasDashboard(HttpClient sessionClient, String startUrl) {
         String url = startUrl;
-        String cookieHeader = lmsCookies;
-        List<String> allSetCookies = new ArrayList<>();
-
         for (int hop = 0; hop <= 10; hop++) {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Cookie", cookieHeader)
                     .header("Referer", "https://lms.ssu.ac.kr/")
                     .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                             + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -146,26 +139,20 @@ public class LmsSsoService {
                     .GET()
                     .build();
             try {
-                HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-                List<String> stepCookies = response.headers().allValues("set-cookie");
-                allSetCookies.addAll(stepCookies);
-                if (!stepCookies.isEmpty()) {
-                    cookieHeader = mergeLmsCookies(cookieHeader, stepCookies);
-                }
-
+                HttpResponse<Void> response = sessionClient.send(request, HttpResponse.BodyHandlers.discarding());
                 int status = response.statusCode();
                 if (status / 100 == 2) {
-                    return allSetCookies;
+                    return;
                 }
                 if (status / 100 == 3) {
                     String location = response.headers().firstValue("location").orElse(null);
                     if (location == null || location.isBlank()) {
-                        return allSetCookies;
+                        return;
                     }
                     url = URI.create(url).resolve(location).toString();
                     continue;
                 }
-                return allSetCookies;
+                return;
             } catch (IOException exception) {
                 throw new LmsAuthFailedException("canvas dashboard io error", exception);
             } catch (InterruptedException exception) {
@@ -173,88 +160,27 @@ public class LmsSsoService {
                 throw new LmsAuthFailedException("canvas dashboard interrupted", exception);
             }
         }
-        return allSetCookies;
     }
 
-    private static String mergeLmsCookies(String base, List<String> setCookieHeaders) {
-        LinkedHashMap<String, String> jar = new LinkedHashMap<>();
-        if (base != null && !base.isBlank()) {
-            for (String pair : base.split(";")) {
-                addLmsCookiePair(jar, pair.trim());
-            }
-        }
-        for (String setCookie : setCookieHeaders) {
-            if (setCookie == null || setCookie.isBlank()) {
-                continue;
-            }
-            int semi = setCookie.indexOf(';');
-            String pair = semi < 0 ? setCookie : setCookie.substring(0, semi);
-            addLmsCookiePair(jar, pair.trim());
-        }
-        StringBuilder out = new StringBuilder();
-        for (Map.Entry<String, String> entry : jar.entrySet()) {
-            if (out.length() > 0) {
-                out.append("; ");
-            }
-            out.append(entry.getKey()).append('=').append(entry.getValue());
-        }
-        return out.toString();
+    private static String getCookieNames(CookieManager cookieManager) {
+        return cookieManager.getCookieStore().getCookies().stream()
+                .map(HttpCookie::getName)
+                .collect(Collectors.joining(","));
     }
 
-    private static void addLmsCookiePair(LinkedHashMap<String, String> jar, String pair) {
-        if (pair == null || pair.isEmpty()) {
-            return;
-        }
-        int eq = pair.indexOf('=');
-        if (eq <= 0) {
-            return;
-        }
-        jar.put(pair.substring(0, eq).trim(), pair.substring(eq + 1).trim());
+    private static boolean hasCookie(CookieManager cookieManager, String name) {
+        return cookieManager.getCookieStore().getCookies().stream()
+                .anyMatch(cookie -> cookie.getName().equals(name));
     }
 
-    private static String buildCookieHeader(List<String> setCookies) {
-        return setCookies.stream()
-                .map(LmsSsoService::stripCookieAttributes)
-                .filter(s -> !s.isBlank())
+    private static String serializeCookies(CookieManager cookieManager) {
+        return cookieManager.getCookieStore().getCookies().stream()
+                .map(cookie -> cookie.getName() + "=" + cookie.getValue())
                 .collect(Collectors.joining("; "));
-    }
-
-    private static String cookieNameList(String cookieHeader) {
-        if (cookieHeader == null || cookieHeader.isBlank()) {
-            return "(none)";
-        }
-        List<String> names = new ArrayList<>();
-        for (String pair : cookieHeader.split(";")) {
-            String trimmed = pair.trim();
-            int eq = trimmed.indexOf('=');
-            if (eq > 0) {
-                names.add(trimmed.substring(0, eq).trim());
-            }
-        }
-        return String.join(",", names);
-    }
-
-    private static boolean hasCookieName(String cookieHeader, String expectedName) {
-        if (cookieHeader == null || cookieHeader.isBlank()) {
-            return false;
-        }
-        for (String pair : cookieHeader.split(";")) {
-            String trimmed = pair.trim();
-            int eq = trimmed.indexOf('=');
-            if (eq > 0 && expectedName.equals(trimmed.substring(0, eq).trim())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static String sanitizeRedirectLocation(String location) {
         return location.replaceAll("(?i)(token|sToken)=[^&]*", "$1=REDACTED");
     }
-
-    private static String stripCookieAttributes(String setCookieHeader) {
-        int semicolon = setCookieHeader.indexOf(';');
-        String pair = semicolon < 0 ? setCookieHeader : setCookieHeader.substring(0, semicolon);
-        return pair.trim();
-    }
 }
+

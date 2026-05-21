@@ -1,57 +1,94 @@
-# Session handoff — 2026-05-18 저녁 (MYSAPSSO2 fix 배포 완료, 진단 로그 정리 대기)
+# Session handoff — 2026-05-20 (PR #161 배포 후 심층 분석 완료)
 
 > Single rolling handoff (CLAUDE.md / AGENTS.md 정책). 이전 handoff overwrite.
 
 ## TL;DR
 
-- **main 최신**: `96b9e8c` (`origin/main` 과 동기화), 워크트리 `TROUBLESHOOTING.md` / `readseongju.txt` 수정 중.
-- **prod 배포**: sha-96b9e8c8add4003989af79deefb355cdad83d85f, pod Running 1/1.
-- **SmartID 로그인 정상**: "안녕하세요 홍성주학생" 확인됨.
-- **남은 즉시 작업**: 진단 로그 (MYSAPSSO2 prefix) 제거 커밋 → prod 에서 시간표/성적 확인 후 진행.
-- **다음 큰 작업**: Phase 4 도서관 좌석 자동 예약 에이전트.
-
-## 이번 세션 작업 요약
-
-| 커밋 | 내용 |
-|------|------|
-| `96b9e8c` | fix: RestClient 302 silent redirect 로 MYSAPSSO2 누락 → HttpClient Redirect.NEVER + 수동 hop 누적. **핵심 fix** |
-| `ad83a99` | fix: MYSAPSSO2 prefix 24자 진단 로그 추가 (임시, 제거 예정) |
-| `72a00fb` | fix: Grades/Schedule connector 4xx 응답 body 진단 로그 추가 |
-| `405c288` | fix: Next.js 16 proxy Set-Cookie header stripping → `cookies.set()` 로 교체 |
-| `a1e74a1` | fix: SSO callback을 App Router route 대신 proxy.ts middleware 에서 처리 |
-| `ccc0c30` | fix: same-origin API proxy, WebDynpro Form_Request flow, Oasis loans path fix |
+- **main 최신**: PR #161 머지 완료 (ecc.ssu.ac.kr URL + gw-cb.php Location 추적)
+- **prod 최신**: PR #161 기준 코드 배포됨 — `sha-8ca7b826e2dd1df12db7c32c86dcaf9e6c870379`
+- **분석 완료**: SAINT ANON session 심층 원인 확인 + LMS canvas phase 누락 확인
+- **다음 task**: `.codex/current-task.md` 작성 완료 — Codex 로 넘김
 
 ## 현재 prod 상태
 
-- pod: `ssuai-backend-5785f6d68c-4nqsg` (Running 1/1)
-- URL: `https://ssuai.vercel.app`
-- SmartID SSO: 정상
-- 시간표/성적 카드: **사용자 확인 필요** (본 세션에서 미확인)
-- KUBE_CONFIG 미설정 → CI Deploy 워크플로우 미반영, 매 배포 수동 필요:
-  `kubectl set image deployment/ssuai-backend "backend=ghcr.io/ghdtjdwn/ssuai-backend:sha-<40자 full SHA>" -n ssuai-prod`
-  (short SHA 7자 쓰면 NotFound — 반드시 full 40자)
+| 기능 | 상태 |
+|------|------|
+| SmartID 로그인 | ✅ 정상 |
+| 도서관 좌석 (`get_library_seat_status`) | ✅ 정상 |
+| 학식/기숙사/시설/도서관 검색 | ✅ 정상 |
+| 시간표 (`get_my_schedule`) | ❌ ANON session → auth gate |
+| 성적 (`get_my_grades`) | ❌ ANON session → HTTP 500 |
+| 과제 (`get_my_assignments`) | ❌ xn_api_token 없음 → canvas 401 |
 
-## 진단 로그 제거 대상 (prod 시간표/성적 확인 후 즉시 제거)
+## PR #161 결과 (배포 후 확인)
 
-### 1. `SaintSsoService.java:114-116` + `L300-310` (extractCookiePrefix 메서드)
-```java
-// 제거 대상 — L114-116
-// Temporary diagnostic: log MYSAPSSO2 prefix to compare with browser value
-String mysapPrefix = extractCookiePrefix(mergedCookies, "MYSAPSSO2", 24);
-log.info("saint sso mysapsso2 prefix(24)={}", mysapPrefix);
+URL 변경(ecc.ssu.ac.kr)과 gw-cb.php Location 추적은 모두 정상 적용됨.
+그러나 두 버그가 남아 있음:
 
-// 제거 대상 — L300-310 (메서드 전체)
-private static String extractCookiePrefix(String cookieHeader, String name, int prefixLen) { ... }
+### SAINT: 포털 쿠키가 ECC USER session 을 막음
+
+pod log 재분석:
+```
+saint sso cookies stored: names=WAF,MYSAPSSO2,saplb_*,JSESSIONID,JSESSIONMARKID,PortalAlias
+saint schedule connector GET final: cookieNames=WAF,MYSAPSSO2,saplb_*,JSESSIONID,JSESSIONMARKID,PortalAlias,...
+sap-contextid=SID:ANON:hana-prd-ap-2_SSP_00:...-NEW
 ```
 
-### 2. 유지 vs 제거 판단 필요한 로그 (error path — 장기 운영 관점으로 재검토)
-- `RealSaintGradesConnector.java:235-237` — 4xx body log (`log.warn`)
-- `RealSaintGradesConnector.java:267-268` — auth gate htmlSnippet log
-- `RealSaintScheduleConnector.java:267-269` — 4xx body log (`log.warn`)
-- `RealSaintScheduleConnector.java:288-289` — auth gate htmlSnippet log
-- bootstrap no-secure-id snippet logs (grades L104, schedule L121) — error path, 유지 추천
+`eccBootstrapCookieHeader()` 가 포털 쿠키 전체를 ECC 로 전달. rusaint 는 RFC 6265 domain 필터링으로
+`MYSAPSSO2`(domain=.ssu.ac.kr) 만 ECC 로 보냄. 포털 쿠키(`JSESSIONID`, `JSESSIONMARKID`, `PortalAlias`,
+`saplb_*`, `WAF`)가 ECC SAP ICM 에 전달되면 ECC 가 포털 세션을 찾으려 하다 실패 → ANON 생성.
 
-## 완성된 MCP tool 목록 (10개)
+**Fix**: `eccBootstrapCookieHeader()` — MYSAPSSO2 만 추출. 두 connector 모두 동일하게 적용.
+
+### LMS: canvas 가 별도 phase 임
+
+pod log:
+```
+lms auth phase1 redirect: https://lms.ssu.ac.kr/login/callback?result=ZHDtbX2...
+lms auth phase2 merged cookie names: WAF,xn_coursecatalog_api_token,laravel_token,XSRF-TOKEN,coursecatalog_session
+lms canvas 401
+```
+
+`lms.ssu.ac.kr/login/callback` → HTTP 200 종료 (canvas 로 redirect 없음). Canvas 는 별도 phase:
+`canvas.ssu.ac.kr/learningx/dashboard?user_login={sIdno}` 를 LMS 세션 쿠키로 방문 → canvas auth chain → xn_api_token.
+
+**Fix**: `authenticate()` 에 phase 3 추가 — LMS auth 후 canvas dashboard 방문.
+
+## 다음 action
+
+Codex 가 `.codex/current-task.md` 읽고 구현 시작.
+
+```
+새 브랜치: fix/saint-portal-cookie-filter
+변경:
+  1. RealSaintScheduleConnector.eccBootstrapCookieHeader() — MYSAPSSO2 만
+  2. RealSaintGradesConnector.eccBootstrapCookieHeader() — 동일
+  3. LmsSsoService.authenticate() — phase 3 canvas fetch 추가
+  4. LmsSsoServiceTests — phase 3 테스트 + 기존 테스트 큐 보완
+  5. RealSaintScheduleConnectorTests — eccBootstrapCookieHeader 단위 테스트
+  6. gradlew.bat test → PR → CI → kubectl 배포 → pod log 확인
+```
+
+## 배포 참고
+
+```bash
+sudo kubectl set image deployment/ssuai-backend -n ssuai-prod \
+  backend=ghcr.io/ghdtjdwn/ssuai-backend:sha-<full-40char-sha>
+
+sudo kubectl logs -n ssuai-prod -l app=ssuai-backend --tail=100 --since=5m
+```
+
+## prod log 성공 확인 지표
+
+SAINT 수정 성공:
+- `saint schedule init POST url='...sap-contextid=SID:USER:...'` — USER session 확인
+- `saint schedule fetched: studentFp=... terms=... entries=...`
+- `saint grades fetched: studentFp=... terms=...`
+
+LMS 수정 성공:
+- `lms auth final cookie names: ...,xn_api_token,...`
+
+## MCP tool 목록 (14개)
 
 | tool | 종류 | 인증 |
 |------|------|------|
@@ -59,30 +96,22 @@ private static String extractCookiePrefix(String cookieHeader, String name, int 
 | `get_meal_by_date` | read | 공개 |
 | `get_dorm_weekly_meal` | read | 공개 |
 | `search_campus_facilities` | read | 공개 |
-| `get_library_seat_status` | read | 공개 (Pyxis-Auth-Token) |
-| `search_library_book` | read | 공개 (Pyxis JSON API) |
+| `get_library_seat_status` | read | Pyxis-Auth-Token |
+| `search_library_book` | read | Pyxis JSON API |
 | `get_my_schedule` | read | u-SAINT SSO |
 | `get_my_grades` | read | u-SAINT SSO |
 | `get_my_assignments` | read | LMS SSO |
-| `get_my_library_loans` | read | 도서관 세션 연동 |
-
-## 다음 세션 액션
-
-1. `git -C C:/Users/akftj/ssuAI status --short --branch` 로 clean/main 확인.
-2. prod 에서 시간표/성적 카드 동작 확인 (사용자 직접) + kubectl 로그 확인:
-   ```
-   kubectl logs -n ssuai-prod -l app=ssuai-backend --tail=100 | grep -E "saint sso|mysapsso2"
-   ```
-   → `mysapsso2 prefix(24)=...` 가 보이면 fix 정상 동작 중.
-3. **확인 후 즉시**: `SaintSsoService.java` 진단 로그 2줄 + `extractCookiePrefix` 메서드 제거, 커밋.
-4. 4xx body / htmlSnippet 로그 유지 여부 결정 (error path 이므로 유지 권장).
-5. **Phase 4 설계**: Pyxis 좌석 예약 POST endpoint/body/response spike → `action_audit` schema → MVP `ActionLock` 범위 제안. write tool 이므로 설계 후 사용자 승인 필수.
+| `get_my_library_loans` | read | 도서관 세션 |
+| `get_auth_status` | read | 공개 |
+| `start_auth` | action | 공개 |
+| `logout_provider` | action | 공개 |
+| `logout_all` | action | 공개 |
 
 ## 보안 주의
 
-- `docs/security.md` §4 기준: 비밀번호, 쿠키, JWT, 학생번호, 성적/과제 본문, authenticated upstream HTML 전체는 로그 금지.
-- 4xx body 로그 (`log.warn`) 는 학교 서버 응답 HTML 일부를 담을 수 있어 운영 장기 유지 시 §4 위반 가능 — 제거 또는 길이 cap 검토.
-- `backend/.env` 는 로컬 파일, 커밋 금지.
+- `docs/security.md` §4: 비밀번호, 쿠키, JWT, 학생번호, 성적/과제 본문, authenticated
+  upstream HTML 전체는 로그 금지.
+- LMS 진단 로그: cookie 이름만 출력 (값 X).
 
 ## Next-AI opener block
 
@@ -91,17 +120,16 @@ private static String extractCookiePrefix(String cookieHeader, String name, int 
 ```text
 /model opusplan
 
-ssuAI 프로젝트 이어받음. 다음 순서대로:
+ssuAI 프로젝트 이어받음. 다음 순서:
 
-1. CLAUDE.md Project + Model / planning workflow + Implementation Workflow 읽기
+1. CLAUDE.md 읽기
 2. docs/handoff/latest.md 읽기
-3. git -C C:/Users/akftj/ssuAI status --short --branch 로 main/clean 확인
+3. git -C C:/Users/akftj/ssuAI status --short --branch 확인
 
 현재 상태:
-- main = 96b9e8c, prod Running (SmartID SSO 정상)
-- 즉시 할 일: prod 시간표/성적 카드 확인 → SaintSsoService 진단 로그 제거 커밋
-- 이후: Phase 4 도서관 좌석 자동 예약 에이전트 설계
-- write tool 이므로 Pyxis 예약 POST spike + action_audit/confirm_action 설계 제안부터, 사용자 승인 전 구현 금지
+- SAINT ANON session + LMS canvas phase 수정 중 (Codex 작업 예정)
+- .codex/current-task.md 작성 완료
+- 검수 시점: Codex last-result 파일 확인 + gradlew test 결과 확인
 ```
 
 ### Codex 로 이어갈 때
@@ -109,13 +137,10 @@ ssuAI 프로젝트 이어받음. 다음 순서대로:
 ```text
 ssuAI 프로젝트 이어받음. Codex 는 ~/.codex/config.toml 의 ssuai profile 기준으로 시작.
 
-1. AGENTS.md Project + Model / planning workflow + Implementation Workflow 읽기
+1. AGENTS.md 읽기
 2. docs/handoff/latest.md 읽기
-3. git -C C:/Users/akftj/ssuAI status --short --branch 로 main/clean 확인
+3. .codex/current-task.md 읽기 (현재 task 상세)
+4. git -C C:/Users/akftj/ssuAI status --short --branch 확인
 
-현재 상태:
-- main = 96b9e8c, prod Running (SmartID SSO 정상)
-- 즉시 할 일: prod 시간표/성적 카드 확인 → SaintSsoService 진단 로그 제거 커밋
-- 이후: Phase 4 도서관 좌석 자동 예약 에이전트 설계 (설계 세션이면 codex --profile ssuai-deep 추천)
-- write tool 이므로 사용자 승인 전 구현 금지
+즉시 task: .codex/current-task.md 에 작성된 SAINT portal cookie 필터 + LMS canvas phase 3 구현.
 ```
