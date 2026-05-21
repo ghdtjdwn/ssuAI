@@ -385,14 +385,18 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         if (portalCookieHeader == null || portalCookieHeader.isBlank()) {
             return "";
         }
+        List<String> preserved = new ArrayList<>();
         for (String pair : portalCookieHeader.split(";")) {
             String trimmed = pair.trim();
             int eq = trimmed.indexOf('=');
-            if (eq > 0 && "MYSAPSSO2".equals(trimmed.substring(0, eq).trim())) {
-                return trimmed;
+            if (eq > 0) {
+                String name = trimmed.substring(0, eq).trim();
+                if ("MYSAPSSO2".equals(name) || "WAF".equals(name)) {
+                    preserved.add(trimmed);
+                }
             }
         }
-        return "";
+        return String.join("; ", preserved);
     }
 
     private static String cookieNames(String cookieHeader) {
