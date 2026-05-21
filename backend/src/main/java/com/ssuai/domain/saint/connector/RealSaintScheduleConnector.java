@@ -422,16 +422,18 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         }
     }
 
-    private void guardAuthOrThrow(String html, String studentId) {
+    void guardAuthOrThrow(String html, String studentId) {
         if (html == null || html.isBlank()) {
             throw new SaintSessionExpiredException("ecc returned empty body");
         }
-        if (!containsTimetable(html)) {
+        int year = SaintScheduleParser.parseDisplayedYear(html);
+        int term = SaintScheduleParser.parseDisplayedTerm(html);
+        if (year < 0 || term < 0) {
             String snippet = html.substring(0, Math.min(500, html.length())).replaceAll("\\s+", " ");
-            log.info("saint schedule auth gate tripped: studentFp={} htmlSnippet='{}'",
+            log.info("saint schedule auth gate tripped (no term dropdowns): studentFp={} htmlSnippet='{}'",
                     SaintSessionStore.fingerprint(studentId), snippet);
             throw new SaintSessionExpiredException(
-                    "ecc did not return the timetable container (likely logon redirect)");
+                    "ecc did not render the term dropdowns (likely logon redirect)");
         }
     }
 
