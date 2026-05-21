@@ -1,6 +1,8 @@
 package com.ssuai.domain.lms.connector;
 
 import java.io.IOException;
+import java.net.CookieManager;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -62,32 +64,74 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
                 .build();
     }
 
+    private CookieManager createCookieManager(String rawCookieHeader, String targetUrl) {
+        CookieManager cookieManager = new CookieManager();
+        if (rawCookieHeader == null || rawCookieHeader.isBlank()) {
+            return cookieManager;
+        }
+        URI targetUri = URI.create(targetUrl);
+        String host = targetUri.getHost();
+
+        for (String pair : rawCookieHeader.split(";")) {
+            String trimmed = pair.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq > 0) {
+                String name = trimmed.substring(0, eq).trim();
+                String value = trimmed.substring(eq + 1).trim();
+                if (!name.isEmpty()) {
+                    HttpCookie cookie = new HttpCookie(name, value);
+                    cookie.setPath("/");
+                    cookie.setVersion(0);
+                    if (host != null && host.endsWith("ssu.ac.kr")) {
+                        if ("xn_api_token".equals(name) || "_normandy_session".equals(name)
+                                || "_legacy_normandy_session".equals(name) || "canvas_session".equals(name)) {
+                            cookie.setDomain("canvas.ssu.ac.kr");
+                            cookieManager.getCookieStore().add(URI.create("https://canvas.ssu.ac.kr"), cookie);
+                        } else {
+                            cookie.setDomain("lms.ssu.ac.kr");
+                            cookieManager.getCookieStore().add(URI.create("https://lms.ssu.ac.kr"), cookie);
+                        }
+                    } else {
+                        cookie.setDomain(host);
+                        cookieManager.getCookieStore().add(targetUri, cookie);
+                    }
+                }
+            }
+        }
+        return cookieManager;
+    }
+
     @Override
     public AssignmentsResponse fetchAssignments(String studentId, LmsCookies cookies) {
-        String cookieHeader = cookies.rawCookieHeader();
-        long termId = fetchCurrentTermId(studentId, cookieHeader);
-        Map<Long, String> courseNames = fetchCourseNames(termId, cookieHeader);
-        List<AssignmentItem> items = fetchTodoItems(termId, courseNames, cookieHeader);
+        CookieManager cookieManager = createCookieManager(cookies.rawCookieHeader(), properties.getCanvasBaseUrl());
+        HttpClient client = HttpClient.newBuilder()
+                .cookieHandler(cookieManager)
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+
+        long termId = fetchCurrentTermId(client, studentId);
+        Map<Long, String> courseNames = fetchCourseNames(client, termId);
+        List<AssignmentItem> items = fetchTodoItems(client, termId, courseNames);
         return new AssignmentsResponse(termId, items);
     }
 
-    private long fetchCurrentTermId(String studentId, String cookieHeader) {
+    private long fetchCurrentTermId(HttpClient client, String studentId) {
         String encoded = URLEncoder.encode(studentId, StandardCharsets.UTF_8);
         String url = properties.getCanvasBaseUrl()
                 + "/learningx/api/v1/users/" + encoded
                 + "/terms?include_invited_course_contained=true";
-        JsonNode body = getJson(url, cookieHeader);
-        // Canvas returns the list with most-recent term first.
+        JsonNode body = getJson(client, url);
         if (body.isArray() && !body.isEmpty()) {
             return body.get(0).path("id").asLong();
         }
         throw new LmsSessionExpiredException("no terms returned for student");
     }
 
-    private Map<Long, String> fetchCourseNames(long termId, String cookieHeader) {
+    private Map<Long, String> fetchCourseNames(HttpClient client, long termId) {
         String url = properties.getCanvasBaseUrl()
                 + "/learningx/api/v1/learn_activities/courses?term_ids[]=" + termId;
-        JsonNode body = getJson(url, cookieHeader);
+        JsonNode body = getJson(client, url);
         Map<Long, String> map = new HashMap<>();
         if (body.isArray()) {
             for (JsonNode course : body) {
@@ -102,10 +146,10 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
     }
 
     private List<AssignmentItem> fetchTodoItems(
-            long termId, Map<Long, String> courseNames, String cookieHeader) {
+            HttpClient client, long termId, Map<Long, String> courseNames) {
         String url = properties.getCanvasBaseUrl()
                 + "/learningx/api/v1/learn_activities/to_dos?term_ids[]=" + termId;
-        JsonNode body = getJson(url, cookieHeader);
+        JsonNode body = getJson(client, url);
         JsonNode todos = body.path("to_dos");
         List<AssignmentItem> items = new ArrayList<>();
         if (todos.isArray()) {
@@ -127,16 +171,15 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
         return items;
     }
 
-    private JsonNode getJson(String url, String cookieHeader) {
+    private JsonNode getJson(HttpClient client, String url) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Cookie", cookieHeader)
                 .header("Accept", "application/json")
                 .timeout(properties.getTimeout())
                 .GET()
                 .build();
         try {
-            HttpResponse<String> response = httpClient.send(
+            HttpResponse<String> response = client.send(
                     request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() == 401) {
                 String bodySnippet = response.body() == null ? "(null)"
