@@ -393,16 +393,16 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         }
     }
 
-    private void guardAuthOrThrow(String html, String studentId) {
+    void guardAuthOrThrow(String html, String studentId) {
         if (html == null || html.isBlank()) {
             throw new SaintSessionExpiredException("ecc returned empty body");
         }
-        if (!containsGradesTables(html)) {
+        if (GradesParser.parseTermHistory(html).isEmpty()) {
             String snippet = html.substring(0, Math.min(500, html.length())).replaceAll("\\s+", " ");
-            log.info("saint grades auth gate tripped: studentFp={} htmlSnippet='{}'",
+            log.info("saint grades auth gate tripped (no term history): studentFp={} htmlSnippet='{}'",
                     SaintSessionStore.fingerprint(studentId), snippet);
             throw new SaintSessionExpiredException(
-                    "ecc did not return the grades tables (likely logon redirect)");
+                    "ecc did not render the term GPA history (likely logon redirect)");
         }
     }
 
