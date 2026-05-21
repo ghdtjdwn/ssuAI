@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -203,6 +204,10 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
 
         String firstHtml = firstRenderableHtml(rawFirstResponse);
         if (!containsGradesTables(firstHtml)) {
+            log.info("saint grades init POST cookies: {}",
+                    cookieManager.getCookieStore().getCookies().stream()
+                            .map(HttpCookie::getName)
+                            .collect(Collectors.joining(",")));
             String initXml = httpPostInitialLoad(client, bootstrapSecureId.get(), "ZCMB3W0017",
                     finalUrl, postUrl, bootstrapFormFields);
             try {
@@ -326,7 +331,12 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
             HttpClient client, String secureId, String appName,
             String pageUrl, String postUrl, Map<String, String> formFields) {
         String queue = WebDynproSapEventEncoder.encodeInitialLoad(pageUrl);
-        String body = formEncoded(webDynproForm(formFields, secureId, appName, queue));
+        log.info("saint grades init POST form fields: names={}", formFields == null ? List.of() : formFields.keySet());
+        Map<String, String> form = webDynproForm(formFields, secureId, appName, queue);
+        Map<String, Integer> fieldLengths = new LinkedHashMap<>();
+        form.forEach((key, value) -> fieldLengths.put(key, value == null ? 0 : value.length()));
+        log.info("saint grades init POST form lengths: {}", fieldLengths);
+        String body = formEncoded(form);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(postUrl))
                 .header("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
@@ -373,9 +383,12 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 throw new SaintSessionExpiredException("ecc rejected WebDynpro request with " + status);
             }
             if (status / 100 == 5) {
-                String snippet = response.body() == null ? "(null)"
-                        : response.body().substring(0, Math.min(300, response.body().length()));
-                log.warn("saint grades connector 5xx: status={} body='{}'", status, snippet);
+                String body = response.body() == null ? "(null)" : response.body();
+                String snippet = body.length() > 4000
+                        ? body.substring(0, 4000) + "...(truncated " + body.length() + ")"
+                        : body;
+                log.warn("saint grades connector 5xx: status={} url={} body='{}'",
+                        status, request.uri(), snippet.replaceAll("\\s+", " "));
                 throw new ConnectorUnavailableException();
             }
             String body4xx = response.body() == null ? "(null)"
