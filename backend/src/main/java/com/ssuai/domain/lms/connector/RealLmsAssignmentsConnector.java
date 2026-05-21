@@ -110,28 +110,33 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
 
-        long termId = fetchCurrentTermId(client, studentId);
-        Map<Long, String> courseNames = fetchCourseNames(client, termId);
-        List<AssignmentItem> items = fetchTodoItems(client, termId, courseNames);
+        String bearer = extractXnApiToken(cookies.rawCookieHeader());
+        if (bearer == null || bearer.isBlank()) {
+            throw new LmsSessionExpiredException("xn_api_token missing from stored cookies");
+        }
+
+        long termId = fetchCurrentTermId(client, bearer, studentId);
+        Map<Long, String> courseNames = fetchCourseNames(client, bearer, termId);
+        List<AssignmentItem> items = fetchTodoItems(client, bearer, termId, courseNames);
         return new AssignmentsResponse(termId, items);
     }
 
-    private long fetchCurrentTermId(HttpClient client, String studentId) {
+    private long fetchCurrentTermId(HttpClient client, String bearer, String studentId) {
         String encoded = URLEncoder.encode(studentId, StandardCharsets.UTF_8);
         String url = properties.getCanvasBaseUrl()
                 + "/learningx/api/v1/users/" + encoded
                 + "/terms?include_invited_course_contained=true";
-        JsonNode body = getJson(client, url);
+        JsonNode body = getJson(client, bearer, url);
         if (body.isArray() && !body.isEmpty()) {
             return body.get(0).path("id").asLong();
         }
         throw new LmsSessionExpiredException("no terms returned for student");
     }
 
-    private Map<Long, String> fetchCourseNames(HttpClient client, long termId) {
+    private Map<Long, String> fetchCourseNames(HttpClient client, String bearer, long termId) {
         String url = properties.getCanvasBaseUrl()
                 + "/learningx/api/v1/learn_activities/courses?term_ids[]=" + termId;
-        JsonNode body = getJson(client, url);
+        JsonNode body = getJson(client, bearer, url);
         Map<Long, String> map = new HashMap<>();
         if (body.isArray()) {
             for (JsonNode course : body) {
@@ -146,10 +151,10 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
     }
 
     private List<AssignmentItem> fetchTodoItems(
-            HttpClient client, long termId, Map<Long, String> courseNames) {
+            HttpClient client, String bearer, long termId, Map<Long, String> courseNames) {
         String url = properties.getCanvasBaseUrl()
                 + "/learningx/api/v1/learn_activities/to_dos?term_ids[]=" + termId;
-        JsonNode body = getJson(client, url);
+        JsonNode body = getJson(client, bearer, url);
         JsonNode todos = body.path("to_dos");
         List<AssignmentItem> items = new ArrayList<>();
         if (todos.isArray()) {
@@ -171,10 +176,12 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
         return items;
     }
 
-    private JsonNode getJson(HttpClient client, String url) {
+    private JsonNode getJson(HttpClient client, String bearer, String url) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Accept", "application/json")
+                .header("Authorization", "Bearer " + bearer)
+                .header("Referer", properties.getCanvasBaseUrl() + "/")
                 .timeout(properties.getTimeout())
                 .GET()
                 .build();
@@ -201,5 +208,19 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
             Thread.currentThread().interrupt();
             throw new LmsSessionExpiredException("canvas API interrupted");
         }
+    }
+
+    private static String extractXnApiToken(String rawCookieHeader) {
+        if (rawCookieHeader == null) {
+            return null;
+        }
+        for (String pair : rawCookieHeader.split(";")) {
+            String trimmed = pair.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq > 0 && "xn_api_token".equals(trimmed.substring(0, eq).trim())) {
+                return trimmed.substring(eq + 1).trim();
+            }
+        }
+        return null;
     }
 }
