@@ -1,6 +1,7 @@
 package com.ssuai.domain.saint.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
@@ -107,7 +108,7 @@ class RealSaintGradesConnectorTests {
                 .build();
         connector = new RealSaintGradesConnector(properties, postClient, noRedirectClient);
 
-        String htmlOnly = "<TABLE><tbody id=\"WD65-contentTBody\"><tr rt=\"2\"></tr></tbody></TABLE>";
+        String htmlOnly = minimalTermHistoryHtml();
         server.enqueue(new MockResponse()
                 .setResponseCode(302)
                 .setHeader("Location", "/hana-zcmb3w0017?sap-client=100&sap-language=KO"));
@@ -150,7 +151,7 @@ class RealSaintGradesConnectorTests {
                         + "<input type=\"hidden\" name=\"sap-wd-cltwndid\" value=\"WID-EXCLUDED\"/>"
                         + "<input type=\"hidden\" name=\"sap-wd-secure-id\" value=\"CSRF-G\"/>"
                         + "</form></body></html>";
-        String htmlOnly = "<TABLE><tbody id=\"WD65-contentTBody\"><tr rt=\"2\"></tr></tbody></TABLE>"
+        String htmlOnly = minimalTermHistoryHtml()
                 + "<input id=\"sap-wd-secure-id\" name=\"sap-wd-secure-id\" value=\"CSRF-1\"/>";
         server.enqueue(htmlOk(bootstrapHtml));
         server.enqueue(xmlOk(wrap(htmlOnly)));
@@ -211,20 +212,32 @@ class RealSaintGradesConnectorTests {
     }
 
     @Test
-    void emptyHistoryShortCircuitsBeforeAnyPrevPost() throws Exception {
-        // A response with NO 학기별 표 rows still has the tbody anchor
-        // (the auth gate stays clear) but iterate has nothing to walk.
+    void emptyHistoryTriggersSaintSessionExpiredBeforeAnyPrevPost() {
         String htmlOnly = "<TABLE><tbody id=\"WD65-contentTBody\"><tr rt=\"2\"></tr></tbody></TABLE>";
         server.enqueue(bootstrapOk("CSRF-BOOT"));
         server.enqueue(xmlOk(wrap(htmlOnly
                 + "<input id=\"sap-wd-secure-id\" name=\"sap-wd-secure-id\" value=\"CSRF\"/>")));
 
-        GradesResponse response = connector.fetchGrades("20221528",
-                new PortalCookies("MYSAPSSO2=abc"));
-
-        assertThat(response.history()).isEmpty();
-        assertThat(response.detailsByTerm()).isEmpty();
+        assertThatThrownBy(() -> connector.fetchGrades("20221528",
+                new PortalCookies("MYSAPSSO2=abc")))
+                .isInstanceOf(SaintSessionExpiredException.class)
+                .hasMessageContaining("term GPA history");
         assertThat(server.getRequestCount()).isEqualTo(2);
+    }
+
+    @Test
+    void guardAuthOrThrowPassesWhenTermHistoryNonEmpty() {
+        assertThatNoException().isThrownBy(() ->
+                connector.guardAuthOrThrow(minimalTermHistoryHtml(), "20221528"));
+    }
+
+    @Test
+    void guardAuthOrThrowFailsWhenNoTermHistory() {
+        String html = "<html><body><h1>SAP Logon</h1></body></html>";
+
+        assertThatThrownBy(() -> connector.guardAuthOrThrow(html, "20221528"))
+                .isInstanceOf(SaintSessionExpiredException.class)
+                .hasMessageContaining("term GPA history");
     }
 
     @Test
@@ -278,5 +291,18 @@ class RealSaintGradesConnectorTests {
                 + "<content-update id=\"sapwd_main_window_root_\">"
                 + "<![CDATA[" + html + "]]>"
                 + "</content-update></full-update></updates>";
+    }
+
+    private static String minimalTermHistoryHtml() {
+        return """
+                <TABLE>
+                  <tbody id="WD65-contentTBody">
+                    <tr rt="1">
+                      <td role="gridcell" cc="1"><span class="lsTextView--wrap">2025</span></td>
+                      <td role="gridcell" cc="2"><span class="lsTextView--wrap">2학기</span></td>
+                    </tr>
+                  </tbody>
+                </TABLE>
+                """;
     }
 }
