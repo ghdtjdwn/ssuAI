@@ -29,6 +29,24 @@
 - 포트폴리오 포인트:
 ```
 
+## 2026-05-21 — u-SAINT 웹 방화벽(WAF) 우회 및 LMS/Canvas 세션 오염 방지(CookieManager 격리)를 통한 실서버 로그인 정상화
+
+- 맥락: ssumcp 실서버 환경에서 로그인 연동 시, SAINT(시간표/성적) 및 LMS(과제) 조회 시 무조건 세션 오류(`logon redirect` 또는 `401 session expired`)가 발생하여 기능이 작동하지 않았다.
+- 증상:
+  - u-SAINT 시간표 및 성적 조회 시: 로그인 상태임에도 대학 웹 방화벽에서 ANON(비로그인) 세션으로 강제 강등시켜 `ecc did not return the timetable container` 에러가 발생.
+  - LMS 과제 조회 시: 스마트아이디 로그인 후 Canvas 연동 리다이렉트 과정에서 쿠키가 유실되거나 꼬여 `canvas returned 401 session expired` 에러가 발생.
+- 원인:
+  1. u-SAINT WAF 강등: `ecc.ssu.ac.kr` 최초 접근 시 Portal SSO 연동 과정에서 포탈이 발급한 `WAF` 쿠키가 누락되어, 보안 장비(WAF)가 봇/크롤러로 오인해 세션을 비로그인 상태로 강등시켰다.
+  2. LMS 세션 오염: 기존의 수동 쿠키 병합 로직이 LMS(`lms.ssu.ac.kr`)와 Canvas(`canvas.ssu.ac.kr`) 서브도메인 쿠키를 하나로 무작위 병합 전송함으로써 보안 규칙에 걸려 Canvas API 토큰(`xn_api_token`) 발급이 누락됐다.
+- 해결:
+  1. WAF 쿠키 보존: `eccBootstrapCookieHeader` 필터링 로직을 수정하여 `MYSAPSSO2`와 함께 **`WAF` 쿠키도 함께 추출 및 보존하여 ECC 요청에 실어 보내도록 해결**하였다.
+  2. CookieManager 세션 격리: 기존의 불안정한 수동 쿠키 병합 로직을 폐기하고, 인증 요청(스레드)별로 완벽히 격리된 `java.net.CookieManager`를 HttpClient에 장착하여 브라우저 수준의 서브도메인/경로별 쿠키 격리를 보장함으로써 `xn_api_token`을 안정적으로 획득하도록 구현하였다.
+  3. 테스트 케이스 갱신: WAF 쿠키가 보존되어 전송되는 새로운 로직에 맞춰, 기존 테스트 코드의 `doesNotContain("WAF")` 단언문을 `contains("WAF")`로 갱신하여 6개의 깨진 단위/통합 테스트를 모두 정상화(Green)시켰다.
+- 검증: 로컬 전체 백엔드 테스트(`.\gradlew.bat test`)를 실행하여 `BUILD SUCCESSFUL`로 100% 성공을 검증했다.
+- 포트폴리오 포인트:
+  - 대학 보안 장비(WAF)가 세션을 강제 강등시키는 현상을 분석하여 필수 보안 토큰(`WAF`) 누락이 원인임을 밝혀내고 이를 커넥터 헤더에 바인딩하여 우회한 실전 디버깅 사례이다.
+  - 고유 서브도메인을 넘나드는 SSO 체인에서 발생할 수 있는 "쿠키 오염(Cookie Pollution)" 현상을 스레드 세이프하고 고립된 `CookieManager`를 갖춘 `HttpClient` 동적 생성 패턴을 설계하여 격리함으로써 완벽히 해소했다.
+
 ---
 
 ## 2026-05-18 — MCP auth tools 구현 후 서버 등록 누락
