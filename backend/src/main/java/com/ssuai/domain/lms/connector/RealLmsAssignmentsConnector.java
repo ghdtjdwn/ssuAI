@@ -114,6 +114,8 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
         if (bearer == null || bearer.isBlank()) {
             throw new LmsSessionExpiredException("xn_api_token missing from stored cookies");
         }
+        log.info("lms canvas bearer extracted: lengthBytes={} prefix='{}...'",
+                bearer.length(), bearer.length() > 8 ? bearer.substring(0, 8) : "(short)");
 
         long termId = fetchCurrentTermId(client, bearer, studentId);
         Map<Long, String> courseNames = fetchCourseNames(client, bearer, termId);
@@ -128,8 +130,12 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
                 + "/terms?include_invited_course_contained=true";
         JsonNode body = getJson(client, bearer, url);
         if (body.isArray() && !body.isEmpty()) {
+            log.info("lms canvas terms ok: count={} firstId={}", body.size(), body.get(0).path("id").asLong());
             return body.get(0).path("id").asLong();
         }
+        String bodyStr = body.toString();
+        String snippet = bodyStr.length() > 1500 ? bodyStr.substring(0, 1500) + "...(truncated)" : bodyStr;
+        log.warn("lms canvas terms empty: url={} responseBody='{}'", url, snippet);
         throw new LmsSessionExpiredException("no terms returned for student");
     }
 
@@ -188,6 +194,8 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
         try {
             HttpResponse<String> response = client.send(
                     request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            log.info("lms canvas response: url={} status={} bodyLengthBytes={}",
+                    url, response.statusCode(), response.body() == null ? 0 : response.body().length());
             if (response.statusCode() == 401) {
                 String bodySnippet = response.body() == null ? "(null)"
                         : response.body().substring(0, Math.min(400, response.body().length()))
