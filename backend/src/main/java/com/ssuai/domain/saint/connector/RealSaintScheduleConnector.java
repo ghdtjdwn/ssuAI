@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.jsoup.Jsoup;
 import org.slf4j.Logger;
@@ -219,6 +220,10 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
 
         String currentHtml = firstRenderableHtml(bootstrapHtml);
         if (!containsTimetable(currentHtml)) {
+            log.info("saint schedule init POST cookies: {}",
+                    cookieManager.getCookieStore().getCookies().stream()
+                            .map(HttpCookie::getName)
+                            .collect(Collectors.joining(",")));
             String initXml = httpPostInitialLoad(client, bootstrapSecureId.get(), "ZCMW2102",
                     finalUrl, postUrl, bootstrapFormFields);
             try {
@@ -372,7 +377,11 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
             String pageUrl, String postUrl, Map<String, String> formFields) {
         String queue = WebDynproSapEventEncoder.encodeInitialLoad(pageUrl);
         log.info("saint schedule init POST form fields: names={}", formFields == null ? List.of() : formFields.keySet());
-        String body = formEncoded(webDynproForm(formFields, secureId, appName, queue));
+        Map<String, String> form = webDynproForm(formFields, secureId, appName, queue);
+        Map<String, Integer> fieldLengths = new LinkedHashMap<>();
+        form.forEach((key, value) -> fieldLengths.put(key, value == null ? 0 : value.length()));
+        log.info("saint schedule init POST form lengths: {}", fieldLengths);
+        String body = formEncoded(form);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(postUrl))
                 .header("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
@@ -402,9 +411,12 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
                 throw new SaintSessionExpiredException("ecc rejected WebDynpro request with " + status);
             }
             if (status / 100 == 5) {
-                String snippet = response.body() == null ? "(null)"
-                        : response.body().substring(0, Math.min(300, response.body().length()));
-                log.warn("saint schedule connector 5xx: status={} body='{}'", status, snippet);
+                String body = response.body() == null ? "(null)" : response.body();
+                String snippet = body.length() > 4000
+                        ? body.substring(0, 4000) + "...(truncated " + body.length() + ")"
+                        : body;
+                log.warn("saint schedule connector 5xx: status={} url={} body='{}'",
+                        status, request.uri(), snippet.replaceAll("\\s+", " "));
                 throw new ConnectorUnavailableException();
             }
             String body4xx = response.body() == null ? "(null)"
