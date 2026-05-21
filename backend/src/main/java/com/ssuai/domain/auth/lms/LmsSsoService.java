@@ -5,14 +5,12 @@ import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.HttpCookie;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -33,11 +31,12 @@ import com.ssuai.global.exception.LmsAuthFailedException;
  * <p>Phase 2 — GET the gw-cb.php Location when present, with a dashboard URL
  * fallback for older flows.
  *
- * <p>Phase 3 — if phase 2 did not issue {@code xn_api_token}, visit the Canvas
- * dashboard with the LMS cookies. Canvas issues its own session cookies
- * including {@code xn_api_token} (JWT, 2h TTL), {@code _legacy_normandy_session},
- * and {@code _normandy_session}. These are the auth credentials the
- * {@code RealLmsAssignmentsConnector} sends to the Canvas API.
+ * <p>Phase 3 — visit {@code canvas.ssu.ac.kr/learningx/login/from_cc?result=}
+ * with the SmartID result value captured from phase 1. Canvas issues its own
+ * session cookies including {@code xn_api_token} (JWT, 2h TTL),
+ * {@code _legacy_normandy_session}, and {@code _normandy_session}. These are
+ * the auth credentials the {@code RealLmsAssignmentsConnector} sends to the
+ * Canvas API.
  *
  * <p>Both sets of cookies are merged and stored encrypted in
  * {@link LmsSessionStore} keyed by {@code sIdno} (= ssuAI studentId).
@@ -90,7 +89,19 @@ public class LmsSsoService {
         fetchCanvasDashboard(sessionClient, canvasStartUrl);
         log.info("lms auth phase2 cookies: {}", getCookieNames(cookieManager));
 
-        // Phase 3: if phase 2 did not issue xn_api_token, visit the Canvas dashboard.
+        // Phase 3: the LearningX from_cc endpoint issues xn_api_token in the live browser flow.
+        String resultParam = extractResultParam(location);
+        if (resultParam != null && !resultParam.isBlank()) {
+            String fromCcUrl = properties.getCanvasBaseUrl()
+                    + "/learningx/login/from_cc?result="
+                    + URLEncoder.encode(resultParam, StandardCharsets.UTF_8);
+            fetchCanvasDashboard(sessionClient, fromCcUrl);
+            log.info("lms auth phase3 from_cc cookies: {}", getCookieNames(cookieManager));
+        } else {
+            log.warn("lms auth phase1 missing result param; from_cc skipped");
+        }
+
+        // Phase 4: diagnostic fallback for older flows that still issue the token from dashboard.
         if (!hasCookie(cookieManager, "xn_api_token")) {
             String canvasDashboardUrl = properties.getCanvasBaseUrl()
                     + "/learningx/dashboard?user_login="
@@ -98,6 +109,11 @@ public class LmsSsoService {
             fetchCanvasDashboard(sessionClient, canvasDashboardUrl);
         }
         log.info("lms auth final cookies: {}", getCookieNames(cookieManager));
+
+        if (!hasCookie(cookieManager, "xn_api_token")) {
+            log.warn("lms auth missing xn_api_token: cookies={}", getCookieNames(cookieManager));
+            throw new LmsAuthFailedException("xn_api_token not issued");
+        }
 
         String allCookiesHeader = serializeCookies(cookieManager);
         sessionStore.put(sIdno.trim(), new LmsCookies(allCookiesHeader));
@@ -173,6 +189,29 @@ public class LmsSsoService {
                 .anyMatch(cookie -> cookie.getName().equals(name));
     }
 
+    private static String extractResultParam(String redirectLocation) {
+        if (redirectLocation == null || redirectLocation.isBlank()) {
+            return null;
+        }
+        URI uri;
+        try {
+            uri = URI.create(redirectLocation);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+        String query = uri.getRawQuery();
+        if (query == null || query.isBlank()) {
+            return null;
+        }
+        for (String pair : query.split("&")) {
+            int eq = pair.indexOf('=');
+            if (eq > 0 && "result".equals(pair.substring(0, eq))) {
+                return URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
+            }
+        }
+        return null;
+    }
+
     private static String serializeCookies(CookieManager cookieManager) {
         return cookieManager.getCookieStore().getCookies().stream()
                 .map(cookie -> cookie.getName() + "=" + cookie.getValue())
@@ -180,7 +219,7 @@ public class LmsSsoService {
     }
 
     private static String sanitizeRedirectLocation(String location) {
-        return location.replaceAll("(?i)(token|sToken)=[^&]*", "$1=REDACTED");
+        return location.replaceAll("(?i)(token|sToken|result)=[^&]*", "$1=REDACTED");
     }
 }
 
