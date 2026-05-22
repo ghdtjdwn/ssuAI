@@ -76,6 +76,16 @@
   2. 무한 추측 fix 중단: reference implementation이나 wire trace가 없는 stateful protocol은 일정 시점에 중단 기준이 필요하다.
   3. wrapper 이상의 가치: ssuAI가 직접 책임지는 부분은 encrypted session store, cache, DTO normalization, cross-source tools, observability다.
   4. 실패 기록 보존: 이전 Java WebDynpro 시도는 silent rewrite하지 않고 troubleshooting과 ADR에 남긴다.
+- 최종 검증: 2026-05-22 prod 배포 후 `get_my_schedule` / `get_my_grades` 모두 정상 응답 확인.
+
+## 2026-05-22 — rusaint 배포 후 "Illegal cookie name" — Helm values.yaml connector 값 미변경
+
+- 맥락: rusaint FFI PR을 main에 머지하고 prod 배포 후 바로 테스트했더니 SAINT 기능만 `Illegal cookie name` 오류가 발생했다.
+- 증상: `get_my_schedule`, `get_my_grades` 모두 `IllegalArgumentException: Illegal cookie name` 반환. LMS/도서관은 정상.
+- 원인: `deploy/charts/ssuai-backend/values.yaml`의 `connectorSaintSchedule`, `connectorSaintGrades`가 `real`로 남아 있었다. k8s ConfigMap이 `SSUAI_CONNECTOR_SAINT_SCHEDULE=real`로 주입되어 `RealSaintScheduleConnector`가 로드됐고, 해당 connector가 rusaint session JSON을 raw cookie header로 파싱하려다 `new HttpCookie("{", ...)` 호출에서 예외가 발생했다. `application-prod.yml`의 default가 `rusaint`여도 ConfigMap env var가 더 우선하므로 덮어씌워졌다.
+- 해결: `values.yaml`에서 `connectorSaintSchedule: rusaint`, `connectorSaintGrades: rusaint`로 변경 후 commit/push. k8s ConfigMap 직접 패치 + `kubectl rollout restart`로 즉시 적용.
+- 검증: `kubectl get configmap … -o jsonpath='{.data.SSUAI_CONNECTOR_SAINT_SCHEDULE}'` → `rusaint`. 재배포 후 `get_my_grades` / `get_my_schedule` 모두 정상 응답.
+- 포트폴리오 포인트: Spring Boot application.yml 기본값은 k8s ConfigMap env var에 의해 덮어씌워진다. connector를 코드에서 바꿔도 Helm values.yaml을 같이 바꾸지 않으면 prod에서 다른 connector가 로드된다. "새 기능 배포 시 Helm values도 함께 업데이트" 를 체크리스트에 추가해야 한다.
 
 ## 2026-05-18 — MCP auth tools 구현 후 서버 등록 누락
 
