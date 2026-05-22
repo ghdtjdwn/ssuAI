@@ -13,6 +13,7 @@ import com.ssuai.domain.mcp.tool.LibrarySeatMcpTool;
 import com.ssuai.domain.mcp.tool.LmsAssignmentsMcpTool;
 import com.ssuai.domain.mcp.tool.MealMcpTools;
 import com.ssuai.domain.mcp.tool.McpAuthMcpTools;
+import com.ssuai.domain.mcp.tool.NoticeMcpTools;
 import com.ssuai.domain.mcp.tool.SaintGradesMcpTool;
 import com.ssuai.domain.mcp.tool.SaintScheduleMcpTool;
 
@@ -30,7 +31,8 @@ class McpServerConfig {
             LibraryLoansMcpTool libraryLoansMcpTool,
             SaintScheduleMcpTool saintScheduleMcpTool,
             SaintGradesMcpTool saintGradesMcpTool,
-            LmsAssignmentsMcpTool lmsAssignmentsMcpTool
+            LmsAssignmentsMcpTool lmsAssignmentsMcpTool,
+            NoticeMcpTools noticeMcpTools
     ) {
         return MethodToolCallbackProvider.builder()
                 .toolObjects(
@@ -43,7 +45,8 @@ class McpServerConfig {
                         libraryLoansMcpTool,
                         saintScheduleMcpTool,
                         saintGradesMcpTool,
-                        lmsAssignmentsMcpTool)
+                        lmsAssignmentsMcpTool,
+                        noticeMcpTools)
                 .build();
     }
 }
