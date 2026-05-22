@@ -16,7 +16,8 @@ FROM --platform=$BUILDPLATFORM ubuntu:22.04 AS rusaint-builder
 ARG RUST_VERSION=1.95.0
 ARG RUSAINT_REF=c2bdcf91c6efb313b971efa2a8a67ed79ad77b4b
 ARG TARGETARCH
-ENV PATH="/root/.cargo/bin:${PATH}"
+ENV PATH="/root/.cargo/bin:${PATH}" \
+    RUSTUP_TOOLCHAIN="${RUST_VERSION}"
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
     CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
     CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
