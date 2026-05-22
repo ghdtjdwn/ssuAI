@@ -1,5 +1,18 @@
 # Dev Log
 
+## 2026-05-22
+
+- 2026-05-22: **SAINT portal-navigation ECC entry fix**. Browser capture
+  showed schedule/grades must enter ECC through the SAINT portal-issued
+  WebDynpro URL (`ecc.ssu.ac.kr:8443`, `;sap-ext-sid=...`, iframe `POST`
+  headers) rather than a plain direct component `GET`. Added
+  `PortalNavigationService` to resolve component entry URLs from portal
+  HTML, wired `RealSaintScheduleConnector` and `RealSaintGradesConnector`
+  to use portal `POST` when configured, changed direct fallback defaults
+  to `:8443`, and removed authenticated HTML/body snippets from SAINT
+  connector logs in favor of byte counts and safe flags. ADR 0016 records
+  the decision and security constraints.
+
 ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
 큰 결정은 별도로 `docs/adr/` 에 ADR 로 적는다.
 
