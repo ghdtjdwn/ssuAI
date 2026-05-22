@@ -89,35 +89,50 @@ context 에서 작업.
 - Verify 후 done 선언: 백엔드 `.\gradlew.bat test`, 프론트 `pnpm --dir frontend test|lint|typecheck`
 
 ## Model / planning workflow
-- **Claude 설계·아키텍처 결정** (`/plan` 진입) → Opus 4.7. 비자명 feature
-  설계, security 판단, 아키텍처 트레이드오프. 결과를 `docs/tasks/<NN>-*.md`
-  와 `.codex/current-task.md` 에 기록 후 Codex 에 넘긴다.
-- **Claude 검수** → Codex 결과를 `Read` 로 파일 확인. 통째 diff/log 금지.
-  acceptance criteria 충족 여부만 판단. 수정 필요 시 `.codex/current-task.md`
-  에 재작업 지시를 쓰고 넘긴다.
-- **Codex 기본 구현 세션** → `~/.codex/config.toml` 의 `ssuai` profile:
-  GPT-5.5, `model_reasoning_effort=medium`,
-  `plan_mode_reasoning_effort=xhigh`, `approval_policy=never`,
-  `sandbox_mode=danger-full-access`. 구현/테스트/커밋/push/PR 전부 Codex.
-- **Codex 설계 보조** → 필요 시 `codex --profile ssuai-deep -C C:/Users/akftj/ssuAI`.
-  끝나면 구현은 기본 `ssuai` profile 로 돌아간다.
-- **Antigravity CLI (Codex 대체)** → Codex 토큰 소진 시 `agy` (Gemini CLI 후속,
-  Gemini 3.5 Flash 구동). `AGENTS.md` 를 자동 로드하므로 별도 설정 불필요.
-  Manager View 로 서브에이전트 병렬 실행 가능. 구현/커밋/PR 모두 담당.
-  commit author 는 반드시 hoengj 계정 (`git config user.name` 확인) 으로 고정.
-  Antigravity handoff opener: `.codex/current-task.md` 를 먼저 읽도록 지시.
 
-`/plan` 트리거 — **아래 중 하나여야 함:**
-- 외부 시스템 auth shape / 연동 방식이 spike 로 불명확한 상황
+### Claude Code (`/model opusplan` 고정)
+- **Opus 4.7** (plan mode): `/plan` 진입 시 자동 전환. 설계, security 판단,
+  아키텍처 트레이드오프. 결과를 `docs/tasks/<NN>-*.md` + `.codex/current-task.md` 에 기록.
+- **Sonnet 4.6** (기본): 검수, 일상 대화, 짧은 질문. Opus 대비 토큰 절약.
+- Claude handoff opener 첫 줄: `/model opusplan`.
+
+`/plan` 트리거 (아래 중 하나일 때만):
+- 외부 시스템 auth shape / 연동 방식이 spike 로 불명확
 - 새 도메인 패키지 신설 (클래스 책임·data flow·security policy 미결)
 - `docs/security.md` 관련 trade-off 결정
 
-**`/plan` 스킵 (task spec 작성 후 Codex 직행):**
-- 해당 task 의 `docs/tasks/<NN>-*.md` spec 이 설계를 이미 커버
-- 단순 fix / 커밋 / 테스트 / PR / spec 에 없는 사소한 판단
+`/plan` 스킵 → `docs/tasks/<NN>-*.md` 가 설계 커버 / 단순 fix / 커밋 / 테스트 / PR.
 
-Claude handoff opener 의 첫 줄은 `/model opusplan`. Codex handoff 는
-slash command 없이 시작하고, 필요 시 `ssuai-deep` profile 명을 명시한다.
+### Codex (`~/.codex/config.toml`)
+모든 profile: `approval_policy=never`, `sandbox_mode=danger-full-access`, `commit_attribution=""`.
+
+| profile | model | reasoning | 사용 시점 |
+|---------|-------|-----------|----------|
+| `ssuai` (기본) | GPT-5.5 | xhigh / xhigh | 복잡 구현 — 외부 연동, FFI, auth flow, 신규 도메인 |
+| `ssuai-deep` | GPT-5.5 | xhigh / xhigh | 아키텍처 탐색 — 여러 접근법 비교, Claude /plan 전 spike |
+| `ssuai-fast` | GPT-5.4-mini | medium / high | 단순 fix, 설정 변경, 문서, 커밋 정리 |
+| `ssuai-review` | GPT-5.4-mini | low / xhigh | PR 검토, 코드 읽기, 보고서 작성 |
+
+실행: `codex -C C:/Users/akftj/ssuAI` (기본 ssuai), `codex --profile ssuai-fast -C ...`
+세션 시작 즉시 `.codex/current-task.md` 읽기 필수.
+
+### Antigravity CLI — `agy` (Codex 대체)
+Gemini CLI 후속 (Gemini CLI 종료: 2026-06-18). Codex 토큰 소진 시 사용.
+- 모델: Gemini 3.5 Flash 자동 선택 (수동 변경 불가). Pro plan 이면 충분.
+- `agy inspect` → `AGENTS.md` 자동 로드 확인. 별도 설정 파일 불필요.
+- Manager View: 서브에이전트 병렬 실행 가능.
+- 세션 시작 지시: "`.codex/current-task.md` 먼저 읽어라."
+- commit author 반드시 `git config user.name` = hoengj 확인.
+
+### Task → 모델 routing 가이드
+
+| 복잡도 | 예시 | Claude 모델 | 구현 AI / profile |
+|--------|------|-------------|------------------|
+| 높음 | 외부 auth 연동, FFI, security | Opus 4.7 (`/plan`) | GPT-5.5 `ssuai` |
+| 중간 | REST API, 서비스, 테스트 작성 | Sonnet 4.6 (검수) | GPT-5.5 `ssuai` |
+| 낮음 | 설정, 문서, 삭제, 파일 이동 | (검수 생략 가능) | GPT-5.4-mini `ssuai-fast` |
+| 검수만 | PR 리뷰, 보고문 확인 | Sonnet 4.6 | GPT-5.4-mini `ssuai-review` |
+
 한 시점에 한 agent 만 active owner 로 작업한다.
 
 ## Authorship & Merge
