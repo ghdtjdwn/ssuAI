@@ -70,8 +70,8 @@ ssuai:
     library-seat: mock # mock | real
     library-book: mock # mock | real
     library-loans: mock # mock | real
-    saint-schedule: mock # mock | real | rusaint
-    saint-grades: mock # mock | real | rusaint
+    saint-schedule: mock # mock | rusaint
+    saint-grades: mock # mock | rusaint
     lms-assignments: mock # mock | real
     chat: ${SSUAI_CONNECTOR_CHAT:mock} # mock | llm
   library:
@@ -101,15 +101,9 @@ ssuai:
     portal-url: ${SSUAI_SAINT_PORTAL_URL:https://saint.ssu.ac.kr/irj/portal}
     timeout: 10s
     schedule:
-      portal-url: ${SSUAI_SAINT_PORTAL_URL:https://saint.ssu.ac.kr/irj/portal}
-      timetable-url: ${SSUAI_SAINT_SCHEDULE_TIMETABLE_URL:https://ecc.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMW2102}
-      # Per-student timetable cache TTL (Task 16 spec §6 #5). Long enough that
-      # a chat user asking "내일 1교시" several times reuses one cumulative
-      # WDA7-iterate fetch, short enough that drop/add reflects within an hour.
+      # Per-student timetable cache TTL. Long enough to absorb burst chat
+      # queries ("내일 1교시"), short enough that drop/add reflects within an hour.
       cache-ttl: 1h
-    grades:
-      portal-url: ${SSUAI_SAINT_PORTAL_URL:https://saint.ssu.ac.kr/irj/portal}
-      grades-url: ${SSUAI_SAINT_GRADES_URL:https://ecc.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMB3W0017}
     session:
       # Encrypted-at-rest store of post-SSO SAINT session material. The
       # rusaint path stores serialized rusaint session JSON here; the legacy
