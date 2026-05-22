@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -51,7 +53,7 @@ class RealSaintGradesConnectorTests {
         String firstFixture = loadFixture("grades-success.html");
         String prevFixture = loadFixture("grades-prev-success.html");
 
-        // GET returns SAP WDA bootstrap, then initial Form_Request POST
+        // GET returns SAP WDA bootstrap, then initial placeholder-load POST
         // returns the current page (6 history rows, empty detail).
         server.enqueue(bootstrapOk("CSRF-BOOT")
                 .addHeader("Set-Cookie", "SAP_SESSIONID_SSP_100=GR-SESS; Path=/")
@@ -142,7 +144,7 @@ class RealSaintGradesConnectorTests {
     }
 
     @Test
-    void sessionCorrelationFieldsPassedThroughExceptCltwndid() throws Exception {
+    void initPostDoesNotEchoBootstrapHiddenFields() throws Exception {
         String bootstrapHtml =
                 "<html><body>"
                         + "<form id=\"sap.client.SsrClient.form\" action=\"/zcmb3w0017\">"
@@ -161,10 +163,29 @@ class RealSaintGradesConnectorTests {
         server.takeRequest(); // GET
         RecordedRequest initPost = server.takeRequest();
         String body = initPost.getBody().readUtf8();
-        assertThat(body).contains("_external_session_=EXT-999");
-        assertThat(body).contains("_popup_url_=POP");
+        assertThat(body).doesNotContain("_external_session_");
+        assertThat(body).doesNotContain("_popup_url_");
         assertThat(body).doesNotContain("sap-wd-cltwndid");
         assertThat(body).contains("sap-wd-secure-id=CSRF-G");
+    }
+
+    @Test
+    void webDynproFormContainsOnlyFiveCanonicalFields() {
+        Map<String, String> bootstrapHidden = new LinkedHashMap<>();
+        bootstrapHidden.put("_popup_url_", "x");
+        bootstrapHidden.put("_main_window_id_", "y");
+        bootstrapHidden.put("_environment_", "z");
+        bootstrapHidden.put("_external_session_", "w");
+        bootstrapHidden.put("sap-wd-cltwndid", "drop");
+
+        Map<String, String> form = RealSaintGradesConnector.webDynproForm(
+                bootstrapHidden, "secure-abc", "ZCMB3W0017", "QUEUE");
+
+        assertThat(form.keySet()).containsExactly(
+                "sap-charset", "sap-wd-secure-id", "fesrAppName", "fesrUseBeacon", "SAPEVENTQUEUE");
+        assertThat(form).containsEntry("sap-wd-secure-id", "secure-abc");
+        assertThat(form).containsEntry("fesrAppName", "ZCMB3W0017");
+        assertThat(form).containsEntry("SAPEVENTQUEUE", "QUEUE");
     }
 
     @Test
