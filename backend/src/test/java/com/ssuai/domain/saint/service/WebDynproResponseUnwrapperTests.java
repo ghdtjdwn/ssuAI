@@ -48,6 +48,16 @@ class WebDynproResponseUnwrapperTests {
     }
 
     @Test
+    void extractHtmlAllowsAnonSapContextIdWhenPayloadIsRenderable() {
+        String html = "<form action=\"/sap/bc/webdynpro/SAP/ZCMW2102"
+                + "?sap-contextid=SID%3aANON%3ahana-prd-ap-1\"></form>";
+        String envelope = "<updates><full-update><content-update><![CDATA[" + html
+                + "]]></content-update></full-update></updates>";
+
+        assertThat(WebDynproResponseUnwrapper.extractHtml(envelope)).isEqualTo(html);
+    }
+
+    @Test
     void extractHtmlRejectsBlankInput() {
         assertThatThrownBy(() -> WebDynproResponseUnwrapper.extractHtml(null))
                 .isInstanceOf(IllegalArgumentException.class);
