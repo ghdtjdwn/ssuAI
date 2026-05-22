@@ -163,8 +163,8 @@ class RealSaintGradesConnectorTests {
         server.takeRequest(); // GET
         RecordedRequest initPost = server.takeRequest();
         String body = initPost.getBody().readUtf8();
-        assertThat(body).doesNotContain("_external_session_");
-        assertThat(body).doesNotContain("_popup_url_");
+        assertThat(body).contains("_external_session_=EXT-999");
+        assertThat(body).contains("_popup_url_=POP");
         assertThat(body).doesNotContain("sap-wd-cltwndid");
         assertThat(body).contains("sap-wd-secure-id=CSRF-G");
     }
@@ -182,9 +182,10 @@ class RealSaintGradesConnectorTests {
                 bootstrapHidden, "secure-abc", "ZCMB3W0017", "QUEUE");
 
         assertThat(form.keySet()).containsExactly(
+                "_popup_url_", "_main_window_id_", "_environment_", "_external_session_",
                 "sap-charset", "sap-wd-secure-id", "fesrAppName", "fesrUseBeacon", "SAPEVENTQUEUE");
-        assertThat(form).doesNotContainKey("_external_session_");
-        assertThat(form).doesNotContainKey("_popup_url_");
+        assertThat(form).containsEntry("_popup_url_", "x");
+        assertThat(form).containsEntry("_external_session_", "w");
         assertThat(form).doesNotContainKey("sap-wd-cltwndid");
         assertThat(form).containsEntry("sap-wd-secure-id", "secure-abc");
         assertThat(form).containsEntry("fesrAppName", "ZCMB3W0017");

@@ -545,9 +545,16 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
     }
 
     static Map<String, String> webDynproForm(
-            @SuppressWarnings("unused") Map<String, String> formFields,
+            Map<String, String> formFields,
             String secureId, String appName, String queue) {
         LinkedHashMap<String, String> form = new LinkedHashMap<>();
+        if (formFields != null) {
+            formFields.forEach((key, value) -> {
+                if (key != null && !key.isBlank() && !"sap-wd-cltwndid".equals(key)) {
+                    form.put(key, value == null ? "" : value);
+                }
+            });
+        }
         form.put("sap-charset", "utf-8");
         form.put("sap-wd-secure-id", secureId);
         form.put("fesrAppName", appName);
