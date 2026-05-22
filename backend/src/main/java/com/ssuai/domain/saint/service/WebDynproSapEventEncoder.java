@@ -44,10 +44,10 @@ public final class WebDynproSapEventEncoder {
     }
 
     /**
-     * The initial Form_Request a SAP WDA client sends after the JavaScript
-     * bootstrap loads. Triggers a full-page render (the same one the server
-     * would have sent if auth were done server-side). Without this POST the
-     * server only returns the JS bootstrap and never the application HTML.
+     * The initial four-event placeholder load a SAP WDA client sends after
+     * the JavaScript bootstrap. This matches rusaint's load_placeholder()
+     * request shape: two client inspector notifications, the loading
+     * placeholder submit, then Custom_ClientInfos.
      */
     public static String encodeInitialLoad(String pageUrl) {
         if (pageUrl == null || pageUrl.isBlank()) {
@@ -56,31 +56,30 @@ public final class WebDynproSapEventEncoder {
         URI uri = URI.create(pageUrl);
         String origin = uri.getScheme() + "://" + uri.getHost()
                 + (uri.getPort() > 0 ? ":" + uri.getPort() : "");
-        String domain = uri.getHost();
         String svgBase = origin
                 + "/sap/public/bc/ur/nw5/themes/~cache-20230801062755"
                 + "/Base/baseLib/sap_fiori_3/svg/libs";
         String clientUrl = pageUrl.contains("#") ? pageUrl : pageUrl + "#";
 
-        String data1 = "ClientWidth:935px;ClientHeight:869px;ScreenWidth:1536px;ScreenHeight:864px;"
+        String data1 = "ClientWidth:1920px;ClientHeight:1000px;ScreenWidth:1920px;ScreenHeight:1080px;"
                 + "ScreenOrientation:landscape;ThemedTableRowHeight:33px;ThemedFormLayoutRowHeight:32px;"
                 + "ThemedSvgLibUrls:{\"SAPGUI-icons\":\"" + svgBase + "/SAPGUI-icons.svg\","
                 + "\"SAPWeb-icons\":\"" + svgBase + "/SAPWeb-icons.svg\"};"
                 + "ThemeTags:Fiori_3,Touch;ThemeID:sap_fiori_3;SapThemeID:sap_fiori_3;"
-                + "DeviceType:DESKTOP;DocumentDomain:" + domain + ";"
-                + "ClientURL:" + clientUrl + ";IsTopWindow:TRUE;ParentAccessible:TRUE";
+                + "DeviceType:DESKTOP";
         String data2 = "ThemedTableRowHeight:25px";
 
-        SapEvent formRequest = SapEvent.builder("Form_Request")
+        SapEvent customClientInfos = SapEvent.builder("Custom_ClientInfos")
                 .meta(meta -> {
-                    meta.put("Id", "sap.client.SsrClient.form");
-                    meta.put("Async", "false");
-                    meta.put("FocusInfo", "");
-                    meta.put("Hash", "");
-                    meta.put("DomChanged", "false");
-                    meta.put("IsDirty", "false");
+                    meta.put("Id", "WD01");
+                    meta.put("WindowOpenerExists", "false");
+                    meta.put("ClientURL", clientUrl);
+                    meta.put("ClientWidth", "1920px");
+                    meta.put("ClientHeight", "1000px");
+                    meta.put("DocumentDomain", "ssu.ac.kr");
+                    meta.put("IsTopWindow", "TRUE");
+                    meta.put("ParentAccessible", "TRUE");
                 })
-                .meta(meta -> meta.put("ResponseData", "delta"))
                 .build();
         return "ClientInspector_Notify"
                 + "~E002Id~E004WD01~E005Data~E004" + escape(data1)
@@ -94,7 +93,7 @@ public final class WebDynproSapEventEncoder {
                 + "~E002Id~E004_loadingPlaceholder_"
                 + "~E003~E002ResponseData~E004delta~E005ClientAction~E004submit~E003~E002~E003"
                 + EVENT_SEPARATOR
-                + encode(List.of(formRequest));
+                + encode(List.of(customClientInfos));
     }
 
     /**
