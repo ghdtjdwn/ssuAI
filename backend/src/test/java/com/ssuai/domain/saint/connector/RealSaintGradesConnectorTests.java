@@ -49,6 +49,55 @@ class RealSaintGradesConnectorTests {
     }
 
     @Test
+    void portalNavigationEntryUsesPostIframeHeadersAndSapExtSidUrl() throws Exception {
+        SaintGradesProperties properties = new SaintGradesProperties();
+        properties.setGradesUrl(server.url("/sap/bc/webdynpro/SAP/ZCMB3W0017").toString());
+        properties.setPortalUrl(server.url("/portal").toString());
+        properties.setTimeout(Duration.ofSeconds(5));
+        HttpClient httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+        connector = new RealSaintGradesConnector(properties, httpClient);
+
+        server.enqueue(htmlOk("""
+                <html><body>
+                  <script>
+                    window.frameUrl = "/sap/bc/webdynpro/SAP/ZCMB3W0017;sap-ext-sid=SID-GRADES";
+                  </script>
+                </body></html>
+                """));
+        server.enqueue(htmlOk("<html><body><form id=\"sap.client.SsrClient.form\">"
+                + "<input type=\"hidden\" name=\"sap-wd-secure-id\" value=\"CSRF-G\"/>"
+                + "</form></body></html>"));
+        server.enqueue(xmlOk(wrap(minimalTermHistoryHtml()
+                + "<input id=\"sap-wd-secure-id\" name=\"sap-wd-secure-id\" value=\"CSRF-1\"/>")));
+
+        GradesResponse response = connector.fetchGrades("20221528",
+                new PortalCookies("MYSAPSSO2=abc"));
+
+        assertThat(response.history()).hasSize(1);
+        assertThat(server.getRequestCount()).isEqualTo(3);
+
+        RecordedRequest portalGet = server.takeRequest();
+        assertThat(portalGet.getMethod()).isEqualTo("GET");
+        assertThat(portalGet.getPath()).isEqualTo("/portal");
+
+        RecordedRequest entryPost = server.takeRequest();
+        assertThat(entryPost.getMethod()).isEqualTo("POST");
+        assertThat(entryPost.getPath()).isEqualTo("/sap/bc/webdynpro/SAP/ZCMB3W0017;sap-ext-sid=SID-GRADES");
+        assertThat(entryPost.getHeader("Referer")).isEqualTo("https://saint.ssu.ac.kr/");
+        assertThat(entryPost.getHeader("Origin")).isEqualTo("https://saint.ssu.ac.kr");
+        assertThat(entryPost.getHeader("Sec-Fetch-Site")).isEqualTo("same-site");
+        assertThat(entryPost.getHeader("Sec-Fetch-Mode")).isEqualTo("navigate");
+        assertThat(entryPost.getHeader("Sec-Fetch-Dest")).isEqualTo("iframe");
+
+        RecordedRequest initPost = server.takeRequest();
+        assertThat(initPost.getMethod()).isEqualTo("POST");
+        assertThat(initPost.getPath()).isEqualTo("/sap/bc/webdynpro/SAP/ZCMB3W0017;sap-ext-sid=SID-GRADES");
+        assertThat(initPost.getBody().readUtf8()).contains("sap-wd-secure-id=CSRF-G");
+    }
+
+    @Test
     void firstGetParsesHistorySummariesAndIteratesPrevButtonForEachPriorTerm() throws Exception {
         String firstFixture = loadFixture("grades-success.html");
         String prevFixture = loadFixture("grades-prev-success.html");

@@ -56,6 +56,50 @@ class RealSaintScheduleConnectorTests {
     }
 
     @Test
+    void portalNavigationEntryUsesPostIframeHeadersAndSapExtSidUrl() throws Exception {
+        SaintScheduleProperties properties = new SaintScheduleProperties();
+        properties.setTimetableUrl(server.url("/sap/bc/webdynpro/SAP/ZCMW2102").toString());
+        properties.setPortalUrl(server.url("/portal").toString());
+        properties.setTimeout(Duration.ofSeconds(5));
+        HttpClient httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+        connector = new RealSaintScheduleConnector(properties, CLOCK_2026_05_16, httpClient);
+
+        server.enqueue(htmlOk("""
+                <html><body>
+                  <iframe src="/sap/bc/webdynpro/SAP/ZCMW2102;sap-ext-sid=SID-SCHEDULE"></iframe>
+                </body></html>
+                """));
+        server.enqueue(htmlOk(withSecureId("<html><body></body></html>", "CSRF-BOOT")));
+        server.enqueue(xmlOk(wrap(loadFixture())));
+
+        ScheduleResponse response = connector.fetchSchedule("20261234",
+                new PortalCookies("MYSAPSSO2=abc"));
+
+        assertThat(response.terms()).hasSize(1);
+        assertThat(server.getRequestCount()).isEqualTo(3);
+
+        RecordedRequest portalGet = server.takeRequest();
+        assertThat(portalGet.getMethod()).isEqualTo("GET");
+        assertThat(portalGet.getPath()).isEqualTo("/portal");
+
+        RecordedRequest entryPost = server.takeRequest();
+        assertThat(entryPost.getMethod()).isEqualTo("POST");
+        assertThat(entryPost.getPath()).isEqualTo("/sap/bc/webdynpro/SAP/ZCMW2102;sap-ext-sid=SID-SCHEDULE");
+        assertThat(entryPost.getHeader("Referer")).isEqualTo("https://saint.ssu.ac.kr/");
+        assertThat(entryPost.getHeader("Origin")).isEqualTo("https://saint.ssu.ac.kr");
+        assertThat(entryPost.getHeader("Sec-Fetch-Site")).isEqualTo("same-site");
+        assertThat(entryPost.getHeader("Sec-Fetch-Mode")).isEqualTo("navigate");
+        assertThat(entryPost.getHeader("Sec-Fetch-Dest")).isEqualTo("iframe");
+
+        RecordedRequest initPost = server.takeRequest();
+        assertThat(initPost.getMethod()).isEqualTo("POST");
+        assertThat(initPost.getPath()).isEqualTo("/sap/bc/webdynpro/SAP/ZCMW2102;sap-ext-sid=SID-SCHEDULE");
+        assertThat(initPost.getBody().readUtf8()).contains("sap-wd-secure-id=CSRF-BOOT");
+    }
+
+    @Test
     void enrollmentAlreadyAtCurrentTermDoesOneGetAndZeroPosts() throws Exception {
         // Chrome UA → SAP WDA returns JS bootstrap on GET, then serves the
         // real timetable HTML on the initial placeholder-load POST.
