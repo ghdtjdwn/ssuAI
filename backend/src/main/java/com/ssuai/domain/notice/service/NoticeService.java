@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.ssuai.domain.notice.connector.DepartmentNoticeConnector;
 import com.ssuai.domain.notice.connector.NoticeConnector;
 import com.ssuai.domain.notice.dto.NoticeCategoriesResponse;
 import com.ssuai.domain.notice.dto.NoticeDetailResponse;
@@ -20,9 +21,11 @@ public class NoticeService {
     static final int MAX_KEYWORD_LENGTH = 64;
 
     private final NoticeConnector connector;
+    private final DepartmentNoticeConnector departmentConnector;
 
-    public NoticeService(NoticeConnector connector) {
+    public NoticeService(NoticeConnector connector, DepartmentNoticeConnector departmentConnector) {
         this.connector = connector;
+        this.departmentConnector = departmentConnector;
     }
 
     public NoticeListResponse getRecentNotices(String category, Integer page) {
@@ -66,14 +69,8 @@ public class NoticeService {
         if (department == null || department.isBlank()) {
             throw new IllegalArgumentException("학과/부서 이름을 입력해 주세요.");
         }
-        String trimmedDept = department.trim();
         int effectivePage = page == null || page < 1 ? 1 : page;
-
-        NoticeListResponse result = connector.searchNotices(trimmedDept, null, effectivePage);
-        List<Notice> filtered = result.items().stream()
-                .filter(notice -> notice.department().contains(trimmedDept))
-                .toList();
-        return new NoticeListResponse(filtered, result.currentPage(), result.totalPages());
+        return departmentConnector.fetchByDepartment(department.trim(), effectivePage);
     }
 
     private static String normalizeCategory(String category) {

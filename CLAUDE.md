@@ -88,6 +88,24 @@ context 에서 작업.
 - Commit: Conventional Commits (`feat(backend): ...`)
 - Verify 후 done 선언: 백엔드 `.\gradlew.bat test`, 프론트 `pnpm --dir frontend test|lint|typecheck`
 
+## MCP 도구 완성 후 배포까지 자동화 (구현 AI 필독)
+
+MCP 도구를 수정·신규 추가한 작업이 끝나면 **구현 AI가 아래를 전부 수행**한다.
+사용자가 Claude Desktop 에서 ssuMCP 연결을 Refresh 하면 바로 테스트할 수 있는 상태로 만드는 것이 목표.
+
+1. `.\gradlew.bat test` 통과 확인
+2. Conventional Commit 으로 커밋
+3. **feature 브랜치면**: PR 생성 → auto-merge safe 조건 충족 시 즉시 `gh pr merge --rebase --delete-branch`
+   **직접 fix(main)이면**: `git push origin main` 바로
+4. main push 후 CI → Deploy workflow 가 자동 실행됨 (k3s `kubectl set image`)
+5. **새 MCP 도구 클래스를 만들었으면 반드시** `McpServerConfig.java` 의
+   `MethodToolCallbackProvider.builder().toolObjects(...)` 에 등록할 것.
+   등록 안 하면 클라이언트에 도구가 노출되지 않음.
+6. 보고할 때 반드시 포함:
+   - 머지/push된 커밋 SHA
+   - `gh run list --workflow deploy.yml --limit 1` 결과 (completed success 확인)
+   - "Claude Desktop 에서 ssuMCP Refresh 하면 테스트 가능합니다" 문구
+
 ## Model / planning workflow
 
 ### Claude Code (`/model opusplan` 고정)
