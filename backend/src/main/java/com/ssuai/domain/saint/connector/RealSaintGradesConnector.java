@@ -121,15 +121,13 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 String name = trimmed.substring(0, eq).trim();
                 String value = trimmed.substring(eq + 1).trim();
                 if (!name.isEmpty()) {
-                    if ("MYSAPSSO2".equals(name) || "sToken".equals(name) || "WAF".equals(name)) {
-                        HttpCookie cookie = new HttpCookie(name, value);
-                        if (cookieDomain != null) {
-                            cookie.setDomain(cookieDomain);
-                        }
-                        cookie.setPath("/");
-                        cookie.setVersion(0);
-                        cookieManager.getCookieStore().add(targetUri, cookie);
+                    HttpCookie cookie = new HttpCookie(name, value);
+                    if (cookieDomain != null) {
+                        cookie.setDomain(cookieDomain);
                     }
+                    cookie.setPath("/");
+                    cookie.setVersion(0);
+                    cookieManager.getCookieStore().add(targetUri, cookie);
                 }
             }
         }
