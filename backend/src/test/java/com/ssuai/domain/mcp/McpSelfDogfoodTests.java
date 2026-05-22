@@ -74,7 +74,13 @@ class McpSelfDogfoodTests {
                             "get_my_library_loans",
                             "get_my_schedule",
                             "get_my_grades",
-                            "get_my_assignments"
+                            "get_my_assignments",
+                            "get_recent_notices",
+                            "search_notices",
+                            "list_notice_categories",
+                            "get_notice_detail",
+                            "get_active_notices",
+                            "get_department_notices"
                     );
         }
     }
