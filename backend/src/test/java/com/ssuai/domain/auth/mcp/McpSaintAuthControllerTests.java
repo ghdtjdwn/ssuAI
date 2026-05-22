@@ -108,6 +108,24 @@ class McpSaintAuthControllerTests {
     }
 
     @Test
+    void doubleQuestionMarkStateWithIdnoAndTokenIsHandled() throws Exception {
+        McpAuthStateEntry entry = new McpAuthStateEntry("valid-state", SESSION_ID, McpProviderType.SAINT, EXPIRES);
+        when(mcpAuthService.consumeState("valid-state")).thenReturn(Optional.of(entry));
+        when(saintSsoService.authenticate("tok", "20231234"))
+                .thenReturn(new UsaintAuthResult("20231234", "홍길동", "CS", "재학"));
+
+        mockMvc.perform(get("/api/mcp/auth/saint/callback")
+                        .param("state", "valid-state?sIdno=20231234&sToken=tok"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<String> stateCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mcpAuthService).consumeState(stateCaptor.capture());
+        org.assertj.core.api.Assertions.assertThat(stateCaptor.getValue()).isEqualTo("valid-state");
+        verify(saintSsoService).authenticate("tok", "20231234");
+        verify(mcpAuthService).linkProvider(SESSION_ID, McpProviderType.SAINT, "20231234");
+    }
+
+    @Test
     void normalStateIsHandled() throws Exception {
         McpAuthStateEntry entry = new McpAuthStateEntry("normal-state", SESSION_ID, McpProviderType.SAINT, EXPIRES);
         when(mcpAuthService.consumeState("normal-state")).thenReturn(Optional.of(entry));

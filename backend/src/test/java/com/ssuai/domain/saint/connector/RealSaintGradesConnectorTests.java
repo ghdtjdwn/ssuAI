@@ -144,7 +144,7 @@ class RealSaintGradesConnectorTests {
     }
 
     @Test
-    void initPostDoesNotEchoBootstrapHiddenFields() throws Exception {
+    void initPostPassesSessionHiddenFieldsExceptCltwndid() throws Exception {
         String bootstrapHtml =
                 "<html><body>"
                         + "<form id=\"sap.client.SsrClient.form\" action=\"/zcmb3w0017\">"
@@ -170,7 +170,7 @@ class RealSaintGradesConnectorTests {
     }
 
     @Test
-    void webDynproFormContainsOnlyFiveCanonicalFields() {
+    void webDynproFormPreservesSessionFieldsExceptCltwndid() {
         Map<String, String> bootstrapHidden = new LinkedHashMap<>();
         bootstrapHidden.put("_popup_url_", "x");
         bootstrapHidden.put("_main_window_id_", "y");
@@ -183,6 +183,9 @@ class RealSaintGradesConnectorTests {
 
         assertThat(form.keySet()).containsExactly(
                 "sap-charset", "sap-wd-secure-id", "fesrAppName", "fesrUseBeacon", "SAPEVENTQUEUE");
+        assertThat(form).doesNotContainKey("_external_session_");
+        assertThat(form).doesNotContainKey("_popup_url_");
+        assertThat(form).doesNotContainKey("sap-wd-cltwndid");
         assertThat(form).containsEntry("sap-wd-secure-id", "secure-abc");
         assertThat(form).containsEntry("fesrAppName", "ZCMB3W0017");
         assertThat(form).containsEntry("SAPEVENTQUEUE", "QUEUE");
