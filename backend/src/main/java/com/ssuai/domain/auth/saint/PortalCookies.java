@@ -1,18 +1,16 @@
 package com.ssuai.domain.auth.saint;
 
 /**
- * Raw {@code Cookie} header value captured at the end of the saint
- * two-phase SSO handshake. The value is intentionally opaque — it is the
- * exact string a connector must echo back to {@code saint.ssu.ac.kr} on
- * authenticated requests for that user.
+ * Plaintext SAINT session material loaded from {@link SaintSessionStore}.
  *
- * <p>This record is the *plaintext* shape. {@code SaintSessionStore}
- * encrypts the {@code rawCookieHeader} at rest with AES-GCM; only callers
- * of {@code SaintSessionStore.cookies(...)} see this type.
+ * <p>The legacy Java WebDynpro connectors interpret {@code rawCookieHeader}
+ * as an HTTP {@code Cookie} header. The rusaint connectors interpret the same
+ * opaque slot as serialized rusaint session JSON. Keeping the record shape
+ * stable avoids a session-store migration; existing entries simply expire and
+ * users re-run SmartID SSO.
  *
- * <p>Never log {@code rawCookieHeader} directly — see
- * {@code docs/security.md} §4. The store exposes a SHA-256 fingerprint
- * helper for log correlation.
+ * <p>Never log {@code rawCookieHeader} directly. It can contain upstream
+ * cookies or rusaint's serialized authenticated session.
  */
 public record PortalCookies(String rawCookieHeader) {
 
@@ -20,5 +18,9 @@ public record PortalCookies(String rawCookieHeader) {
         if (rawCookieHeader == null || rawCookieHeader.isBlank()) {
             throw new IllegalArgumentException("rawCookieHeader is required");
         }
+    }
+
+    public String sessionJson() {
+        return rawCookieHeader;
     }
 }

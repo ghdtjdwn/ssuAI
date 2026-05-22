@@ -70,8 +70,8 @@ ssuai:
     library-seat: mock # mock | real
     library-book: mock # mock | real
     library-loans: mock # mock | real
-    saint-schedule: mock # mock | real
-    saint-grades: mock # mock | real
+    saint-schedule: mock # mock | real | rusaint
+    saint-grades: mock # mock | real | rusaint
     lms-assignments: mock # mock | real
     chat: ${SSUAI_CONNECTOR_CHAT:mock} # mock | llm
   library:
@@ -111,10 +111,9 @@ ssuai:
       portal-url: ${SSUAI_SAINT_PORTAL_URL:https://saint.ssu.ac.kr/irj/portal}
       grades-url: ${SSUAI_SAINT_GRADES_URL:https://ecc.ssu.ac.kr:8443/sap/bc/webdynpro/SAP/ZCMB3W0017}
     session:
-      # Encrypted-at-rest store of post-SSO portal cookies, consumed by
-      # realtime u-SAINT data tools (Task 16). TTL kept shorter than the
-      # worst-case upstream cookie lifetime so the store never hands out a
-      # cookie saint already rejected.
+      # Encrypted-at-rest store of post-SSO SAINT session material. The
+      # rusaint path stores serialized rusaint session JSON here; the legacy
+      # Java connector stored a raw Cookie header in the same slot.
       ttl: 30m
       max-sessions: 1000
       # AES-256 key (>= 32 bytes, base64 recommended). Empty default →
