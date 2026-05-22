@@ -131,8 +131,8 @@ ssuai:
     library-seat: mock
     library-book: mock
     library-loans: mock
-    saint-schedule: mock
-    saint-grades: mock
+    saint-schedule: mock # mock | real | rusaint
+    saint-grades: mock # mock | real | rusaint
     lms-assignments: mock
 ```
 

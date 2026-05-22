@@ -61,6 +61,22 @@
 
 ---
 
+## 2026-05-22 — u-SAINT SAP WebDynpro reverse engineering 한계 인정, rusaint upstream FFI 통합으로 전환
+
+- 맥락: 2026-05-14부터 2026-05-22까지 SAINT 시간표/성적 조회를 Java WebDynpro 직접 구현으로 살리려 했지만, 여러 protocol 추측 fix가 실제 사용자 검증에서 계속 같은 실패 계열로 돌아왔다.
+- 증상: `get_my_schedule`, `get_my_grades`가 prod에서 안정적으로 동작하지 않았고, LMS/학식/도서관 등 다른 tools와 달리 SAINT만 SAP WebDynpro state mismatch에 계속 걸렸다.
+- 원인:
+  1. SAP NetWeaver WebDynpro는 `sap-contextid`, portal-issued `sap-ext-sid`, hidden input, SAPEVENTQUEUE, application-server routing이 모두 stateful하게 엮여 있다.
+  2. 우리 Java 구현은 production wire-level ground truth 없이 browser 관찰과 log fragment만으로 protocol을 추측했다.
+  3. 단순 LMS Canvas SSO와 달리 SAP WebDynpro는 직접 reverse engineering 비용이 product 가치보다 커졌다.
+- 해결: 검증된 Rust upstream인 `yourssu/rusaint`를 UniFFI Kotlin binding으로 통합한다. SmartID callback의 `sToken`/`sIdno`는 Java token-probe flow에서 소비하지 않고 rusaint `withToken`에 한 번만 전달한다. 결과 `USaintSession.toJson()`은 기존 `SaintSessionStore`에 AES-GCM encrypted-at-rest로 저장하고, schedule/grades 호출 시 `fromJson`으로 복원한다.
+- 검증: 2026-05-22 로컬 `rusaint-cli` ground truth에서 schedule과 grades recorded-summary가 정상 응답했다. 이번 PR은 `RusaintClient`를 mock한 unit test와 backend test로 contract를 검증하고, prod 배포 후 사용자가 실제 MCP client에서 `get_my_schedule` / `get_my_grades`를 다시 확인한다.
+- 포트폴리오 사인:
+  1. 적재적소 판단: LMS처럼 단순한 흐름은 직접 구현하고, 복잡한 SAP는 검증된 upstream을 활용한다.
+  2. 무한 추측 fix 중단: reference implementation이나 wire trace가 없는 stateful protocol은 일정 시점에 중단 기준이 필요하다.
+  3. wrapper 이상의 가치: ssuAI가 직접 책임지는 부분은 encrypted session store, cache, DTO normalization, cross-source tools, observability다.
+  4. 실패 기록 보존: 이전 Java WebDynpro 시도는 silent rewrite하지 않고 troubleshooting과 ADR에 남긴다.
+
 ## 2026-05-18 — MCP auth tools 구현 후 서버 등록 누락
 
 - 맥락: Task 18에서 외부 MCP 클라이언트용 인증 흐름을 추가했다.
