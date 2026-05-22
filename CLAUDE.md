@@ -30,15 +30,17 @@ read** — 전체 read 는 task 범위가 정말 넓을 때만.
 - Codex: 구현, 테스트 실행, git 커밋/push, PR 생성. Claude 가 작성한
   `.codex/current-task.md` 를 읽고 실행.
 
-3-AI rotation (claude1 / claude2 / codex) — Claude 토큰이 적어 설계/검수에만
-집중. 구현이 필요하면 task spec 을 `.codex/current-task.md` 에 쓰고 Codex 로 넘긴다.
+AI rotation: Claude (설계/검수) ↔ Codex or Antigravity (구현). Codex 토큰이
+소진되면 Antigravity CLI (`agy`) 가 Codex 역할을 대체한다. 구현이 필요하면
+task spec 을 `.codex/current-task.md` 에 쓰고 넘긴다 — 두 도구 모두 이 파일을
+픽업 규칙으로 삼는다.
 State 는 `docs/handoff/latest.md`, `docs/tasks/`, `docs/dev-log.md`, git history 로 인계.
 
-**Codex 세션 픽업**: `.codex/current-task.md` 가 있으면 세션 시작 직후
-먼저 읽어 현재 task 파악. Claude 가 여기에 task 를 써두고 넘긴다.
+**구현 AI 픽업**: `.codex/current-task.md` 가 있으면 세션 시작 직후 먼저 읽어
+현재 task 파악. "no active task" 이면 사용자에게 다음 task 요청.
 
 비자명 feature: design (Goal/API/data flow/security/test) → 사용자 승인 →
-`.codex/current-task.md` 작성 → Codex 구현 → Claude 검수.
+`.codex/current-task.md` 작성 → 구현 AI → Claude 검수.
 
 ## User Context
 숭실대 컴퓨터학부 3학년. 기본 Spring CRUD 익숙 / production backend
@@ -99,6 +101,11 @@ context 에서 작업.
   `sandbox_mode=danger-full-access`. 구현/테스트/커밋/push/PR 전부 Codex.
 - **Codex 설계 보조** → 필요 시 `codex --profile ssuai-deep -C C:/Users/akftj/ssuAI`.
   끝나면 구현은 기본 `ssuai` profile 로 돌아간다.
+- **Antigravity CLI (Codex 대체)** → Codex 토큰 소진 시 `agy` (Gemini CLI 후속,
+  Gemini 3.5 Flash 구동). `AGENTS.md` 를 자동 로드하므로 별도 설정 불필요.
+  Manager View 로 서브에이전트 병렬 실행 가능. 구현/커밋/PR 모두 담당.
+  commit author 는 반드시 hoengj 계정 (`git config user.name` 확인) 으로 고정.
+  Antigravity handoff opener: `.codex/current-task.md` 를 먼저 읽도록 지시.
 
 `/plan` 트리거 — **아래 중 하나여야 함:**
 - 외부 시스템 auth shape / 연동 방식이 spike 로 불명확한 상황
