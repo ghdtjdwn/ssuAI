@@ -11,11 +11,16 @@
 #     -t ghcr.io/<owner>/ssuai-backend:<sha> --push ./backend
 
 # ---- rusaint native library stage -----------------------------------------
-FROM ubuntu:22.04 AS rusaint-builder
+FROM --platform=$BUILDPLATFORM ubuntu:22.04 AS rusaint-builder
 
 ARG RUST_VERSION=1.95.0
 ARG RUSAINT_REF=c2bdcf91c6efb313b971efa2a8a67ed79ad77b4b
+ARG TARGETARCH
 ENV PATH="/root/.cargo/bin:${PATH}"
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+    CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
+    CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
+    AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar
 WORKDIR /workspace
 
 RUN apt-get update \
@@ -24,12 +29,21 @@ RUN apt-get update \
       curl \
       git \
       build-essential \
+      gcc-aarch64-linux-gnu \
+      g++-aarch64-linux-gnu \
       pkg-config \
       libssl-dev \
  && rm -rf /var/lib/apt/lists/*
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
   | sh -s -- -y --profile minimal --default-toolchain ${RUST_VERSION}
+
+RUN case "${TARGETARCH}" in \
+      amd64) echo "x86_64-unknown-linux-gnu" > /tmp/rust-target ;; \
+      arm64) echo "aarch64-unknown-linux-gnu" > /tmp/rust-target ;; \
+      *) echo "unsupported TARGETARCH=${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+ && rustup target add "$(cat /tmp/rust-target)"
 
 RUN git clone https://github.com/EATSTEAK/rusaint.git rusaint \
  && cd rusaint \
@@ -39,11 +53,11 @@ RUN --mount=type=cache,target=/root/.cargo/registry \
     --mount=type=cache,target=/root/.cargo/git \
     --mount=type=cache,target=/workspace/rusaint/target \
     cd rusaint \
- && cargo build --release --package rusaint-ffi \
- && cp target/release/librusaint_ffi.so /workspace/librusaint_ffi.so
+ && cargo build --release --package rusaint-ffi --target "$(cat /tmp/rust-target)" \
+ && cp "target/$(cat /tmp/rust-target)/release/librusaint_ffi.so" /workspace/librusaint_ffi.so
 
 # ---- Build stage ----------------------------------------------------------
-FROM eclipse-temurin:21-jdk-jammy AS builder
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk-jammy AS builder
 WORKDIR /workspace
 
 # Cache Gradle wrapper + dependency resolution before copying sources so
