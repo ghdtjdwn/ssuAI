@@ -5,7 +5,7 @@
 
 ## Status
 
-- 🚧 In progress
+- ✅ Done — main 머지 완료 (PR #169, 2026-05-23)
 
 ## 1. Goal / Scope / Non-goals
 
