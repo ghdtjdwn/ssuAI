@@ -31,10 +31,16 @@ RUN apt-get update \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
   | sh -s -- -y --profile minimal --default-toolchain ${RUST_VERSION}
 
-RUN git clone https://github.com/yourssu/rusaint.git rusaint \
+RUN git clone https://github.com/EATSTEAK/rusaint.git rusaint \
  && cd rusaint \
- && git checkout ${RUSAINT_REF} \
- && cargo build --release --package rusaint-ffi
+ && git checkout ${RUSAINT_REF}
+
+RUN --mount=type=cache,target=/root/.cargo/registry \
+    --mount=type=cache,target=/root/.cargo/git \
+    --mount=type=cache,target=/workspace/rusaint/target \
+    cd rusaint \
+ && cargo build --release --package rusaint-ffi \
+ && cp target/release/librusaint_ffi.so /workspace/librusaint_ffi.so
 
 # ---- Build stage ----------------------------------------------------------
 FROM eclipse-temurin:21-jdk-jammy AS builder
@@ -62,8 +68,7 @@ RUN groupadd --system spring \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /workspace/build/libs/*-SNAPSHOT.jar app.jar
-COPY --from=rusaint-builder /workspace/rusaint/target/release/librusaint_ffi.so \
-  /usr/local/lib/librusaint_ffi.so
+COPY --from=rusaint-builder /workspace/librusaint_ffi.so /usr/local/lib/librusaint_ffi.so
 RUN chown spring:spring app.jar /usr/local/lib/librusaint_ffi.so
 
 USER 1001
