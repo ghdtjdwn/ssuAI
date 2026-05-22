@@ -13,7 +13,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -56,7 +58,7 @@ class RealSaintScheduleConnectorTests {
     @Test
     void enrollmentAlreadyAtCurrentTermDoesOneGetAndZeroPosts() throws Exception {
         // Chrome UA → SAP WDA returns JS bootstrap on GET, then serves the
-        // real timetable HTML on the initial Form_Request POST.
+        // real timetable HTML on the initial placeholder-load POST.
         // Pinned fixture shows (2026, 1학기). Enrolled 2026 → no PREV needed.
         server.enqueue(htmlOk(withSecureId("<html><body>"
                 + "<input type=\"hidden\" name=\"sap-wd-cltwndid\" value=\"WID-123\"/>"
@@ -132,7 +134,7 @@ class RealSaintScheduleConnectorTests {
     }
 
     @Test
-    void sessionCorrelationFieldsPassedThroughExceptCltwndid() throws Exception {
+    void initPostDoesNotEchoBootstrapHiddenFields() throws Exception {
         server.enqueue(htmlOk(
                 "<html><body>"
                         + "<form id=\"sap.client.SsrClient.form\" action=\"/zcmw2102\">"
@@ -148,10 +150,29 @@ class RealSaintScheduleConnectorTests {
         server.takeRequest(); // GET
         RecordedRequest initPost = server.takeRequest();
         String body = initPost.getBody().readUtf8();
-        assertThat(body).contains("_external_session_=EXT-999");
-        assertThat(body).contains("_popup_url_=POP");
+        assertThat(body).doesNotContain("_external_session_");
+        assertThat(body).doesNotContain("_popup_url_");
         assertThat(body).doesNotContain("sap-wd-cltwndid");
         assertThat(body).contains("sap-wd-secure-id=CSRF-S");
+    }
+
+    @Test
+    void webDynproFormContainsOnlyFiveCanonicalFields() {
+        Map<String, String> bootstrapHidden = new LinkedHashMap<>();
+        bootstrapHidden.put("_popup_url_", "x");
+        bootstrapHidden.put("_main_window_id_", "y");
+        bootstrapHidden.put("_environment_", "z");
+        bootstrapHidden.put("_external_session_", "w");
+        bootstrapHidden.put("sap-wd-cltwndid", "drop");
+
+        Map<String, String> form = RealSaintScheduleConnector.webDynproForm(
+                bootstrapHidden, "secure-abc", "ZCMW2102", "QUEUE");
+
+        assertThat(form.keySet()).containsExactly(
+                "sap-charset", "sap-wd-secure-id", "fesrAppName", "fesrUseBeacon", "SAPEVENTQUEUE");
+        assertThat(form).containsEntry("sap-wd-secure-id", "secure-abc");
+        assertThat(form).containsEntry("fesrAppName", "ZCMW2102");
+        assertThat(form).containsEntry("SAPEVENTQUEUE", "QUEUE");
     }
 
     @Test
