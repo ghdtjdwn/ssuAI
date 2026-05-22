@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
+import com.ssuai.domain.notice.connector.MockDepartmentNoticeConnector;
 import com.ssuai.domain.notice.connector.MockNoticeConnector;
 import com.ssuai.domain.notice.dto.NoticeCategoriesResponse;
 import com.ssuai.domain.notice.dto.NoticeDetailResponse;
@@ -12,7 +13,10 @@ import com.ssuai.domain.notice.dto.NoticeListResponse;
 
 class NoticeServiceTests {
 
-    private final NoticeService service = new NoticeService(new MockNoticeConnector());
+    private final NoticeService service = new NoticeService(
+            new MockNoticeConnector(),
+            new MockDepartmentNoticeConnector()
+    );
 
     @Test
     void getRecentNoticesReturnsAll() {

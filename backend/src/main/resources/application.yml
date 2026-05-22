@@ -75,6 +75,7 @@ ssuai:
     lms-assignments: mock # mock | real
     chat: ${SSUAI_CONNECTOR_CHAT:mock} # mock | llm
     notice: mock # mock | real
+    department-notice: real # mock | real
   library:
     seat:
       # Per-floor cache TTL. Short enough that students get fresh data
@@ -151,6 +152,8 @@ ssuai:
     cache-ttl: 5m
     timeout: 8s
     max-page-size: 20
+  ssufid:
+    base-url: ${SSUAI_SSUFID_BASE_URL:https://ssufid.yourssu.com}
   chat:
     llm:
       max-tokens: ${SSUAI_LLM_MAX_TOKENS:400}
