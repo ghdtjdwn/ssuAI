@@ -95,6 +95,7 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
     private final Clock clock;
     private final HttpClient httpClient;
     private final HttpClient httpClientNoRedirect;
+    private final PortalNavigationService portalNavigationService;
 
     @Autowired
     public RealSaintScheduleConnector(SaintScheduleProperties properties) {
@@ -102,22 +103,33 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
                 HttpClient.newBuilder()
                         .followRedirects(HttpClient.Redirect.NEVER)
                         .connectTimeout(properties.getTimeout())
-                        .build());
+                        .build(),
+                new PortalNavigationService(properties.getPortalUrl(), properties.getTimeout()));
     }
 
     RealSaintScheduleConnector(SaintScheduleProperties properties, Clock clock, HttpClient httpClient) {
-        this(properties, clock, httpClient, httpClient);
+        this(properties, clock, httpClient, httpClient,
+                new PortalNavigationService(properties.getPortalUrl(), properties.getTimeout()));
     }
 
     RealSaintScheduleConnector(SaintScheduleProperties properties, Clock clock,
             HttpClient httpClient, HttpClient httpClientNoRedirect) {
+        this(properties, clock, httpClient, httpClientNoRedirect,
+                new PortalNavigationService(properties.getPortalUrl(), properties.getTimeout()));
+    }
+
+    RealSaintScheduleConnector(SaintScheduleProperties properties, Clock clock,
+            HttpClient httpClient, HttpClient httpClientNoRedirect,
+            PortalNavigationService portalNavigationService) {
         this.properties = properties;
         this.clock = clock;
         this.httpClient = httpClient;
         this.httpClientNoRedirect = httpClientNoRedirect;
+        this.portalNavigationService = portalNavigationService;
     }
 
     private record InitGetResult(String html, String cookieHeader, String finalUrl) {}
+    private record InitialEntryResponse(String body, String finalUrl) {}
 
     private CookieManager createCookieManager(String rawCookieHeader, String targetUrl) {
         CookieManager cookieManager = new CookieManager();
@@ -160,36 +172,9 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
                 .connectTimeout(properties.getTimeout())
                 .build();
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(properties.getTimetableUrl()))
-                .header("Accept", "text/html,application/xhtml+xml")
-                .header("Accept-Language", "ko")
-                .header("User-Agent", BROWSER_UA)
-                .timeout(properties.getTimeout())
-                .GET()
-                .build();
-
-        HttpResponse<String> response;
-        try {
-            response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        } catch (java.net.http.HttpTimeoutException e) {
-            throw new ConnectorTimeoutException(e);
-        } catch (IOException e) {
-            log.warn("saint schedule connector IOException on GET", e);
-            throw new ConnectorUnavailableException(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new ConnectorUnavailableException(e);
-        }
-
-        int status = response.statusCode();
-        if (status / 100 != 2) {
-            log.warn("saint schedule connector unexpected status on GET: status={}", status);
-            throw new ConnectorUnavailableException();
-        }
-
-        String bootstrapHtml = response.body();
-        String finalUrl = response.uri().toString();
+        InitialEntryResponse entryResponse = httpEnterWebDynpro(client);
+        String bootstrapHtml = entryResponse.body();
+        String finalUrl = entryResponse.finalUrl();
         Map<String, String> bootstrapFormFields = hiddenFormFields(bootstrapHtml);
 
         String actionRaw = extractFormActionUrl(bootstrapHtml, finalUrl);
@@ -200,19 +185,14 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
             URI base = URI.create(finalUrl);
             postUrl = base.getScheme() + "://" + base.getAuthority() + actionRaw;
         }
-        log.info("saint schedule init POST url='{}'", postUrl);
+        log.info("saint schedule init POST target: sapExtSidPresent={}", postUrl.contains(";sap-ext-sid="));
 
         Optional<String> bootstrapSecureId = WebDynproResponseUnwrapper.extractSecureIdFromAny(bootstrapHtml);
-        log.info("saint schedule bootstrap: secureIdPresent={} snippet='{}'",
-                bootstrapSecureId.isPresent(),
-                bootstrapHtml == null ? "(null)"
-                        : bootstrapHtml.substring(0, Math.min(300, bootstrapHtml.length()))
-                                .replaceAll("\\s+", " "));
+        log.info("saint schedule bootstrap: secureIdPresent={} bodyBytes={}",
+                bootstrapSecureId.isPresent(), utf8Bytes(bootstrapHtml));
         if (bootstrapSecureId.isEmpty()) {
-            String snippet = bootstrapHtml == null ? "(null)"
-                    : bootstrapHtml.substring(0, Math.min(300, bootstrapHtml.length())).replaceAll("\\s+", " ");
-            log.info("saint schedule bootstrap no secure-id: studentFp={} snippet='{}'",
-                    SaintSessionStore.fingerprint(studentId), snippet);
+            log.info("saint schedule bootstrap no secure-id: studentFp={} bodyBytes={}",
+                    SaintSessionStore.fingerprint(studentId), utf8Bytes(bootstrapHtml));
             throw new SaintSessionExpiredException("ecc did not provide sap-wd-secure-id on first GET");
         }
 
@@ -293,6 +273,50 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
 
     private static boolean atEnrollmentStart(int year, int term, int enrollmentYear) {
         return year <= enrollmentYear && term <= SaintScheduleHelpers.TERM_SPRING;
+    }
+
+    private InitialEntryResponse httpEnterWebDynpro(HttpClient client) {
+        Optional<PortalNavigationService.EccEntryPoint> portalEntry =
+                portalNavigationService.resolveEntryPoint(client, "ZCMW2102", properties.getTimetableUrl());
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(portalEntry.map(PortalNavigationService.EccEntryPoint::url)
+                        .orElse(properties.getTimetableUrl())))
+                .header("Accept", "text/html,application/xhtml+xml")
+                .header("Accept-Language", "ko")
+                .header("User-Agent", BROWSER_UA)
+                .timeout(properties.getTimeout());
+        if (portalEntry.isPresent()) {
+            builder.header("Referer", PortalNavigationService.saintReferer())
+                    .header("Origin", PortalNavigationService.saintOrigin())
+                    .header("Sec-Fetch-Site", "same-site")
+                    .header("Sec-Fetch-Mode", "navigate")
+                    .header("Sec-Fetch-Dest", "iframe")
+                    .POST(HttpRequest.BodyPublishers.noBody());
+        } else {
+            builder.GET();
+        }
+        HttpRequest request = builder.build();
+        HttpResponse<String> response;
+        try {
+            response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (java.net.http.HttpTimeoutException e) {
+            throw new ConnectorTimeoutException(e);
+        } catch (IOException e) {
+            log.warn("saint schedule connector IOException on entry", e);
+            throw new ConnectorUnavailableException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ConnectorUnavailableException(e);
+        }
+
+        int status = response.statusCode();
+        if (status / 100 != 2) {
+            log.warn("saint schedule connector unexpected status on entry: status={}", status);
+            throw new ConnectorUnavailableException();
+        }
+        log.info("saint schedule entry fetched: viaPortal={} status={} bodyBytes={}",
+                portalEntry.isPresent(), status, utf8Bytes(response.body()));
+        return new InitialEntryResponse(response.body(), response.uri().toString());
     }
 
     private InitGetResult httpGetFollowCookies(String startCookieHeader, String startUrl, String logPrefix) {
@@ -402,24 +426,17 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
                 return response;
             }
             if (status == 401 || status == 403) {
-                String bodySnippet4xx = response.body() == null ? "(null)"
-                        : response.body().substring(0, Math.min(400, response.body().length()))
-                                .replaceAll("\\s+", " ");
-                log.info("saint schedule connector auth rejected: status={} body='{}'", status, bodySnippet4xx);
+                log.info("saint schedule connector auth rejected: status={} bodyBytes={}",
+                        status, utf8Bytes(response.body()));
                 throw new SaintSessionExpiredException("ecc rejected WebDynpro request with " + status);
             }
             if (status / 100 == 5) {
-                String body = response.body() == null ? "(null)" : response.body();
-                String snippet = body.length() > 4000
-                        ? body.substring(0, 4000) + "...(truncated " + body.length() + ")"
-                        : body;
-                log.warn("saint schedule connector 5xx: status={} url={} body='{}'",
-                        status, request.uri(), snippet.replaceAll("\\s+", " "));
+                log.warn("saint schedule connector 5xx: status={} bodyBytes={}",
+                        status, utf8Bytes(response.body()));
                 throw new ConnectorUnavailableException();
             }
-            String body4xx = response.body() == null ? "(null)"
-                    : response.body().substring(0, Math.min(500, response.body().length())).replaceAll("\\s+", " ");
-            log.warn("saint schedule connector unexpected status={} body='{}'", status, body4xx);
+            log.warn("saint schedule connector unexpected status={} bodyBytes={}",
+                    status, utf8Bytes(response.body()));
             throw new ConnectorParseException();
         } catch (java.net.http.HttpTimeoutException exception) {
             throw new ConnectorTimeoutException(exception);
@@ -439,12 +456,15 @@ public class RealSaintScheduleConnector implements SaintScheduleConnector {
         int year = SaintScheduleParser.parseDisplayedYear(html);
         int term = SaintScheduleParser.parseDisplayedTerm(html);
         if (year < 0 || term < 0) {
-            String snippet = html.substring(0, Math.min(500, html.length())).replaceAll("\\s+", " ");
-            log.info("saint schedule auth gate tripped (no term dropdowns): studentFp={} htmlSnippet='{}'",
-                    SaintSessionStore.fingerprint(studentId), snippet);
+            log.info("saint schedule auth gate tripped (no term dropdowns): studentFp={} bodyBytes={}",
+                    SaintSessionStore.fingerprint(studentId), utf8Bytes(html));
             throw new SaintSessionExpiredException(
                     "ecc did not render the term dropdowns (likely logon redirect)");
         }
+    }
+
+    private static int utf8Bytes(String body) {
+        return body == null ? 0 : body.getBytes(StandardCharsets.UTF_8).length;
     }
 
     private static String firstRenderableHtml(String responseBody) {
