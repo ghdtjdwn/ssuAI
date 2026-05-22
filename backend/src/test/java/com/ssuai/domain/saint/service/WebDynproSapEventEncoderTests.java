@@ -51,20 +51,25 @@ class WebDynproSapEventEncoderTests {
     }
 
     @Test
-    void encodeInitialLoadMatchesClientInspectorBootstrapShape() {
+    void encodeInitialLoadProducesRusaintCompatibleFourEventPayload() {
         String queue = WebDynproSapEventEncoder.encodeInitialLoad(PAGE_URL);
+        String[] events = queue.split("~E001");
 
-        assertThat(queue.split("~E001")).hasSize(4);
-        assertThat(queue).startsWith("ClientInspector_Notify");
+        assertThat(events).hasSize(4);
+        assertThat(events[0]).startsWith("ClientInspector_Notify");
+        assertThat(events[1]).startsWith("ClientInspector_Notify");
+        assertThat(events[2]).startsWith("LoadingPlaceHolder_Load");
+        assertThat(events[3]).startsWith("Custom_ClientInfos");
         assertThat(queue).contains("ClientInspector_Notify~E002Id~E004WD01~E005Data~E004");
         assertThat(queue).contains("ClientInspector_Notify~E002Id~E004WD02~E005Data~E004");
         assertThat(queue).contains("LoadingPlaceHolder_Load~E002Id~E004_loadingPlaceholder_");
-        assertThat(queue).contains("Form_Request");
-        assertThat(queue).contains("Id~E004sap.client.SsrClient.form");
+        assertThat(queue).doesNotContain("Form_Request");
         assertThat(queue).contains("ResponseData~E004delta");
         assertThat(queue).doesNotContain("Button_Press");
-        assertThat(queue).contains("DocumentDomain~003Ahana-prd-ap-4.ssu.ac.kr");
-        assertThat(queue).contains("ClientURL~003A" + WebDynproSapEventEncoder.escape(PAGE_URL + "#"));
+        assertThat(events[0]).doesNotContain(WebDynproSapEventEncoder.escape("DocumentDomain"));
+        assertThat(events[0]).doesNotContain(WebDynproSapEventEncoder.escape("ClientURL"));
+        assertThat(events[3]).contains("DocumentDomain~E004ssu.ac.kr");
+        assertThat(events[3]).contains("ClientURL~E004" + WebDynproSapEventEncoder.escape(PAGE_URL + "#"));
         assertThat(queue).contains("~007Ecache-20230801062755");
         assertThat(queue).contains("ClientAction~E004submit");
     }
