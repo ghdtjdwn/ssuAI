@@ -48,8 +48,9 @@ class RealNoticeConnector implements NoticeConnector {
     private static final String DEPARTMENT_SELECTOR = "div.notice_col4";
     private static final String PAGINATION_SELECTOR = "nav.board-pagination a.page-numbers";
 
-    // scatch notice detail selectors
-    private static final String DETAIL_BODY_SELECTOR = "div.bg-white";
+    // scatch notice detail selectors (spike-confirmed 2026-05-23)
+    // structure: div.bg-white.p-4.mb-5 > [label, h1, div.clearfix, hr, div(body)]
+    private static final String DETAIL_BODY_SELECTOR = "div.bg-white > hr + div";
 
     private static final int MAX_BODY_TEXT_LENGTH = 4000;
 
