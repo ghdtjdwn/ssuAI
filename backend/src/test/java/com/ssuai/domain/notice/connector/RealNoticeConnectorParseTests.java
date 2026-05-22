@@ -108,6 +108,22 @@ class RealNoticeConnectorParseTests {
         assertThat(totalPages).isEqualTo(-1);
     }
 
+    @Test
+    void parseDetailBodySelectsContentAfterHr() throws IOException {
+        Document doc = loadFixture("fixtures/notice/notice_detail.html");
+
+        // hr + div selector should find content div (not header/metadata)
+        org.jsoup.nodes.Element body = doc.selectFirst("div.bg-white > hr + div");
+
+        assertThat(body).isNotNull();
+        String text = body.text();
+        // body should contain actual content, not just metadata noise
+        assertThat(text.length()).isGreaterThan(50);
+        // should NOT start with category label or date pattern
+        assertThat(text).doesNotStartWith("국제교류");
+        assertThat(text).doesNotStartWith("장학");
+    }
+
     private static Document loadFixture(String resourcePath) throws IOException {
         try (InputStream in = RealNoticeConnectorParseTests.class
                 .getClassLoader()
