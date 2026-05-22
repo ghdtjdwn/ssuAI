@@ -58,7 +58,7 @@ public class LibraryBookCache {
     public LibraryBookSearchResponse get(String query, int page, int size) {
         Key key = Key.of(query, page, size);
         Entry cached = entries.get(key);
-        if (cached != null && cached.expiresAt.isAfter(clock.instant())) {
+        if (isFresh(cached)) {
             return cached.value;
         }
 
@@ -66,6 +66,12 @@ public class LibraryBookCache {
         CompletableFuture<Entry> winner = inflight.putIfAbsent(key, mine);
         if (winner == null) {
             try {
+                Entry refreshed = entries.get(key);
+                if (isFresh(refreshed)) {
+                    mine.complete(refreshed);
+                    return refreshed.value;
+                }
+
                 LibraryBookSearchResponse fresh = connector.search(key.query(), key.page(), key.size());
                 Entry entry = new Entry(fresh, clock.instant().plus(ttl));
                 entries.put(key, entry);
@@ -91,6 +97,10 @@ public class LibraryBookCache {
             }
             throw new IllegalStateException("library book cache fetch failed", cause);
         }
+    }
+
+    private boolean isFresh(Entry entry) {
+        return entry != null && entry.expiresAt.isAfter(clock.instant());
     }
 
     int size() {
