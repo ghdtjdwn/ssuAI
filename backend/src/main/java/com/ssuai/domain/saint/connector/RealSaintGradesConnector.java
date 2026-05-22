@@ -82,6 +82,7 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
     private final SaintGradesProperties properties;
     private final HttpClient httpClient;
     private final HttpClient httpClientNoRedirect;
+    private final PortalNavigationService portalNavigationService;
 
     @Autowired
     public RealSaintGradesConnector(SaintGradesProperties properties) {
@@ -89,21 +90,32 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 HttpClient.newBuilder()
                         .followRedirects(HttpClient.Redirect.NEVER)
                         .connectTimeout(properties.getTimeout())
-                        .build());
+                        .build(),
+                new PortalNavigationService(properties.getPortalUrl(), properties.getTimeout()));
     }
 
     RealSaintGradesConnector(SaintGradesProperties properties, HttpClient httpClient) {
-        this(properties, httpClient, httpClient);
+        this(properties, httpClient, httpClient,
+                new PortalNavigationService(properties.getPortalUrl(), properties.getTimeout()));
     }
 
     RealSaintGradesConnector(SaintGradesProperties properties,
             HttpClient httpClient, HttpClient httpClientNoRedirect) {
+        this(properties, httpClient, httpClientNoRedirect,
+                new PortalNavigationService(properties.getPortalUrl(), properties.getTimeout()));
+    }
+
+    RealSaintGradesConnector(SaintGradesProperties properties,
+            HttpClient httpClient, HttpClient httpClientNoRedirect,
+            PortalNavigationService portalNavigationService) {
         this.properties = properties;
         this.httpClient = httpClient;
         this.httpClientNoRedirect = httpClientNoRedirect;
+        this.portalNavigationService = portalNavigationService;
     }
 
     private record InitGetResult(String html, String cookieHeader, String finalUrl) {}
+    private record InitialEntryResponse(String body, String finalUrl) {}
 
     private CookieManager createCookieManager(String rawCookieHeader, String targetUrl) {
         CookieManager cookieManager = new CookieManager();
@@ -144,36 +156,9 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 .connectTimeout(properties.getTimeout())
                 .build();
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(properties.getGradesUrl()))
-                .header("Accept", "text/html,application/xhtml+xml")
-                .header("Accept-Language", "ko")
-                .header("User-Agent", BROWSER_UA)
-                .timeout(properties.getTimeout())
-                .GET()
-                .build();
-
-        HttpResponse<String> response;
-        try {
-            response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        } catch (java.net.http.HttpTimeoutException e) {
-            throw new ConnectorTimeoutException(e);
-        } catch (IOException e) {
-            log.warn("saint grades connector IOException on GET", e);
-            throw new ConnectorUnavailableException(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new ConnectorUnavailableException(e);
-        }
-
-        int status = response.statusCode();
-        if (status / 100 != 2) {
-            log.warn("saint grades connector unexpected status on GET: status={}", status);
-            throw new ConnectorUnavailableException();
-        }
-
-        String rawFirstResponse = response.body();
-        String finalUrl = response.uri().toString();
+        InitialEntryResponse entryResponse = httpEnterWebDynpro(client);
+        String rawFirstResponse = entryResponse.body();
+        String finalUrl = entryResponse.finalUrl();
         Map<String, String> bootstrapFormFields = hiddenFormFields(rawFirstResponse);
 
         String actionRaw = extractFormActionUrl(rawFirstResponse, finalUrl);
@@ -184,19 +169,14 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
             URI base = URI.create(finalUrl);
             postUrl = base.getScheme() + "://" + base.getAuthority() + actionRaw;
         }
-        log.info("saint grades init POST url='{}'", postUrl);
+        log.info("saint grades init POST target: sapExtSidPresent={}", postUrl.contains(";sap-ext-sid="));
 
         Optional<String> bootstrapSecureId = WebDynproResponseUnwrapper.extractSecureIdFromAny(rawFirstResponse);
-        log.info("saint grades bootstrap: secureIdPresent={} snippet='{}'",
-                bootstrapSecureId.isPresent(),
-                rawFirstResponse == null ? "(null)"
-                        : rawFirstResponse.substring(0, Math.min(300, rawFirstResponse.length()))
-                                .replaceAll("\\s+", " "));
+        log.info("saint grades bootstrap: secureIdPresent={} bodyBytes={}",
+                bootstrapSecureId.isPresent(), utf8Bytes(rawFirstResponse));
         if (bootstrapSecureId.isEmpty()) {
-            String snippet = rawFirstResponse == null ? "(null)"
-                    : rawFirstResponse.substring(0, Math.min(300, rawFirstResponse.length())).replaceAll("\\s+", " ");
-            log.info("saint grades bootstrap no secure-id: studentFp={} snippet='{}'",
-                    SaintSessionStore.fingerprint(studentId), snippet);
+            log.info("saint grades bootstrap no secure-id: studentFp={} bodyBytes={}",
+                    SaintSessionStore.fingerprint(studentId), utf8Bytes(rawFirstResponse));
             throw new SaintSessionExpiredException("ecc did not provide sap-wd-secure-id on first GET");
         }
 
@@ -266,6 +246,50 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
         log.info("saint grades fetched: studentFp={} history={} detailTerms={} hops={}",
                 SaintSessionStore.fingerprint(studentId), history.size(), details.size(), hops);
         return new GradesResponse(history, academicRecord, certificate, details);
+    }
+
+    private InitialEntryResponse httpEnterWebDynpro(HttpClient client) {
+        Optional<PortalNavigationService.EccEntryPoint> portalEntry =
+                portalNavigationService.resolveEntryPoint(client, "ZCMB3W0017", properties.getGradesUrl());
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(portalEntry.map(PortalNavigationService.EccEntryPoint::url)
+                        .orElse(properties.getGradesUrl())))
+                .header("Accept", "text/html,application/xhtml+xml")
+                .header("Accept-Language", "ko")
+                .header("User-Agent", BROWSER_UA)
+                .timeout(properties.getTimeout());
+        if (portalEntry.isPresent()) {
+            builder.header("Referer", PortalNavigationService.saintReferer())
+                    .header("Origin", PortalNavigationService.saintOrigin())
+                    .header("Sec-Fetch-Site", "same-site")
+                    .header("Sec-Fetch-Mode", "navigate")
+                    .header("Sec-Fetch-Dest", "iframe")
+                    .POST(HttpRequest.BodyPublishers.noBody());
+        } else {
+            builder.GET();
+        }
+        HttpRequest request = builder.build();
+        HttpResponse<String> response;
+        try {
+            response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (java.net.http.HttpTimeoutException e) {
+            throw new ConnectorTimeoutException(e);
+        } catch (IOException e) {
+            log.warn("saint grades connector IOException on entry", e);
+            throw new ConnectorUnavailableException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ConnectorUnavailableException(e);
+        }
+
+        int status = response.statusCode();
+        if (status / 100 != 2) {
+            log.warn("saint grades connector unexpected status on entry: status={}", status);
+            throw new ConnectorUnavailableException();
+        }
+        log.info("saint grades entry fetched: viaPortal={} status={} bodyBytes={}",
+                portalEntry.isPresent(), status, utf8Bytes(response.body()));
+        return new InitialEntryResponse(response.body(), response.uri().toString());
     }
 
     private InitGetResult httpGetFollowCookies(String startCookieHeader, String startUrl, String logPrefix) {
@@ -374,24 +398,17 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
                 return response;
             }
             if (status == 401 || status == 403) {
-                String bodySnippet4xx = response.body() == null ? "(null)"
-                        : response.body().substring(0, Math.min(400, response.body().length()))
-                                .replaceAll("\\s+", " ");
-                log.info("saint grades connector auth rejected: status={} body='{}'", status, bodySnippet4xx);
+                log.info("saint grades connector auth rejected: status={} bodyBytes={}",
+                        status, utf8Bytes(response.body()));
                 throw new SaintSessionExpiredException("ecc rejected WebDynpro request with " + status);
             }
             if (status / 100 == 5) {
-                String body = response.body() == null ? "(null)" : response.body();
-                String snippet = body.length() > 4000
-                        ? body.substring(0, 4000) + "...(truncated " + body.length() + ")"
-                        : body;
-                log.warn("saint grades connector 5xx: status={} url={} body='{}'",
-                        status, request.uri(), snippet.replaceAll("\\s+", " "));
+                log.warn("saint grades connector 5xx: status={} bodyBytes={}",
+                        status, utf8Bytes(response.body()));
                 throw new ConnectorUnavailableException();
             }
-            String body4xx = response.body() == null ? "(null)"
-                    : response.body().substring(0, Math.min(500, response.body().length())).replaceAll("\\s+", " ");
-            log.warn("saint grades connector unexpected status={} body='{}'", status, body4xx);
+            log.warn("saint grades connector unexpected status={} bodyBytes={}",
+                    status, utf8Bytes(response.body()));
             throw new ConnectorParseException();
         } catch (java.net.http.HttpTimeoutException exception) {
             throw new ConnectorTimeoutException(exception);
@@ -409,12 +426,15 @@ public class RealSaintGradesConnector implements SaintGradesConnector {
             throw new SaintSessionExpiredException("ecc returned empty body");
         }
         if (GradesParser.parseTermHistory(html).isEmpty()) {
-            String snippet = html.substring(0, Math.min(500, html.length())).replaceAll("\\s+", " ");
-            log.info("saint grades auth gate tripped (no term history): studentFp={} htmlSnippet='{}'",
-                    SaintSessionStore.fingerprint(studentId), snippet);
+            log.info("saint grades auth gate tripped (no term history): studentFp={} bodyBytes={}",
+                    SaintSessionStore.fingerprint(studentId), utf8Bytes(html));
             throw new SaintSessionExpiredException(
                     "ecc did not render the term GPA history (likely logon redirect)");
         }
+    }
+
+    private static int utf8Bytes(String body) {
+        return body == null ? 0 : body.getBytes(StandardCharsets.UTF_8).length;
     }
 
     private static String firstRenderableHtml(String responseBody) {
