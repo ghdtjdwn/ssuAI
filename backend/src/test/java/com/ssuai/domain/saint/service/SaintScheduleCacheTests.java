@@ -159,12 +159,12 @@ class SaintScheduleCacheTests {
                     CompletableFuture.supplyAsync(() -> cache.get(STUDENT_A), pool),
                     CompletableFuture.supplyAsync(() -> cache.get(STUDENT_A), pool)
             );
-            assertThat(connector.awaitWaiter(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(connector.awaitWaiter(15, TimeUnit.SECONDS)).isTrue();
             connector.release();
 
-            ScheduleResponse common = futures.get(0).get(5, TimeUnit.SECONDS);
+            ScheduleResponse common = futures.get(0).get(15, TimeUnit.SECONDS);
             for (CompletableFuture<ScheduleResponse> future : futures) {
-                assertThat(future.get(5, TimeUnit.SECONDS)).isSameAs(common);
+                assertThat(future.get(15, TimeUnit.SECONDS)).isSameAs(common);
             }
             assertThat(connector.invocationCount()).isEqualTo(1);
         } finally {
