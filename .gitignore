@@ -44,3 +44,12 @@ deploy/generated/
 *.pem
 *.key
 secrets/
+
+# Personal scratch files (never share)
+/myInfo.txt
+/내가모은정보들.txt
+/내가모은정보들_2.txt
+/scratch/
+/rusaint/
+/ssugrade/
+/.antigravitycli/
