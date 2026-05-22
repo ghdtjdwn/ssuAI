@@ -45,7 +45,7 @@ public class LibrarySeatCache {
 
     public LibrarySeatStatusResponse get(LibraryFloor floor, String token) {
         Entry cached = entries.get(floor);
-        if (cached != null && cached.expiresAt.isAfter(clock.instant())) {
+        if (isFresh(cached)) {
             return cached.value;
         }
 
@@ -53,6 +53,12 @@ public class LibrarySeatCache {
         CompletableFuture<Entry> winner = inflight.putIfAbsent(floor, mine);
         if (winner == null) {
             try {
+                Entry refreshed = entries.get(floor);
+                if (isFresh(refreshed)) {
+                    mine.complete(refreshed);
+                    return refreshed.value;
+                }
+
                 LibrarySeatStatusResponse fresh = connector.fetchSeatStatus(floor, token);
                 Entry entry = new Entry(fresh, clock.instant().plus(ttl));
                 entries.put(floor, entry);
@@ -78,6 +84,10 @@ public class LibrarySeatCache {
             }
             throw new IllegalStateException("library seat cache fetch failed", cause);
         }
+    }
+
+    private boolean isFresh(Entry entry) {
+        return entry != null && entry.expiresAt.isAfter(clock.instant());
     }
 
     private record Entry(LibrarySeatStatusResponse value, Instant expiresAt) {

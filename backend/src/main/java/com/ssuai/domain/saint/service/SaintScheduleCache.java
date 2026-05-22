@@ -80,7 +80,7 @@ public class SaintScheduleCache {
 
     public ScheduleResponse get(String studentId) {
         Entry cached = entries.get(studentId);
-        if (cached != null && cached.expiresAt.isAfter(clock.instant())) {
+        if (isFresh(cached)) {
             return cached.value;
         }
 
@@ -88,6 +88,12 @@ public class SaintScheduleCache {
         CompletableFuture<Entry> winner = inflight.putIfAbsent(studentId, mine);
         if (winner == null) {
             try {
+                Entry refreshed = entries.get(studentId);
+                if (isFresh(refreshed)) {
+                    mine.complete(refreshed);
+                    return refreshed.value;
+                }
+
                 PortalCookies cookies = sessionStore.cookies(studentId)
                         .orElseThrow(SaintSessionExpiredException::new);
                 ScheduleResponse fresh = connector.fetchSchedule(studentId, cookies);
@@ -115,6 +121,10 @@ public class SaintScheduleCache {
             }
             throw new IllegalStateException("saint schedule cache fetch failed", cause);
         }
+    }
+
+    private boolean isFresh(Entry entry) {
+        return entry != null && entry.expiresAt.isAfter(clock.instant());
     }
 
     int size() {
