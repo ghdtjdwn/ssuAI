@@ -34,8 +34,8 @@ env:
   connectorLibraryBook: real
   connectorLibraryLoans: real
   connectorLibrarySeat: real
-  connectorSaintSchedule: real
-  connectorSaintGrades: real
+  connectorSaintSchedule: rusaint
+  connectorSaintGrades: rusaint
   connectorLmsAssignments: real
   connectorChat: llm
   mistralTrainingOptOutConfirmed: "false"
