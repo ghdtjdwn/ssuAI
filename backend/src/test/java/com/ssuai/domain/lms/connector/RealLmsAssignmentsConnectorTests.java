@@ -44,7 +44,14 @@ class RealLmsAssignmentsConnectorTests {
 
     @Test
     void getJsonSendsAuthorizationBearerFromCookies() throws Exception {
-        canvasServer.enqueue(jsonOk("[{\"id\":42}]"));
+        canvasServer.enqueue(jsonOk("""
+                {
+                  "enrollment_terms": [
+                    {"id": 41, "name": "Old", "default": false},
+                    {"id": 42, "name": "Current", "default": true}
+                  ]
+                }
+                """));
         canvasServer.enqueue(jsonOk("[{\"id\":10001,\"name\":\"Data Structures\"}]"));
         canvasServer.enqueue(jsonOk("""
                 {
@@ -78,6 +85,26 @@ class RealLmsAssignmentsConnectorTests {
         assertThat(courses.getHeader("Authorization")).isEqualTo("Bearer jwt-xyz");
         assertThat(todos.getHeader("Authorization")).isEqualTo("Bearer jwt-xyz");
         assertThat(terms.getHeader("Referer")).isEqualTo(canvasBaseUrl() + "/");
+    }
+
+    @Test
+    void fetchAssignmentsFallsBackToFirstTermWhenNoDefaultTerm() {
+        canvasServer.enqueue(jsonOk("""
+                {
+                  "enrollment_terms": [
+                    {"id": 43, "name": "First", "default": false},
+                    {"id": 42, "name": "Previous", "default": false}
+                  ]
+                }
+                """));
+        canvasServer.enqueue(jsonOk("[]"));
+        canvasServer.enqueue(jsonOk("{\"to_dos\":[]}"));
+
+        AssignmentsResponse response = connector.fetchAssignments("20221528",
+                new LmsCookies("WAF=w; xn_api_token=jwt-xyz; _normandy_session=ns"));
+
+        assertThat(response.termId()).isEqualTo(43L);
+        assertThat(response.items()).isEmpty();
     }
 
     @Test
