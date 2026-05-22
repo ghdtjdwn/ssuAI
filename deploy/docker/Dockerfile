@@ -10,6 +10,32 @@
 #   docker buildx build --platform linux/arm64 -f deploy/docker/Dockerfile \
 #     -t ghcr.io/<owner>/ssuai-backend:<sha> --push ./backend
 
+# ---- rusaint native library stage -----------------------------------------
+FROM ubuntu:22.04 AS rusaint-builder
+
+ARG RUST_VERSION=1.95.0
+ARG RUSAINT_REF=c2bdcf91c6efb313b971efa2a8a67ed79ad77b4b
+ENV PATH="/root/.cargo/bin:${PATH}"
+WORKDIR /workspace
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      git \
+      build-essential \
+      pkg-config \
+      libssl-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+  | sh -s -- -y --profile minimal --default-toolchain ${RUST_VERSION}
+
+RUN git clone https://github.com/yourssu/rusaint.git rusaint \
+ && cd rusaint \
+ && git checkout ${RUSAINT_REF} \
+ && cargo build --release --package rusaint-ffi
+
 # ---- Build stage ----------------------------------------------------------
 FROM eclipse-temurin:21-jdk-jammy AS builder
 WORKDIR /workspace
@@ -27,15 +53,18 @@ RUN ./gradlew --no-daemon bootJar -x test
 FROM eclipse-temurin:21-jre-jammy AS runtime
 WORKDIR /app
 
-# Run as non-root. curl is used by the HEALTHCHECK below.
+# Run as non-root. curl is used by the HEALTHCHECK below; libssl3 covers
+# native rusaint builds that link OpenSSL on Ubuntu 22.04.
 RUN groupadd --system spring \
  && useradd --system --uid 1001 --gid spring --shell /usr/sbin/nologin spring \
  && apt-get update \
- && apt-get install -y --no-install-recommends curl \
+ && apt-get install -y --no-install-recommends curl libssl3 \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /workspace/build/libs/*-SNAPSHOT.jar app.jar
-RUN chown spring:spring app.jar
+COPY --from=rusaint-builder /workspace/rusaint/target/release/librusaint_ffi.so \
+  /usr/local/lib/librusaint_ffi.so
+RUN chown spring:spring app.jar /usr/local/lib/librusaint_ffi.so
 
 USER 1001
 EXPOSE 8080
@@ -43,6 +72,7 @@ EXPOSE 8080
 # JVM defaults sized for a 1 GB pod request on the Ampere A1 host.
 # Override with the JAVA_OPTS env var from the k8s ConfigMap when needed.
 ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=45s --retries=3 \
   CMD curl --fail --silent http://localhost:8080/actuator/health | grep -q '"status":"UP"' || exit 1

@@ -11,7 +11,7 @@
 #
 # Recommended env vars in prod (silent fallback to ephemeral per-restart values otherwise):
 #   SSUAI_CREDENTIAL_ENCRYPTION_KEY — AES-256 key for SaintSessionStore (Task 16);
-#                                     unset = stored portal cookies vanish on JVM restart,
+#                                     unset = stored SAINT sessions vanish on JVM restart,
 #                                     forcing every user to redo SSO.
 ssuai:
   connector:
@@ -20,8 +20,8 @@ ssuai:
     library-seat: ${SSUAI_CONNECTOR_LIBRARY_SEAT:real}
     library-book: real
     library-loans: ${SSUAI_CONNECTOR_LIBRARY_LOANS:real}
-    saint-schedule: ${SSUAI_CONNECTOR_SAINT_SCHEDULE:real}
-    saint-grades: ${SSUAI_CONNECTOR_SAINT_GRADES:real}
+    saint-schedule: ${SSUAI_CONNECTOR_SAINT_SCHEDULE:rusaint}
+    saint-grades: ${SSUAI_CONNECTOR_SAINT_GRADES:rusaint}
     lms-assignments: ${SSUAI_CONNECTOR_LMS_ASSIGNMENTS:real}
     chat: ${SSUAI_CONNECTOR_CHAT:mock}
   # Production CORS allowlist — exactly one origin (the deployed Vercel
