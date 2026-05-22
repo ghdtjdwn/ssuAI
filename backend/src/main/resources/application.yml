@@ -74,6 +74,7 @@ ssuai:
     saint-grades: mock # mock | rusaint
     lms-assignments: mock # mock | real
     chat: ${SSUAI_CONNECTOR_CHAT:mock} # mock | llm
+    notice: mock # mock | real
   library:
     seat:
       # Per-floor cache TTL. Short enough that students get fresh data
@@ -145,6 +146,11 @@ ssuai:
     # In prod application-prod.yml force-empties this so the SSUAI_FRONTEND_ORIGIN
     # env var becomes required and the empty case fails fast at startup.
     origin: ${SSUAI_FRONTEND_ORIGIN:http://localhost:3000}
+  notice:
+    base-url: ${SSUAI_NOTICE_BASE_URL:https://scatch.ssu.ac.kr}
+    cache-ttl: 5m
+    timeout: 8s
+    max-page-size: 20
   chat:
     llm:
       max-tokens: ${SSUAI_LLM_MAX_TOKENS:400}
