@@ -118,10 +118,18 @@ context 에서 작업.
 
 ### Antigravity CLI — `agy` (Codex 대체)
 Gemini CLI 후속 (Gemini CLI 종료: 2026-06-18). Codex 토큰 소진 시 사용.
-- 모델: Gemini 3.5 Flash 자동 선택 (수동 변경 불가). Pro plan 이면 충분.
-- `agy inspect` → `AGENTS.md` 자동 로드 확인. 별도 설정 파일 불필요.
+- **기본 모델: Gemini 3.5 Flash** (서버 사이드 자동 선택). Pro plan 이면 충분.
+- 모델 변경 가능: TUI 내 `/model <id>` 또는 CLI `-m <id>` 플래그.
+  사용 가능 모델: `gemini-3.5-flash` (기본), `gemini-3.1-pro`, `claude-sonnet-4-6`,
+  `claude-opus-4-6`, `gpt-oss-120b`.
+- **구현 작업은 Gemini 3.5 Flash 유지 권장** — agentic 벤치마크(MCP Atlas 83.6%,
+  Terminal-Bench 76.2%, GDPval-AA 1656 Elo)에서 GPT-5.5 초과. 289 tok/s, 빠름.
+  SWE-bench 정확도(코드 품질)는 Claude Sonnet 4.6(82.1%)이 높지만,
+  multi-step tool-use 중심인 agy 워크플로우에는 Flash가 더 적합.
+- **세션 시작**: `agy -m gemini-3.5-flash` 실행 후 "`.codex/current-task.md` 먼저 읽어라." 입력.
+  (`-m` 생략 시 Claude로 자동 선택될 수 있음 — Flash quota가 넉넉하므로 명시 권장)
+- `agy inspect` 는 AGENTS.md 로드 여부 확인용 일회성 진단 커맨드 — 매 세션 불필요.
 - Manager View: 서브에이전트 병렬 실행 가능.
-- 세션 시작 지시: "`.codex/current-task.md` 먼저 읽어라."
 - commit author 반드시 `git config user.name` = ghdtjdwn 확인.
 
 ### Task → 모델 routing 가이드
