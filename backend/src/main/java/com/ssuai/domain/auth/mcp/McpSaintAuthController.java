@@ -89,11 +89,14 @@ public class McpSaintAuthController {
             int q = state.indexOf('?');
             String suffix = state.substring(q + 1);
             state = state.substring(0, q);
-            if (sToken == null) {
-                for (String pair : suffix.split("&")) {
-                    if (pair.startsWith("sToken=")) {
-                        sToken = pair.substring("sToken=".length());
-                        break;
+            for (String pair : suffix.split("&")) {
+                String[] parts = pair.split("=", 2);
+                if (parts.length == 2) {
+                    if ("sToken".equals(parts[0]) && sToken == null) {
+                        sToken = parts[1];
+                    }
+                    if ("sIdno".equals(parts[0]) && sIdno == null) {
+                        sIdno = parts[1];
                     }
                 }
             }

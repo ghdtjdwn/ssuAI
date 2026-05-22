@@ -100,6 +100,22 @@ class McpLmsAuthControllerTests {
     }
 
     @Test
+    void doubleQuestionMarkStateWithIdnoAndTokenIsHandled() throws Exception {
+        McpAuthStateEntry entry = new McpAuthStateEntry("valid-state", SESSION_ID, McpProviderType.LMS, EXPIRES);
+        when(mcpAuthService.consumeState("valid-state")).thenReturn(Optional.of(entry));
+
+        mockMvc.perform(get("/api/mcp/auth/lms/callback")
+                        .param("state", "valid-state?sIdno=20231234&sToken=tok"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<String> stateCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mcpAuthService).consumeState(stateCaptor.capture());
+        org.assertj.core.api.Assertions.assertThat(stateCaptor.getValue()).isEqualTo("valid-state");
+        verify(lmsSsoService).authenticate("tok", "20231234");
+        verify(mcpAuthService).linkProvider(SESSION_ID, McpProviderType.LMS, "20231234");
+    }
+
+    @Test
     void normalStateIsHandled() throws Exception {
         McpAuthStateEntry entry = new McpAuthStateEntry("normal-state", SESSION_ID, McpProviderType.LMS, EXPIRES);
         when(mcpAuthService.consumeState("normal-state")).thenReturn(Optional.of(entry));
