@@ -129,9 +129,19 @@ class RealLmsAssignmentsConnector implements LmsAssignmentsConnector {
                 + "/learningx/api/v1/users/" + encoded
                 + "/terms?include_invited_course_contained=true";
         JsonNode body = getJson(client, bearer, url);
-        if (body.isArray() && !body.isEmpty()) {
-            log.info("lms canvas terms ok: count={} firstId={}", body.size(), body.get(0).path("id").asLong());
-            return body.get(0).path("id").asLong();
+        JsonNode terms = body.path("enrollment_terms");
+        if (terms.isArray() && !terms.isEmpty()) {
+            for (JsonNode term : terms) {
+                if (term.path("default").asBoolean(false)) {
+                    log.info("lms canvas terms ok: count={} pickedId={} pickedName={}",
+                            terms.size(), term.path("id").asLong(), term.path("name").asText(""));
+                    return term.path("id").asLong();
+                }
+            }
+            JsonNode first = terms.get(0);
+            log.info("lms canvas terms ok (no default): count={} fallbackId={} fallbackName={}",
+                    terms.size(), first.path("id").asLong(), first.path("name").asText(""));
+            return first.path("id").asLong();
         }
         String bodyStr = body.toString();
         String snippet = bodyStr.length() > 1500 ? bodyStr.substring(0, 1500) + "...(truncated)" : bodyStr;
