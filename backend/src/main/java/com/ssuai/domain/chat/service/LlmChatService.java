@@ -26,7 +26,6 @@ import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -45,7 +44,9 @@ import com.ssuai.domain.chat.service.llm.LlmProvider;
 import com.ssuai.domain.chat.service.llm.LlmProviderException;
 import com.ssuai.domain.library.mcp.LibraryToolContext;
 import com.ssuai.domain.library.service.LibraryLoansService;
+import com.ssuai.domain.lms.mcp.LmsToolContext;
 import com.ssuai.domain.lms.service.LmsAssignmentsService;
+import com.ssuai.domain.saint.mcp.SaintToolContext;
 import com.ssuai.domain.saint.service.SaintGradesService;
 import com.ssuai.domain.saint.service.SaintScheduleService;
 import com.ssuai.global.exception.ChatUnavailableException;
@@ -105,7 +106,7 @@ public class LlmChatService implements ChatService {
                말해. 다른 사이트 링크나 외부 추정 정보를 만들지 마.
 
             범위 밖 안내:
-            - 수강신청, 졸업요건 같은 시스템 연동은 아직 지원 안 함.
+            - 수강신청은 아직 지원 안 함.
             - get_my_schedule / get_my_grades / get_my_assignments 는 u-SAINT 또는 LMS 로그인이
               필요해. 로그인 안 된 사용자에게는 SmartID 로그인 안내.
             - get_my_library_loans 는 도서관 연동이 필요해.
@@ -115,12 +116,12 @@ public class LlmChatService implements ChatService {
             """;
 
     private static final String SCOPE_GUIDANCE =
-            "아직은 그 정보는 지원하지 않아요. 지금은 학식, 기숙사 식단, 캠퍼스 시설, 도서관 좌석/도서 검색, 그리고 (로그인된 경우) 본인 시간표·성적·LMS 과제·도서관 대출 현황을 도와줄 수 있어요.";
+            "아직은 그 정보는 지원하지 않아요. 지금은 학식, 기숙사 식단, 캠퍼스 시설, 도서관 좌석/도서 검색, 공지사항, 그리고 (로그인된 경우) 본인 시간표·성적·채플·졸업요건·장학금·LMS 과제·도서관 대출 현황을 도와줄 수 있어요.";
 
     private static final String SECRET_GUIDANCE =
             "비밀번호, 쿠키, 세션, API key 같은 비밀 정보는 입력하지 말아주세요. "
-                    + "학식, 기숙사 식단, 캠퍼스 시설, 도서관 좌석/도서 검색, 그리고 "
-                    + "(로그인된 경우) 본인 시간표·성적·LMS 과제·도서관 대출 현황을 도와줄 수 있어요.";
+                    + "학식, 기숙사 식단, 캠퍼스 시설, 도서관 좌석/도서 검색, 공지사항, 그리고 "
+                    + "(로그인된 경우) 본인 시간표·성적·채플·졸업요건·장학금·LMS 과제·도서관 대출 현황을 도와줄 수 있어요.";
 
     private static final String SAINT_SESSION_GUIDANCE =
             "u-SAINT 로그인이 필요한 정보예요. 먼저 SmartID 로 로그인하고 다시 물어봐 주세요.";
@@ -157,7 +158,6 @@ public class LlmChatService implements ChatService {
 
     private final List<McpSyncClient> mcpClients;
 
-    @Autowired
     public LlmChatService(
             LlmChatProperties properties,
             List<LlmProvider> providers,
@@ -309,10 +309,8 @@ public class LlmChatService implements ChatService {
         // callback path; chat's direct-service short-circuit uses the
         // local parameter, so the binding is also a safety net for
         // future loopback routing changes.
-        try (com.ssuai.domain.saint.mcp.SaintToolContext.Scope ignored =
-                     com.ssuai.domain.saint.mcp.SaintToolContext.withStudentId(studentId);
-             com.ssuai.domain.lms.mcp.LmsToolContext.Scope ignoredLms =
-                     com.ssuai.domain.lms.mcp.LmsToolContext.withStudentId(studentId);
+        try (SaintToolContext.Scope ignored = SaintToolContext.withStudentId(studentId);
+             LmsToolContext.Scope ignoredLms = LmsToolContext.withStudentId(studentId);
              LibraryToolContext.Scope ignoredLibrary =
                      LibraryToolContext.withSessionKey(LibraryToolContext.currentSessionKey())) {
             for (int index = 0; index < toolCalls.size(); index++) {
