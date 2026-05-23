@@ -8,6 +8,7 @@ import com.ssuai.domain.auth.mcp.McpAuthService;
 import com.ssuai.domain.auth.mcp.McpAuthSession;
 import com.ssuai.domain.auth.mcp.McpAuthStateEntry;
 import com.ssuai.domain.auth.mcp.McpAuthUrlFactory;
+import com.ssuai.domain.auth.mcp.McpProviderLink;
 import com.ssuai.domain.auth.mcp.McpProviderType;
 import com.ssuai.domain.auth.mcp.dto.McpPrivateToolResponse;
 
@@ -34,7 +35,7 @@ public class McpAuthHelper {
     public Optional<String> principalKey(String idValue, McpProviderType provider) {
         return mcpAuthService.find(idValue)
                 .flatMap(session -> session.provider(provider))
-                .map(com.ssuai.domain.auth.mcp.McpProviderLink::principalKey);
+                .map(McpProviderLink::principalKey);
     }
 
     /**
