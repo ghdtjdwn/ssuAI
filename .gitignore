@@ -53,3 +53,6 @@ secrets/
 /rusaint/
 /ssugrade/
 /.antigravitycli/
+
+# ssufid Rust library (local reference clone, not part of the build)
+backend/ssufid/
