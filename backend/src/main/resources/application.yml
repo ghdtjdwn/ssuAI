@@ -23,28 +23,28 @@ spring:
         name: ssuai-mcp
         version: 0.0.1
         type: SYNC
+        protocol: STREAMABLE
       client:
         enabled: ${SSUAI_MCP_CLIENT_ENABLED:true}
         name: ssuai-self-mcp-client
         version: 0.0.1
         type: SYNC
-        # Defer the SSE handshake to the first chat request: the MCP server
-        # we are connecting to is in the same JVM, and its /sse endpoint is
-        # only ready once Tomcat finishes binding the port — initializing
+        # Defer the Streamable HTTP handshake to the first chat request: the
+        # MCP server we connect to is in the same JVM, and its /mcp endpoint
+        # is only ready once Tomcat finishes binding the port — initializing
         # the client during context refresh deadlocks against startup.
         initialized: false
         # We do not use Spring AI's ChatClient ToolCallback bridge; the chat
         # path is OpenAI-compatible REST (ADR 0009) and discovers tools via
         # mcpClient.listTools() lazily (ADR 0011). Leaving this on would
-        # also block startup trying to list tools over /sse.
+        # also block startup trying to list tools over /mcp.
         toolcallback:
           enabled: false
         request-timeout: 10s
-        sse:
+        streamable-http:
           connections:
             self:
               url: ${SSUAI_MCP_CLIENT_BASE_URL:http://localhost:8080}
-              sse-endpoint: /sse
 
 management:
   endpoints:

@@ -6,6 +6,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
 import com.ssuai.domain.auth.mcp.McpAuthService;
@@ -47,7 +48,9 @@ public class McpAuthMcpTools {
                     + "If mcp_session_id is missing or invalid, all providers show as not linked. "
                     + "Sessions are stored in server memory and reset on server restart — call start_auth again if your session is lost."
     )
-    public McpAuthStatusResponse getAuthStatus(String mcp_session_id) {
+    public McpAuthStatusResponse getAuthStatus(
+            @ToolParam(description = "MCP session ID issued by start_auth. If absent or invalid, all providers show as not linked.", required = false)
+            String mcp_session_id) {
         McpAuthSession session = mcpAuthService.find(mcp_session_id).orElse(null);
         String sessionIdValue = session != null ? session.id().value() : null;
 
@@ -78,7 +81,11 @@ public class McpAuthMcpTools {
                     + "4) Retry the original private tool call with mcp_session_id=[mcpSessionId]. "
                     + "Creates a new MCP session if mcp_session_id is not provided."
     )
-    public McpAuthStartResponse startAuth(String provider, String mcp_session_id) {
+    public McpAuthStartResponse startAuth(
+            @ToolParam(description = "Provider to authenticate. SAINT: 시간표·성적·채플·졸업·장학금. LMS: 과제·퀴즈. LIBRARY: 도서관 대출 현황.")
+            String provider,
+            @ToolParam(description = "Existing MCP session ID to reuse. If absent, a new session is created.", required = false)
+            String mcp_session_id) {
         McpProviderType providerType = parseProvider(provider);
         if (providerType == null) {
             return new McpAuthStartResponse(
@@ -105,7 +112,11 @@ public class McpAuthMcpTools {
             description = "Unlinks a specific provider (SAINT, LMS, or LIBRARY) from the MCP session. "
                     + "Requires both mcp_session_id and provider."
     )
-    public McpAuthLogoutResponse logoutProvider(String provider, String mcp_session_id) {
+    public McpAuthLogoutResponse logoutProvider(
+            @ToolParam(description = "Provider to unlink: SAINT, LMS, or LIBRARY.")
+            String provider,
+            @ToolParam(description = "MCP session ID issued by start_auth.")
+            String mcp_session_id) {
         McpProviderType providerType = parseProvider(provider);
         if (providerType == null) {
             return new McpAuthLogoutResponse("ERROR", mcp_session_id, provider,
@@ -131,7 +142,9 @@ public class McpAuthMcpTools {
             description = "Removes the entire MCP auth session and all linked providers. "
                     + "Requires mcp_session_id."
     )
-    public McpAuthLogoutResponse logoutAll(String mcp_session_id) {
+    public McpAuthLogoutResponse logoutAll(
+            @ToolParam(description = "MCP session ID to fully invalidate.")
+            String mcp_session_id) {
         if (mcp_session_id == null || mcp_session_id.isBlank()) {
             return new McpAuthLogoutResponse("ERROR", null, null, "mcp_session_id is required.");
         }
