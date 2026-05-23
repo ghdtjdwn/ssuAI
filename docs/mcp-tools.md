@@ -13,6 +13,8 @@ MCP server 는 별도 프로세스가 아니라 기존 ssuAI Spring Boot backend
 
 ### 2a. 공개 tool (인증 불필요)
 
+**학식·시설·도서관**
+
 | tool name | 설명 | 주요 인자 | 응답 DTO |
 | --- | --- | --- | --- |
 | `get_today_meal` | 오늘 숭실대 캠퍼스 식당 메뉴 | `restaurant` (선택) | `MealResponse` |
@@ -21,6 +23,19 @@ MCP server 는 별도 프로세스가 아니라 기존 ssuAI Spring Boot backend
 | `search_campus_facilities` | 캠퍼스 시설 검색 | `query` (선택) | `CampusFacilityListResponse` |
 | `get_library_seat_status` | 도서관 층별 좌석 현황 | `floor` (정수: -1~6) | `LibrarySeatStatusResponse` |
 | `search_library_book` | 도서관 소장 도서 검색 | `query`, `page`, `size` (선택) | `LibraryBookSearchResponse` |
+
+**공지사항**
+
+| tool name | 설명 | 주요 인자 | 응답 DTO |
+| --- | --- | --- | --- |
+| `get_recent_notices` | 학교 공지사항 최신 목록 | `category` (선택), `page` (선택) | `NoticeListResponse` |
+| `search_notices` | 공지사항 키워드 검색 | `keyword`, `category` (선택), `page` (선택) | `NoticeListResponse` |
+| `list_notice_categories` | 공지 카테고리 목록 반환 | 없음 | `NoticeCategoriesResponse` |
+| `get_notice_detail` | 공지 URL 로 본문 전체 조회 | `url` | `NoticeDetailResponse` |
+| `get_active_notices` | 진행중(마감 전) 공지 | `category` (선택) | `NoticeListResponse` |
+| `get_department_notices` | 학과/부서 공지 | `department`, `page` (선택) | `NoticeListResponse` |
+
+`category` 허용 값: `학사`, `장학`, `국제교류`, `외국인유학생`, `채용`, `비교과·행사`, `교원채용`, `교직`, `봉사`, `기타`
 
 ### 2b. MCP 인증 세션 관리 tool
 
@@ -79,6 +94,9 @@ MCP server 는 별도 프로세스가 아니라 기존 ssuAI Spring Boot backend
 | --- | --- | --- | --- |
 | `get_my_schedule` | 전 학기 시간표 (과목·요일·교시·강의실) | SAINT | `mcp_session_id` |
 | `get_my_grades` | 누적 GPA + 학기별 과목 수 | SAINT | `mcp_session_id` |
+| `get_my_chapel_info` | 채플 출석 현황 | SAINT | `year` (선택), `semester` (선택), `mcp_session_id` |
+| `check_graduation_requirements` | 졸업 요건 충족 여부 및 잔여 학점 | SAINT | `mcp_session_id` |
+| `get_my_scholarships` | 장학금 수혜 내역 | SAINT | `year` (선택), `mcp_session_id` |
 | `get_my_assignments` | 현재 학기 미제출 과제·퀴즈 목록 | LMS | `mcp_session_id` |
 | `get_my_library_loans` | 도서관 대출 현황 (반납 기한 포함) | LIBRARY | `mcp_session_id` |
 
@@ -163,14 +181,27 @@ npx @modelcontextprotocol/inspector
 2. URL 에 `http://localhost:8080/sse` 를 입력한다.
 3. Connect 를 누른다.
 4. `Tools` 탭에서 `List Tools` 를 누른다.
-5. tool 14개가 보이는지 확인한다.
+5. tool 23개가 보이는지 확인한다.
 
 보여야 하는 tool 이름:
 ```
-공개: get_today_meal, get_meal_by_date, get_dorm_weekly_meal, search_campus_facilities,
-      get_library_seat_status, search_library_book
-인증: get_auth_status, start_auth, logout_provider, logout_all
-private: get_my_schedule, get_my_grades, get_my_assignments, get_my_library_loans
+공개(학식·시설·도서관):
+  get_today_meal, get_meal_by_date, get_dorm_weekly_meal,
+  search_campus_facilities, get_library_seat_status, search_library_book
+
+공개(공지사항):
+  get_recent_notices, search_notices, list_notice_categories,
+  get_notice_detail, get_active_notices, get_department_notices
+
+인증 관리:
+  get_auth_status, start_auth, logout_provider, logout_all
+
+개인(SAINT):
+  get_my_schedule, get_my_grades, get_my_chapel_info,
+  check_graduation_requirements, get_my_scholarships
+
+개인(LMS): get_my_assignments
+개인(LIBRARY): get_my_library_loans
 ```
 
 `start_auth` 호출 예시:
@@ -258,7 +289,7 @@ MCP inspector 의 `Tools` 탭에서 `List Tools` 를 다시 클릭한다. Claude
 `ssuai.auth.api-base-url` (= `SSUAI_AUTH_API_BASE_URL` 환경 변수) 가 설정되지 않으면 loginUrl 이 생성되지 않는다. 로컬 개발 시 `http://localhost:8080` 으로 설정한다.
 
 ## 8. 위험·write tool 정책 (향후)
-현재 노출된 14개 MCP tool 은 모두 read-only 이다. 학교 시스템 상태를 변경하지 않는다.
+현재 노출된 23개 MCP tool 은 모두 read-only 이다. 학교 시스템 상태를 변경하지 않는다.
 
 ### Phase 4 flagship — 도서관 좌석 자동 예약
 
