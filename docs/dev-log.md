@@ -1,5 +1,20 @@
 # Dev Log
 
+ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
+큰 결정은 별도로 `docs/adr/` 에 ADR 로 적는다.
+
+## 2026-05-24
+
+- 2026-05-24: **MCP transport SSE → Streamable HTTP 전환 + 포트폴리오 문서 정비**.
+  `LlmModeStartupSmokeTest` CI 실패 수정 (SSE 프로퍼티 키 → `streamable-http`).
+  `McpServerConfig` 에 `@Primary McpSyncServerCustomizer` 추가 — `readOnlyHint` /
+  `destructiveHint` tool annotation 을 reflection 으로 주입 (Claude Desktop 에서
+  read-only / write tool 시각 분리). `application.yml` 에 MCP `instructions` 추가.
+  `LlmChatService` `@Autowired` 제거 + import 정리 + 시스템 프롬프트 업데이트
+  (졸업요건 지원 반영). `McpAuthHelper` FQ 참조 → import 로 전환.
+  ADR 0018 신규 (Streamable HTTP 전환 결정 기록). README / `docs/mcp-tools.md` /
+  `docs/architecture.md` SSE 잔재 제거 + 패키지 레이아웃 현행화 (Phase 3 완료 기준).
+
 ## 2026-05-22
 
 - 2026-05-22: **SAINT portal-navigation ECC entry fix**. Browser capture
@@ -12,9 +27,6 @@
   to `:8443`, and removed authenticated HTML/body snippets from SAINT
   connector logs in favor of byte counts and safe flags. ADR 0016 records
   the decision and security constraints.
-
-ssuAI 작업 진행 회고. 매 task 끝마다 한 줄씩 누적.
-큰 결정은 별도로 `docs/adr/` 에 ADR 로 적는다.
 
 ## 2026-05-17 (새벽 — 자동화 세션)
 
