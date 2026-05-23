@@ -29,6 +29,81 @@
 - 포트폴리오 포인트:
 ```
 
+## 2026-05-24 — MCP transport SSE → Streamable HTTP 후 통합 테스트 CI 실패 (프로퍼티 키 불일치)
+
+- 맥락: `application.yml` 의 MCP client transport 를 SSE (`sse.connections.self.url`) 에서
+  Streamable HTTP (`streamable-http.connections.self.url`) 로 전환했다.
+  단위 테스트 (~500개) 는 모두 mock 모드라 MCP client 를 실제로 초기화하지 않아 전부 그린이었다.
+- 증상: `LlmModeStartupSmokeTest` 만 CI 에서 실패. Spring Boot 컨텍스트가 올라오지 못하고
+  `spring.ai.mcp.client.sse.connections.self.url` property 를 찾지 못해 MCP 자체 연결에서 타임아웃.
+- 원인: `@DynamicPropertySource` 블록이 구 SSE 프로퍼티 키를 하드코딩하고 있었다.
+  ```java
+  // 구: SSE 시절
+  registry.add("spring.ai.mcp.client.sse.connections.self.url", () -> "http://localhost:" + SERVER_PORT);
+  // 신: Streamable HTTP 전환 후
+  registry.add("spring.ai.mcp.client.streamable-http.connections.self.url", () -> "http://localhost:" + SERVER_PORT);
+  ```
+  mock 모드 단위 테스트는 `spring.ai.mcp.client.enabled: false` 가 `application-test.yml` 에 설정되어
+  MCP client 빈 자체가 로드 안 됨 → transport 전환 영향이 단위 테스트에서 가려져 통합 테스트 CI
+  에서만 드러났다.
+- 해결: `@DynamicPropertySource` 에서 프로퍼티 키를 `streamable-http` 로 수정.
+- 검증: `gradlew.bat test` 전체 통과, CI 그린.
+- 포트폴리오 포인트:
+  - **"단위 테스트 전부 그린" ≠ "인프라 설정 변경이 안전"**. transport 전환처럼 Spring context 수준의
+    설정 변경은 full-context 통합 테스트 (여기서는 `@SpringBootTest(RANDOM_PORT)`) 가 아니면 잡히지 않는다.
+    mock profile 이 CI 의 fast gate 역할을 하지만, 실 transport / 실 MCP 초기화를 검증하는
+    smoke test 를 분리 보유하는 이유가 정확히 이 사례다.
+
+---
+
+## 2026-05-24 — Spring AI MCP tool annotation 주입: @Primary McpSyncServerCustomizer + reflection
+
+- 맥락: Claude Desktop 에서 MCP 도구를 "Read-only tools" / "Write/delete tools" 로 시각적으로 구분하려면
+  각 tool 에 `McpSchema.ToolAnnotations` (`readOnlyHint`, `destructiveHint`) 를 붙여야 한다.
+  Spring AI 1.1.x 는 tool annotation 을 주입하는 공개 API 를 제공하지 않는다.
+- 증상 (목표): Spring AI 가 자동으로 등록한 모든 tool 에 annotation 을 추가하고 싶다.
+- 원인 (제약):
+  1. `McpServer.SyncSpecification` 의 `tools` 필드가 `package-private` + `final`인 `List<SyncToolSpecification>` 이어서 외부에서 직접 접근 불가.
+  2. 기존 `servletMcpSyncServerCustomizer` auto-configure 빈은 `spec.immediateExecution(true)` 를 호출한다.
+     WebMVC servlet mode 에서 이 호출이 없으면 MCP 요청이 blocking 되지 않아 SSE 스트리밍이 깨진다.
+     단순히 `@Bean McpSyncServerCustomizer` 를 추가하면 auto-configure 빈과 순서 충돌 → 어느 쪽이 먼저 실행될지 보장 없음.
+- 해결:
+  ```java
+  @Primary               // auto-configured servletMcpSyncServerCustomizer 를 교체
+  @Bean
+  McpSyncServerCustomizer ssuaiToolAnnotationsCustomizer() {
+      return spec -> {
+          spec.immediateExecution(true);   // ① servlet mode 필수 호출 보존
+
+          // ② package-private 필드를 reflection 으로 열어 tool list 재구성
+          Field toolsField = McpServer.SyncSpecification.class.getDeclaredField("tools");
+          toolsField.setAccessible(true);
+          List<SyncToolSpecification> tools = (List<>) toolsField.get(spec);
+
+          List<SyncToolSpecification> annotated = tools.stream()
+              .map(McpServerConfig::withAnnotations)   // readOnlyHint / destructiveHint 부착
+              .collect(toList());
+
+          tools.clear();
+          tools.addAll(annotated);   // 같은 리스트 인스턴스를 교체 → spec 내부 참조 유지
+      };
+  }
+  ```
+  `@Primary` 가 `servletMcpSyncServerCustomizer` 를 대체하므로 두 customizer 가 충돌 없이
+  한 빈으로 통합된다.
+- 검증: `McpServerConfigTests` 에서 `get_today_meal` (readOnly), `logout_all` (destructive) 의
+  annotation 이 올바로 붙었는지 확인. `gradlew.bat test` 전체 통과.
+  Claude Desktop 에서 ssuMCP 재연결 후 "Read-only tools (20)" / "Write/delete tools (3)" 시각 분리 확인.
+- 포트폴리오 포인트:
+  - **공개 API 가 없는 프레임워크 내부 상태 변경 패턴**: `@Primary` 로 auto-configure 빈을 교체하면서
+    기존 빈의 side-effect (`immediateExecution`) 도 함께 보존해야 하는 상황. 두 가지를 한 빈으로 통합해 충돌을 제거.
+  - **reflection 의 적절한 사용 범위**: Spring AI 가 public API 를 열기 전까지 bridging 용도로만 사용.
+    팀 합류 면접에서 "framework 의 package-private 를 건드린 적 있나?" 라는 질문에 근거 있는 사례.
+  - tool annotation 이 클라이언트 UX (도구 그룹화) 에 직접 영향을 주는 구조 — MCP spec 의
+    `annotations` 필드가 실제 Claude 화면에서 어떻게 표현되는지 end-to-end 검증까지 한 사례.
+
+---
+
 ## 2026-05-21 — u-SAINT 웹 방화벽(WAF) 우회 및 LMS/Canvas 세션 오염 방지(CookieManager 격리)를 통한 실서버 로그인 정상화
 
 - 맥락: ssumcp 실서버 환경에서 로그인 연동 시, SAINT(시간표/성적) 및 LMS(과제) 조회 시 무조건 세션 오류(`logon redirect` 또는 `401 session expired`)가 발생하여 기능이 작동하지 않았다.
