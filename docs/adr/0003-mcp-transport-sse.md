@@ -1,6 +1,7 @@
 # ADR 0003 — MCP transport 로 SSE 선택
 
-- **Status**: Accepted (retroactive — 이미 구현되어 머지됨, 관련 commit: `b6051af`)
+- **Status**: ~~Accepted~~ **Superseded by [ADR 0018](0018-mcp-transport-streamable-http.md)**
+  (2026-05-24: SSE endpoint 를 Streamable HTTP 단일 POST `/mcp` 로 전환)
 - **Date**: 2026-05-07
 - **Scope**: `com.ssuai.domain.mcp.config.McpServerConfig`, `backend/build.gradle`, `backend/src/main/resources/application.yml`
 
