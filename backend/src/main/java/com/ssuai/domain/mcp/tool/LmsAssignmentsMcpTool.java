@@ -3,6 +3,7 @@ package com.ssuai.domain.mcp.tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
 import com.ssuai.domain.auth.mcp.McpProviderType;
@@ -41,7 +42,9 @@ public class LmsAssignmentsMcpTool {
                     + "show the loginUrl to the user and ask them to open it in a browser, "
                     + "then retry this call with the returned mcp_session_id."
     )
-    public McpPrivateToolResponse<AssignmentsResponse> getMyAssignments(String mcp_session_id) {
+    public McpPrivateToolResponse<AssignmentsResponse> getMyAssignments(
+            @ToolParam(description = "MCP session ID issued by start_auth(LMS). If absent or LMS not linked, returns AUTH_REQUIRED with a loginUrl.")
+            String mcp_session_id) {
         return authHelper.principalKey(mcp_session_id, McpProviderType.LMS)
                 .map(studentId -> {
                     log.debug("get_my_assignments: fetching assignments");
