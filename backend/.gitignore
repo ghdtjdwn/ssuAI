@@ -3,6 +3,7 @@
 !.env.example
 build/
 .gradle/
+.kotlin/
 .idea/
 out/
 *.log

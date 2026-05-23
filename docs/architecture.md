@@ -135,43 +135,83 @@ Connector directly; a Connector never reads from the database.
 com.ssuai
 ├── global
 │   ├── auth            // JwtProvider, JwtProperties, JwtTokenType, JwtClaims, InvalidJwtException
-│   ├── config          // @Configuration classes, beans, profile wiring (CORS, OpenAPI, TraceId)
-│   ├── exception       // ConnectorException, ApiException, GlobalExceptionHandler, SaintAuthFailedException, SaintPortalUnavailableException, LibraryAuthRequiredException
+│   ├── config          // @Configuration classes — CORS, OpenAPI, TraceId filter, RestClient
+│   ├── exception       // ConnectorException hierarchy, ApiException, GlobalExceptionHandler
 │   └── response        // ApiResponse<T> envelope, ErrorResponse
 └── domain
     ├── auth
-    │   └── saint       // SaintSsoService, SaintSsoProperties, SaintSsoConfig, UsaintAuthResult (Task 14 — saint.ssu.ac.kr 2-phase SSO callback)
-    ├── campus          // controller / dto / service — 캠퍼스 시설 검색
+    │   ├── controller  // SmartID / LMS SSO callback controllers (web-path auth)
+    │   ├── dto         // Auth request / response DTOs
+    │   ├── lms         // LmsSessionStore (AES-256-GCM, 2h TTL), LmsCredentialLoginService
+    │   ├── mcp         // MCP auth session layer (Task 18)
+    │   │   ├── McpAuthSession, McpAuthSessionId, McpProviderLink, McpAuthStateEntry
+    │   │   ├── McpAuthSessionStore (LRU, 4h TTL), McpAuthStateStore (one-time, 10min TTL)
+    │   │   ├── McpAuthService, McpAuthUrlFactory
+    │   │   ├── McpSaintAuthController  // GET /api/mcp/auth/saint/start|callback
+    │   │   ├── McpLmsAuthController    // GET /api/mcp/auth/lms/start|callback
+    │   │   ├── McpLibraryAuthController // GET /api/mcp/auth/library/start|callback
+    │   │   └── dto  // McpPrivateToolResponse<T>, McpAuthStatusResponse, etc.
+    │   └── saint       // SaintSsoService — SmartID 2-phase SSO (phase1: token, phase2: portal)
+    ├── campus          // controller / dto / service — 캠퍼스 시설 검색 (정적 데이터)
     ├── chat
-    │   ├── controller  // ChatController (REST chatbot endpoint)
-    │   ├── service     // ChatService impls (mock / llm) + multi-provider llm fallback
-    │   ├── memory      // ChatConversationStore
-    │   ├── dto         // ChatRequest/Response + OpenAI-compatible DTOs
-    │   └── config      // LlmChatProperties, ChatMemoryProperties
-    ├── dorm            // connector / controller / service — 기숙사 식단
+    │   ├── controller  // ChatController — POST /api/chat
+    │   ├── config      // LlmChatProperties, ChatMemoryProperties
+    │   ├── dto         // ChatRequest/Response, OpenAI-compatible request/response DTOs
+    │   ├── memory      // ChatConversationStore (in-memory LRU, 30m TTL, 12 turns cap)
+    │   └── service
+    │       ├── ChatService (interface), MockChatService
+    │       ├── LlmChatService  // 10-provider fallback, MCP tool dispatch, secret guard
+    │       └── llm  // LlmProvider (interface), LlmProviderConfig, LlmCompletionRequest/Result
+    ├── dorm            // connector / controller / service — 레지던스홀 기숙사 식단
     ├── library
-    │   ├── auth        // LibrarySessionController, LibrarySessionStore, LibrarySessionProperties (Task 13)
-    │   ├── connector   // LibraryBookConnector + Real/Mock, LibrarySeatConnector + Mock
+    │   ├── auth        // LibrarySessionStore (AES-256-GCM, 24h TTL), LibraryCredentialLoginService
+    │   │   └── dto
+    │   ├── connector   // LibraryBookConnector (mock / real Pyxis JSON API)
+    │   │               // LibrarySeatConnector (mock / real oasis scrape)
+    │   │               // LibraryLoansConnector (mock / real)
     │   ├── controller  // LibraryBookController, LibrarySeatController
-    │   ├── dto
-    │   └── service     // LibraryBookService, LibrarySeatService + caches
+    │   ├── dto         // LibraryBook, LibraryBookSearchResponse, LibrarySeatStatusResponse, etc.
+    │   ├── mcp         // LibraryToolContext — ThreadLocal scope (chat path only)
+    │   └── service     // LibraryBookService (LRU 200, 60s TTL), LibrarySeatService (30s TTL)
+    │                   // LibraryLoansService
+    ├── lms
+    │   ├── connector   // LmsAssignmentsConnector (mock / real — Canvas LMS SSO)
+    │   ├── controller  // LmsAssignmentsController — GET /api/lms/assignments
+    │   ├── dto         // AssignmentItem, LmsAssignmentsResponse
+    │   ├── mcp         // LmsToolContext — ThreadLocal scope (chat path only)
+    │   └── service     // LmsAssignmentsService
     ├── mcp
-    │   ├── tool        // @Tool methods that delegate to domain Services (6 read-only)
-    │   └── config      // MCP server registration
+    │   ├── config      // McpServerConfig — ToolCallbackProvider bean + tool readOnly/destructive annotations
+    │   └── tool        // All @Tool classes (23 tools total — see §11)
+    │                   // McpAuthHelper — shared principalKey lookup + AUTH_REQUIRED factory
     ├── meal
-    │   ├── controller  // MealController
-    │   ├── service     // MealService + WeeklyMealCache + (export profile) WeeklyMealExportRunner
-    │   ├── dto         // MealResponse, MealItem, MealRestaurant, MealClosure, WeeklyMealResponse, MealType
-    │   ├── config      // MealFanOutConfig
-    │   └── connector   // MealConnector (interface), MockMealConnector, RealMealConnector
+    │   ├── config      // MealFanOutConfig — parallelStream fan-out for weekly export
+    │   ├── connector   // MealConnector (interface), MockMealConnector, RealMealConnector (Jsoup)
+    │   ├── controller  // MealController — GET /api/meals/today|weekly
+    │   ├── dto         // MealResponse, MealItem, MealRestaurant, MealType, WeeklyMealResponse
+    │   └── service     // MealService + WeeklyMealCache (startup warm + @Scheduled Mon 06:00 KST)
+    ├── notice
+    │   ├── connector   // NoticeConnector (mock / real — scatch.ssu.ac.kr)
+    │   │               // DepartmentNoticeConnector (real — ssufid API)
+    │   ├── controller  // NoticeController — GET /api/notices/*
+    │   ├── dto         // NoticeItem, NoticeListResponse, NoticeDetailResponse, NoticeCategoriesResponse
+    │   └── service     // NoticeService + NoticeCache (5m TTL)
+    ├── saint
+    │   ├── connector   // SaintScheduleConnector, SaintGradesConnector (mock / real / rusaint)
+    │   │               // SaintChapelConnector, SaintGraduationConnector, SaintScholarshipConnector
+    │   ├── controller  // SaintScheduleController, SaintGradesController, etc.
+    │   ├── dto         // ScheduleResponse, GradesResponse, ChapelInfo, GraduationRequirements, etc.
+    │   ├── mcp         // SaintToolContext — ThreadLocal scope (chat path only)
+    │   └── service     // SaintScheduleService, SaintGradesService, SaintExtendedService
+    │                   // PortalNavigationService — resolves WebDynpro component entry URLs
     └── user
-        ├── entity      // Student (JPA)
+        ├── entity      // Student (JPA — studentId PK, name, lastLoginAt)
         ├── repository  // StudentRepository
-        └── service     // StudentService — upsertOnLogin
+        └── service     // StudentService.upsertOnLogin — upsert on SmartID callback
 ```
 
 Rule: **do not create a package before there is code that needs it.** The
-layout above reflects the actual on-disk tree as of Phase 3 in-flight.
+layout above reflects the actual on-disk tree as of Phase 3 complete.
 
 ---
 
@@ -451,13 +491,42 @@ Claude Desktop / IDE
    Connectors / Repositories
 ```
 
-MVP tools (all read-only):
+Current tools (23 total — 20 read-only, 3 write):
 
-| Tool                       | Delegates to                        |
-|----------------------------|-------------------------------------|
-| `get_today_meal`           | `MealService.getTodayMeal()`        |
-| `search_library_book`      | `LibraryBookService.search(query)`  |
-| `get_library_seat_status`  | `LibrarySeatService.getStatus()`    |
+**Public read-only (no auth)**
+
+| Tool | Domain |
+|------|--------|
+| `get_today_meal`, `get_meal_by_date` | `MealService` |
+| `get_dorm_weekly_meal` | `DormMealService` |
+| `search_campus_facilities` | `CampusService` |
+| `get_library_seat_status` | `LibrarySeatService` |
+| `search_library_book` | `LibraryBookService` |
+| `get_recent_notices`, `search_notices`, `list_notice_categories`, `get_notice_detail`, `get_active_notices`, `get_department_notices` | `NoticeService` |
+
+**Auth management (write — session state)**
+
+| Tool | Notes |
+|------|-------|
+| `get_auth_status` | read-only session check |
+| `start_auth` | creates/looks-up MCP session + issues state token |
+| `logout_provider`, `logout_all` | destructive — invalidates session |
+
+**Private read-only (mcp_session_id required)**
+
+| Tool | Provider | Delegates to |
+|------|----------|-------------|
+| `get_my_schedule` | SAINT | `SaintScheduleService` |
+| `get_my_grades` | SAINT | `SaintGradesService` |
+| `get_my_chapel_info` | SAINT | `SaintExtendedService` |
+| `check_graduation_requirements` | SAINT | `SaintExtendedService` |
+| `get_my_scholarships` | SAINT | `SaintExtendedService` |
+| `get_my_assignments` | LMS | `LmsAssignmentsService` |
+| `get_my_library_loans` | LIBRARY | `LibraryLoansService` |
+
+Tool annotations (`McpSchema.ToolAnnotations`) are applied at startup by `McpServerConfig`:
+`readOnlyHint=true` for all 20 read-only tools, `destructiveHint=true` for `logout_provider` / `logout_all`.
+This lets Claude Desktop group tools visually into "Read-only tools" and "Write/delete tools".
 
 Rules:
 
@@ -466,10 +535,9 @@ Rules:
   error handling consistent across REST and MCP.
 - Tool inputs and outputs are explicit DTOs — no opaque maps, no
   free-form strings as outputs.
-- Risky / write tools (seat reservation, LMS submission, etc.) are out of
-  scope for the MVP. When they arrive they will require explicit user
-  confirmation, audit logging, and a dry-run mode (see `docs/mcp-tools.md`
-  once drafted).
+- Phase 4 write tools (seat reservation, etc.) will follow the
+  `prepare_X` + `confirm_action` two-step pattern with audit logging
+  (see ADR 0015, `docs/mcp-tools.md` §8).
 
 ---
 
