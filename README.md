@@ -92,6 +92,12 @@ Claude Desktop 재시작 후 채팅창에서 **🔧** 아이콘을 누르면 도
 | `search_campus_facilities` | 교내 시설 검색 |
 | `get_library_seat_status` | 도서관 층별 좌석 현황 |
 | `search_library_book` | 도서관 도서 검색 |
+| `get_recent_notices` | 학교 공지사항 최신 목록 |
+| `search_notices` | 공지사항 키워드 검색 |
+| `list_notice_categories` | 공지 카테고리 목록 |
+| `get_notice_detail` | 공지 상세 본문 |
+| `get_active_notices` | 진행중(마감 전) 공지 |
+| `get_department_notices` | 학과/부서 공지 |
 
 ### 개인 도구 (인증 필요)
 
@@ -116,8 +122,11 @@ u-SAINT / LMS / 도서관 개인 정보 도구는 로그인이 필요합니다.
 |---|---|---|
 | `get_my_schedule` | SAINT | 시간표 |
 | `get_my_grades` | SAINT | 성적 |
-| `get_my_assignments` | LMS | 과제 목록 |
-| `get_my_library_loans` | LIBRARY | 대출 현황 |
+| `get_my_chapel_info` | SAINT | 채플 출석 현황 |
+| `check_graduation_requirements` | SAINT | 졸업 요건 충족 여부 |
+| `get_my_scholarships` | SAINT | 장학금 수혜 내역 |
+| `get_my_assignments` | LMS | 과제·퀴즈 목록 |
+| `get_my_library_loans` | LIBRARY | 도서관 대출 현황 |
 
 > **세션 유지**: 세션은 서버 메모리에 보관되며 서버 재시작 시 초기화됩니다.
 > 세션이 만료되면 `get_auth_status`로 확인 후 `start_auth`로 재로그인하세요.
@@ -294,6 +303,8 @@ ssuAI 의 main deliverable. Spring AI `spring-ai-starter-mcp-server-webmvc`
 
 <!-- markdownlint-disable MD013 MD060 -->
 
+**공개 도구 (인증 불필요)**
+
 | Tool | 설명 | 인자 |
 |---|---|---|
 | `get_today_meal` | 오늘 학식 메뉴 (전체 or 특정 식당) | `restaurant` (선택) |
@@ -302,13 +313,32 @@ ssuAI 의 main deliverable. Spring AI `spring-ai-starter-mcp-server-webmvc`
 | `search_campus_facilities` | 카페, 편의점, 복사실 등 시설 검색 | `query` |
 | `get_library_seat_status` | 중앙도서관 층별 좌석 현황 (읽기 전용) | `floor`: `-1, 1~6` |
 | `search_library_book` | 중앙도서관 도서 검색 (Pyxis JSON, 익명 GET) | `query`, `page`/`size` (선택) |
+| `get_recent_notices` | 학교 공지사항 최신 목록 | `category` (선택), `page` (선택) |
+| `search_notices` | 공지사항 키워드 검색 | `keyword`, `category` (선택), `page` (선택) |
+| `list_notice_categories` | 공지 카테고리 목록 반환 | 없음 |
+| `get_notice_detail` | 공지 URL 로 본문 전체 조회 | `url` |
+| `get_active_notices` | 진행중(마감 전) 공지 | `category` (선택) |
+| `get_department_notices` | 학과/부서 공지 | `department`, `page` (선택) |
+
+**인증 관리 도구**
+
+| Tool | 설명 | 인자 |
+|---|---|---|
 | `get_auth_status` | MCP 인증 세션 상태 확인 | `mcp_session_id` |
 | `start_auth` | SAINT / LMS / LIBRARY 로그인 URL 발급 | `provider`, `mcp_session_id` (선택) |
 | `logout_provider` | 특정 provider 연결 해제 | `provider`, `mcp_session_id` |
 | `logout_all` | MCP 인증 세션 전체 해제 | `mcp_session_id` |
+
+**개인 도구 (인증 필요)**
+
+| Tool | 설명 | 인자 |
+|---|---|---|
 | `get_my_schedule` | u-SAINT 시간표 조회 | `mcp_session_id` |
 | `get_my_grades` | u-SAINT 성적 조회 | `mcp_session_id` |
-| `get_my_assignments` | LMS 과제 조회 | `mcp_session_id` |
+| `get_my_chapel_info` | 채플 출석 현황 | `year` (선택), `semester` (선택), `mcp_session_id` |
+| `check_graduation_requirements` | 졸업 요건 충족 여부 | `mcp_session_id` |
+| `get_my_scholarships` | 장학금 수혜 내역 | `year` (선택), `mcp_session_id` |
+| `get_my_assignments` | LMS 과제·퀴즈 조회 | `mcp_session_id` |
 | `get_my_library_loans` | 도서관 대출 현황 조회 | `mcp_session_id` |
 
 <!-- markdownlint-enable MD013 MD060 -->
@@ -527,12 +557,11 @@ npx @modelcontextprotocol/inspector
 
 ## ⚠️ 알려진 한계
 
-- **인증 미구현.** 현재 endpoint 는 모두 공개 데이터만. u-SAINT / LMS
-  통합과 함께 인증 layer 가 Phase 3 에서 추가됩니다.
 - **단일 노드 운영.** 라이브 데모는 Oracle Free Tier 단일 VM 위
   k3s. Portfolio 시연 용도이고 고부하 트래픽은 가정하지 않습니다.
-- **모바일 UI 미세조정 미완.** 동작은 하지만 데스크탑 우선으로 설계.
-  Phase 2 에서 다듬을 예정.
+- **인증 세션은 서버 메모리 저장.** u-SAINT / LMS / 도서관 로그인 세션이
+  서버 재시작 시 초기화됩니다. 재시작 후 `start_auth` 로 재로그인 필요.
+- **모바일 UI 미세조정 미완.** 웹 대시보드가 동작은 하지만 데스크탑 우선으로 설계.
 - **학교 사이트 변경에 취약.** Connector 가 학교 페이지 HTML 을
   파싱하므로 학교 markup 이 바뀌면 동작이 깨질 수 있음. Connector
   boundary 가 격리되어 있어 connector swap 만으로 복구 가능한 구조.
