@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,8 +16,11 @@ import org.junit.jupiter.api.Test;
 import com.ssuai.domain.saint.connector.RusaintAuthenticatedSession;
 import com.ssuai.domain.saint.connector.RusaintClient;
 import com.ssuai.domain.saint.connector.RusaintClientException;
+import com.ssuai.domain.saint.dto.ChapelInfo;
+import com.ssuai.domain.saint.dto.GraduationStatus;
 import com.ssuai.domain.saint.dto.GradesResponse;
 import com.ssuai.domain.saint.dto.ScheduleResponse;
+import com.ssuai.domain.saint.dto.ScholarshipEntry;
 import com.ssuai.global.exception.SaintAuthFailedException;
 
 class SaintSsoServiceTests {
@@ -106,6 +110,26 @@ class SaintSsoServiceTests {
 
         @Override
         public GradesResponse fetchGrades(String studentId, String sessionJson) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ChapelInfo fetchChapelInfo(String studentId, String sessionJson) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ChapelInfo fetchChapelInfo(String studentId, String sessionJson, Integer year, String semester) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public GraduationStatus fetchGraduationRequirements(String studentId, String sessionJson) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ScholarshipEntry> fetchScholarships(String studentId, String sessionJson) {
             throw new UnsupportedOperationException();
         }
     }

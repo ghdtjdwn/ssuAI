@@ -1,24 +1,36 @@
 package com.ssuai.domain.saint.connector
 
+import com.ssuai.domain.saint.dto.ChapelAttendanceEntry
+import com.ssuai.domain.saint.dto.ChapelInfo
 import com.ssuai.domain.saint.dto.CourseGrade
 import com.ssuai.domain.saint.dto.GpaSummary
+import com.ssuai.domain.saint.dto.GraduationRequirementItem
+import com.ssuai.domain.saint.dto.GraduationStatus
 import com.ssuai.domain.saint.dto.GradesResponse
 import com.ssuai.domain.saint.dto.ScheduleEntry
 import com.ssuai.domain.saint.dto.ScheduleResponse
+import com.ssuai.domain.saint.dto.ScholarshipEntry
 import com.ssuai.domain.saint.dto.TermGpa
 import com.ssuai.domain.saint.dto.TermSchedule
+import dev.eatsteak.rusaint.ffi.ChapelApplicationBuilder
 import dev.eatsteak.rusaint.ffi.CourseGradesApplicationBuilder
+import dev.eatsteak.rusaint.ffi.GraduationRequirementsApplicationBuilder
 import dev.eatsteak.rusaint.ffi.PersonalCourseScheduleApplicationBuilder
+import dev.eatsteak.rusaint.ffi.ScholarshipsApplicationBuilder
 import dev.eatsteak.rusaint.ffi.StudentInformationApplicationBuilder
 import dev.eatsteak.rusaint.ffi.USaintSession
 import dev.eatsteak.rusaint.ffi.USaintSessionBuilder
+import dev.eatsteak.rusaint.model.ChapelAttendance
+import dev.eatsteak.rusaint.model.ChapelInformation
 import dev.eatsteak.rusaint.model.ClassGrade
 import dev.eatsteak.rusaint.model.ClassScore
 import dev.eatsteak.rusaint.model.CourseScheduleInformation
 import dev.eatsteak.rusaint.model.CourseType
 import dev.eatsteak.rusaint.model.GradeSummary
+import dev.eatsteak.rusaint.model.GraduationRequirement
 import dev.eatsteak.rusaint.model.SemesterGrade
 import dev.eatsteak.rusaint.model.SemesterType
+import dev.eatsteak.rusaint.model.Scholarship
 import dev.eatsteak.rusaint.model.Weekday
 import kotlinx.coroutines.runBlocking
 import org.springframework.stereotype.Component
@@ -104,8 +116,112 @@ class RusaintUniFfiClient : RusaintClient {
             }
         }
 
+    override fun fetchChapelInfo(studentId: String, sessionJson: String): ChapelInfo =
+        fetchChapelInfo(studentId, sessionJson, null, null)
+
+    override fun fetchChapelInfo(
+        studentId: String,
+        sessionJson: String,
+        year: Int?,
+        semester: String?,
+    ): ChapelInfo =
+        withClientError("rusaint chapel fetch failed") {
+            require(year == null || year > 0) { "chapel year must be positive" }
+
+            runBlocking {
+                sessionFromJson(sessionJson).useAuto { session ->
+                    ChapelApplicationBuilder().useAuto { builder ->
+                        builder.build(session).useAuto { app ->
+                            val selected = app.getSelectedSemester()
+                            val requestedYear = year?.toUInt() ?: selected.year
+                            val requestedSemester = semesterType(semester) ?: selected.semester
+                            mapChapelInfo(app.information(requestedYear, requestedSemester))
+                        }
+                    }
+                }
+            }
+        }
+
+    override fun fetchGraduationRequirements(studentId: String, sessionJson: String): GraduationStatus =
+        withClientError("rusaint graduation requirements fetch failed") {
+            runBlocking {
+                sessionFromJson(sessionJson).useAuto { session ->
+                    GraduationRequirementsApplicationBuilder().useAuto { builder ->
+                        builder.build(session).useAuto { app ->
+                            val requirements = app.requirements()
+                            val student = app.studentInfo()
+                            GraduationStatus(
+                                requirements.isGraduatable,
+                                student.name,
+                                student.department,
+                                student.grade.toInt(),
+                                student.completedPoints,
+                                student.graduationPoints,
+                                requirements.requirements.values
+                                    .map(::mapGraduationRequirement)
+                                    .sortedBy { it.name() },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+    override fun fetchScholarships(studentId: String, sessionJson: String): List<ScholarshipEntry> =
+        withClientError("rusaint scholarships fetch failed") {
+            runBlocking {
+                sessionFromJson(sessionJson).useAuto { session ->
+                    ScholarshipsApplicationBuilder().useAuto { builder ->
+                        builder.build(session).useAuto { app ->
+                            app.scholarships().map(::mapScholarship)
+                        }
+                    }
+                }
+            }
+        }
+
     private fun sessionFromJson(sessionJson: String): USaintSession =
         USaintSessionBuilder().useAuto { builder -> builder.fromJson(sessionJson) }
+
+    private fun mapChapelInfo(info: ChapelInformation): ChapelInfo =
+        ChapelInfo(
+            info.year.toInt(),
+            termLabel(info.semester),
+            info.generalInformation.chapelTime,
+            info.generalInformation.chapelRoom,
+            null,
+            info.generalInformation.absenceTime.toInt(),
+            info.generalInformation.result,
+            info.attendances.map(::mapChapelAttendance),
+        )
+
+    private fun mapChapelAttendance(attendance: ChapelAttendance): ChapelAttendanceEntry =
+        ChapelAttendanceEntry(
+            attendance.classDate,
+            attendance.title,
+            attendance.instructor,
+            attendance.attendance,
+        )
+
+    private fun mapGraduationRequirement(requirement: GraduationRequirement): GraduationRequirementItem =
+        GraduationRequirementItem(
+            requirement.name,
+            requirement.category,
+            requirement.requirement?.toFloat() ?: 0f,
+            requirement.calculation ?: 0f,
+            requirement.difference ?: 0f,
+            requirement.result,
+        )
+
+    private fun mapScholarship(scholarship: Scholarship): ScholarshipEntry =
+        ScholarshipEntry(
+            scholarship.year.toInt(),
+            termLabel(scholarship.semester),
+            scholarship.name,
+            scholarship.receivedAmount.toLong(),
+            scholarship.receiveType,
+            scholarship.status,
+        )
 
     private fun mapSchedule(schedule: Map<Weekday, List<CourseScheduleInformation>>): List<ScheduleEntry> =
         schedule.entries
@@ -184,6 +300,16 @@ class RusaintUniFfiClient : RusaintClient {
             SemesterType.SUMMER -> 2
             SemesterType.TWO -> 3
             SemesterType.WINTER -> 4
+        }
+
+    private fun semesterType(semester: String?): SemesterType? =
+        when (semester?.trim()?.lowercase()) {
+            null, "" -> null
+            "1", "1학기", "one" -> SemesterType.ONE
+            "여름학기", "summer" -> SemesterType.SUMMER
+            "2", "2학기", "two" -> SemesterType.TWO
+            "겨울학기", "winter" -> SemesterType.WINTER
+            else -> throw IllegalArgumentException("unsupported semester: $semester")
         }
 
     private fun dayNumber(day: Weekday): Int =
