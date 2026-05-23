@@ -46,8 +46,8 @@ public class SaintExtendedMcpTools {
     )
     public McpPrivateToolResponse<ChapelInfo> getMyChapelInfo(
             @ToolParam(required = false, description = "Academic year, such as 2026.") Integer year,
-            @ToolParam(required = false,
-                    description = "Semester: 1학기, 여름학기, 2학기, or 겨울학기.") String semester,
+            @ToolParam(required = false, description = "Semester: 1학기, 여름학기, 2학기, or 겨울학기.") String semester,
+            @ToolParam(description = "MCP session ID issued by start_auth(SAINT). If absent or SAINT not linked, returns AUTH_REQUIRED with a loginUrl.")
             String mcp_session_id) {
         return authHelper.principalKey(mcp_session_id, McpProviderType.SAINT)
                 .map(studentId -> {
@@ -63,7 +63,9 @@ public class SaintExtendedMcpTools {
             description = "Returns the authenticated student's u-SAINT graduation eligibility and requirement status. "
                     + "Requires mcp_session_id with the SAINT provider linked via start_auth."
     )
-    public McpPrivateToolResponse<GraduationStatus> checkGraduationRequirements(String mcp_session_id) {
+    public McpPrivateToolResponse<GraduationStatus> checkGraduationRequirements(
+            @ToolParam(description = "MCP session ID issued by start_auth(SAINT). If absent or SAINT not linked, returns AUTH_REQUIRED with a loginUrl.")
+            String mcp_session_id) {
         return authHelper.principalKey(mcp_session_id, McpProviderType.SAINT)
                 .map(studentId -> {
                     log.debug("check_graduation_requirements: fetching status");
@@ -81,6 +83,7 @@ public class SaintExtendedMcpTools {
     )
     public McpPrivateToolResponse<List<ScholarshipEntry>> getMyScholarships(
             @ToolParam(required = false, description = "Academic year, such as 2026.") Integer year,
+            @ToolParam(description = "MCP session ID issued by start_auth(SAINT). If absent or SAINT not linked, returns AUTH_REQUIRED with a loginUrl.")
             String mcp_session_id) {
         return authHelper.principalKey(mcp_session_id, McpProviderType.SAINT)
                 .map(studentId -> {

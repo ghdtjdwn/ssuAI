@@ -9,4 +9,4 @@ startCommand:
     required: []
     additionalProperties: false
   exampleConfig: {}
-  url: https://ssumcp.duckdns.org/sse
+  url: https://ssumcp.duckdns.org/mcp

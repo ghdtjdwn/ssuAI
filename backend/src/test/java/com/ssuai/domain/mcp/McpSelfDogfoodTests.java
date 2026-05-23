@@ -9,7 +9,7 @@ import java.util.Map;
 
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
-import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
+import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,9 +25,9 @@ import com.ssuai.domain.saint.dto.ScheduleResponse;
 import com.ssuai.domain.saint.service.SaintScheduleService;
 
 /**
- * End-to-end check that the chatbot's "talk to my own MCP server over SSE" claim
- * (ADR 0010) is actually wired: the running Spring Boot process must accept a
- * Spring AI MCP client connection on its own /sse endpoint, expose every tool
+ * End-to-end check that the chatbot's "talk to my own MCP server over Streamable HTTP"
+ * claim (ADR 0010) is actually wired: the running Spring Boot process must accept a
+ * Spring AI MCP client connection on its own /mcp endpoint, expose every tool
  * currently bundled in the server, and complete a real tool round-trip without
  * the in-process bean shortcut.
  *
@@ -89,7 +89,7 @@ class McpSelfDogfoodTests {
     }
 
     @Test
-    void clientCanCallLibrarySeatStatusOverSse() {
+    void clientCanCallLibrarySeatStatusOverMcp() {
         try (McpSyncClient client = openClient()) {
             client.initialize();
 
@@ -108,7 +108,7 @@ class McpSelfDogfoodTests {
     }
 
     @Test
-    void clientCanCallTodayMealOverSse() {
+    void clientCanCallTodayMealOverMcp() {
         try (McpSyncClient client = openClient()) {
             client.initialize();
 
@@ -124,7 +124,7 @@ class McpSelfDogfoodTests {
     }
 
     @Test
-    void privateToolWithoutSessionReturnsAuthRequiredOverSse() {
+    void privateToolWithoutSessionReturnsAuthRequiredOverMcp() {
         try (McpSyncClient client = openClient()) {
             client.initialize();
 
@@ -141,7 +141,7 @@ class McpSelfDogfoodTests {
     }
 
     @Test
-    void privateToolWithValidSessionReturnsOkOverSse() {
+    void privateToolWithValidSessionReturnsOkOverMcp() {
         McpAuthSession session = mcpAuthService.createSession();
         mcpAuthService.linkProvider(session.id(), McpProviderType.SAINT, "20221528");
         when(saintScheduleService.fetchSchedule("20221528"))
@@ -165,7 +165,7 @@ class McpSelfDogfoodTests {
     }
 
     @Test
-    void clientCanCallLibraryBookSearchOverSse() {
+    void clientCanCallLibraryBookSearchOverMcp() {
         try (McpSyncClient client = openClient()) {
             client.initialize();
 
@@ -184,7 +184,7 @@ class McpSelfDogfoodTests {
     }
 
     @Test
-    void clientCanCallFacilitySearchOverSse() {
+    void clientCanCallFacilitySearchOverMcp() {
         try (McpSyncClient client = openClient()) {
             client.initialize();
 
@@ -209,8 +209,7 @@ class McpSelfDogfoodTests {
 
     private McpSyncClient openClient() {
         return McpClient.sync(
-                        HttpClientSseClientTransport.builder("http://localhost:" + serverPort)
-                                .sseEndpoint("/sse")
+                        HttpClientStreamableHttpTransport.builder("http://localhost:" + serverPort)
                                 .connectTimeout(Duration.ofSeconds(5))
                                 .build())
                 .requestTimeout(Duration.ofSeconds(10))
