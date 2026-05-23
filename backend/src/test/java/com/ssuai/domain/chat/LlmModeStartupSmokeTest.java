@@ -56,7 +56,7 @@ class LlmModeStartupSmokeTest {
     @DynamicPropertySource
     static void mcpSelfConnectionProperties(DynamicPropertyRegistry registry) {
         registry.add("server.port", () -> SERVER_PORT);
-        registry.add("spring.ai.mcp.client.sse.connections.self.url",
+        registry.add("spring.ai.mcp.client.streamable-http.connections.self.url",
                 () -> "http://localhost:" + SERVER_PORT);
     }
 
