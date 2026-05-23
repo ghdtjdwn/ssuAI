@@ -22,6 +22,9 @@ ssuai:
     library-loans: ${SSUAI_CONNECTOR_LIBRARY_LOANS:real}
     saint-schedule: ${SSUAI_CONNECTOR_SAINT_SCHEDULE:rusaint}
     saint-grades: ${SSUAI_CONNECTOR_SAINT_GRADES:rusaint}
+    saint-chapel: ${SSUAI_CONNECTOR_SAINT_CHAPEL:rusaint}
+    saint-graduation: ${SSUAI_CONNECTOR_SAINT_GRADUATION:rusaint}
+    saint-scholarship: ${SSUAI_CONNECTOR_SAINT_SCHOLARSHIP:rusaint}
     lms-assignments: ${SSUAI_CONNECTOR_LMS_ASSIGNMENTS:real}
     chat: ${SSUAI_CONNECTOR_CHAT:mock}
   # Production CORS allowlist — exactly one origin (the deployed Vercel
