@@ -9,10 +9,13 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import com.ssuai.domain.auth.saint.PortalCookies;
+import com.ssuai.domain.saint.dto.ChapelInfo;
 import com.ssuai.domain.saint.dto.CourseGrade;
 import com.ssuai.domain.saint.dto.GpaSummary;
+import com.ssuai.domain.saint.dto.GraduationStatus;
 import com.ssuai.domain.saint.dto.GradesResponse;
 import com.ssuai.domain.saint.dto.ScheduleResponse;
+import com.ssuai.domain.saint.dto.ScholarshipEntry;
 import com.ssuai.domain.saint.dto.TermGpa;
 import com.ssuai.global.exception.SaintSessionExpiredException;
 
@@ -95,6 +98,26 @@ class RusaintGradesConnectorTests {
                             3.0d,
                             "김교수",
                             ""))));
+        }
+
+        @Override
+        public ChapelInfo fetchChapelInfo(String studentId, String sessionJson) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ChapelInfo fetchChapelInfo(String studentId, String sessionJson, Integer year, String semester) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public GraduationStatus fetchGraduationRequirements(String studentId, String sessionJson) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ScholarshipEntry> fetchScholarships(String studentId, String sessionJson) {
+            throw new UnsupportedOperationException();
         }
     }
 }
