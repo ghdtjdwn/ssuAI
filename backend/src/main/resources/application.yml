@@ -72,6 +72,9 @@ ssuai:
     library-loans: mock # mock | real
     saint-schedule: mock # mock | rusaint
     saint-grades: mock # mock | rusaint
+    saint-chapel: mock # mock | rusaint
+    saint-graduation: mock # mock | rusaint
+    saint-scholarship: mock # mock | rusaint
     lms-assignments: mock # mock | real
     chat: ${SSUAI_CONNECTOR_CHAT:mock} # mock | llm
     notice: mock # mock | real
