@@ -350,10 +350,10 @@ class LlmChatServiceTests {
 
         List<OpenAiChatCompletionRequest.Message> secondRequestMessages = gemini.request(1).messages();
         assertThat(secondRequestMessages).extracting(OpenAiChatCompletionRequest.Message::role)
-                .containsExactly("system", "system", "user", "assistant", "user");
-        assertThat(secondRequestMessages.get(2).content()).isEqualTo("오늘 학식 뭐야?");
-        assertThat(secondRequestMessages.get(3).content()).isEqualTo("학생식당과 숭실도담식당 중 어디가 궁금해?");
-        assertThat(secondRequestMessages.get(4).content()).isEqualTo("도담");
+                .containsExactly("system", "system", "system", "user", "assistant", "user");
+        assertThat(secondRequestMessages.get(3).content()).isEqualTo("오늘 학식 뭐야?");
+        assertThat(secondRequestMessages.get(4).content()).isEqualTo("학생식당과 숭실도담식당 중 어디가 궁금해?");
+        assertThat(secondRequestMessages.get(5).content()).isEqualTo("도담");
     }
 
     @Test
@@ -368,8 +368,8 @@ class LlmChatServiceTests {
 
         List<OpenAiChatCompletionRequest.Message> secondRequestMessages = gemini.request(1).messages();
         assertThat(secondRequestMessages).extracting(OpenAiChatCompletionRequest.Message::role)
-                .containsExactly("system", "system", "user");
-        assertThat(secondRequestMessages.get(2).content()).isEqualTo("다른 대화");
+                .containsExactly("system", "system", "system", "user");
+        assertThat(secondRequestMessages.get(3).content()).isEqualTo("다른 대화");
     }
 
     @Test
@@ -384,13 +384,16 @@ class LlmChatServiceTests {
 
         List<OpenAiChatCompletionRequest.Message> request = gemini.request(0).messages();
         assertThat(request).extracting(OpenAiChatCompletionRequest.Message::role)
-                .containsExactly("system", "system", "user");
+                .containsExactly("system", "system", "system", "user");
         assertThat(request.get(0).content()).contains("ssuAI 챗봇");
         assertThat(request.get(1).content())
                 .contains("2026-03-05")
                 .contains("(목)")
                 .contains("Asia/Seoul")
                 .contains("yyyy-MM-dd");
+        assertThat(request.get(2).content())
+                .contains("비인증")
+                .contains("start_auth 같은 도구는 이 챗봇에 없어");
     }
 
     @Test
@@ -404,6 +407,34 @@ class LlmChatServiceTests {
         String dateMessage = chatService.buildTodayContextMessage();
 
         assertThat(dateMessage).contains("2026-03-06").contains("(금)");
+    }
+
+    @Test
+    void authContextMessageDirectsAuthenticatedSaintToolUseWithoutAuthToolHallucination() {
+        LlmChatService chatService = chatService(
+                List.of(new FakeProvider("gemini").reply("gemini-model", "ok")),
+                List.of("gemini"));
+
+        String authMessage = chatService.buildAuthContextMessage("20221528");
+
+        assertThat(authMessage)
+                .contains("인증됨")
+                .contains("get_my_grades")
+                .contains("start_auth 같은 도구는 이 챗봇에 없어")
+                .contains("절대 언급하거나 호출하지 마");
+    }
+
+    @Test
+    void authContextMessageDirectsAnonymousUserToDashboardLogin() {
+        LlmChatService chatService = chatService(
+                List.of(new FakeProvider("gemini").reply("gemini-model", "ok")),
+                List.of("gemini"));
+
+        assertThat(chatService.buildAuthContextMessage(null))
+                .contains("비인증")
+                .contains("대시보드에서 SmartID로 로그인하면 볼 수 있어요")
+                .contains("start_auth 같은 도구는 이 챗봇에 없어");
+        assertThat(chatService.buildAuthContextMessage("")).contains("비인증");
     }
 
     @Test

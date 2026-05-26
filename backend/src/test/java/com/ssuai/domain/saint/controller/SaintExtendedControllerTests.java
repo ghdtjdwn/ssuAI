@@ -51,7 +51,7 @@ class SaintExtendedControllerTests {
     @Test
     void chapelEndpointForwardsTermSelection() throws Exception {
         when(chapelService.fetchChapelInfo("20241234", 2025, "2학기"))
-                .thenReturn(new ChapelInfo(2025, "2학기", "", "", null, 0, "", List.of()));
+                .thenReturn(new ChapelInfo(2025, "2학기", "", "", "J-5-5", null, 0, "", List.of()));
 
         mockMvc.perform(get("/api/saint/chapel")
                         .param("year", "2025")
@@ -59,7 +59,8 @@ class SaintExtendedControllerTests {
                         .requestAttr(AuthAttributes.STUDENT_ID, "20241234"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.year").value(2025))
-                .andExpect(jsonPath("$.data.semester").value("2학기"));
+                .andExpect(jsonPath("$.data.semester").value("2학기"))
+                .andExpect(jsonPath("$.data.seatNumber").value("J-5-5"));
 
         verify(chapelService).fetchChapelInfo("20241234", 2025, "2학기");
     }
