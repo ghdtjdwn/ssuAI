@@ -25,6 +25,15 @@ const chapel: ChapelInfo = {
   absenceUsedMinutes: 1,
   result: "진행중",
   attendances: [],
+  absenceApplications: [
+    {
+      category: "병무관계",
+      startDate: "2026.05.14",
+      endDate: "2026.05.20",
+      reason: "예비군",
+      status: "승인",
+    },
+  ],
 };
 
 beforeEach(() => {
@@ -64,5 +73,14 @@ describe("ChapelCard", () => {
 
     expect(screen.getByText("1회 / 최대 2회")).toBeInTheDocument();
     expect(screen.getByText("결석 1번 더 가능")).toBeInTheDocument();
+  });
+
+  it("renders approved absence applications returned by rusaint", () => {
+    render(<ChapelCard />);
+
+    expect(screen.getByText("결석 신청 이력")).toBeInTheDocument();
+    expect(screen.getByText("예비군")).toBeInTheDocument();
+    expect(screen.getByText("2026.05.14 ~ 2026.05.20 · 병무관계")).toBeInTheDocument();
+    expect(screen.getByText("승인")).toBeInTheDocument();
   });
 });

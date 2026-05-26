@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.ssuai.domain.saint.dto.ChapelInfo;
+import com.ssuai.domain.saint.dto.ChapelAbsenceApplication;
 import com.ssuai.domain.saint.dto.GraduationStatus;
 import com.ssuai.domain.saint.dto.ScholarshipEntry;
 import com.ssuai.domain.saint.service.SaintChapelService;
@@ -51,7 +52,10 @@ class SaintExtendedControllerTests {
     @Test
     void chapelEndpointForwardsTermSelection() throws Exception {
         when(chapelService.fetchChapelInfo("20241234", 2025, "2학기"))
-                .thenReturn(new ChapelInfo(2025, "2학기", "", "", "J-5-5", null, 0, "", List.of()));
+                .thenReturn(new ChapelInfo(
+                        2025, "2학기", "", "", "J-5-5", null, 0, "", List.of(),
+                        List.of(new ChapelAbsenceApplication(
+                                "병무관계", "2025.05.14", "2025.05.20", "예비군", "승인"))));
 
         mockMvc.perform(get("/api/saint/chapel")
                         .param("year", "2025")
@@ -60,7 +64,9 @@ class SaintExtendedControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.year").value(2025))
                 .andExpect(jsonPath("$.data.semester").value("2학기"))
-                .andExpect(jsonPath("$.data.seatNumber").value("J-5-5"));
+                .andExpect(jsonPath("$.data.seatNumber").value("J-5-5"))
+                .andExpect(jsonPath("$.data.absenceApplications[0].reason").value("예비군"))
+                .andExpect(jsonPath("$.data.absenceApplications[0].status").value("승인"));
 
         verify(chapelService).fetchChapelInfo("20241234", 2025, "2학기");
     }

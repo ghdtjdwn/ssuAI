@@ -59,7 +59,7 @@ class SaintExtendedMcpToolsTests {
 
     @Test
     void chapelToolPassesOptionalTermSelection() {
-        ChapelInfo stub = new ChapelInfo(2025, "2학기", "", "", null, null, 0, "", List.of());
+        ChapelInfo stub = new ChapelInfo(2025, "2학기", "", "", null, null, 0, "", List.of(), List.of());
         when(authHelper.principalKey(SESSION_ID, McpProviderType.SAINT)).thenReturn(Optional.of(STUDENT_ID));
         when(chapelService.fetchChapelInfo(STUDENT_ID, 2025, "2학기")).thenReturn(stub);
 
