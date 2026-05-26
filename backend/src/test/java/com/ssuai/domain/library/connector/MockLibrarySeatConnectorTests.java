@@ -35,6 +35,13 @@ class MockLibrarySeatConnectorTests {
                 .mapToInt(LibrarySeatZone::available)
                 .sum();
         assertThat(zoneAvailable).isEqualTo(response.availableSeats());
+        assertThat(response.zones()).allSatisfy(zone -> {
+            assertThat(zone.seats()).hasSize(zone.total());
+            assertThat(zone.seatIds()).hasSize(zone.available());
+            assertThat(zone.seats().stream()
+                    .filter(seat -> "available".equals(seat.status())))
+                    .hasSize(zone.available());
+        });
     }
 
     @Test

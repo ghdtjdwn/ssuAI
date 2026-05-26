@@ -843,6 +843,39 @@ class LlmChatServiceTests {
     }
 
     @Test
+    void librarySeatCompactKeepsCountsAndDropsIndividualSeatData() {
+        LlmChatService chatService = chatService(
+                List.of(new FakeProvider("noop").reply("noop", "noop")),
+                List.of("noop"));
+        String rawSeatJson = """
+                {
+                  "floor":2,
+                  "floorLabel":"2층",
+                  "totalSeats":112,
+                  "availableSeats":1,
+                  "reservedSeats":111,
+                  "outOfServiceSeats":0,
+                  "zones":[
+                    {"label":"숭실스퀘어ON(2F)","total":112,"available":1,
+                     "seatIds":["2-A-001"],
+                     "seats":[{"id":"2-A-001","label":"A-1","status":"available"}]}
+                  ]
+                }
+                """;
+
+        String compact = chatService.compactAndCap("get_library_seat_status", rawSeatJson);
+
+        assertThat(compact)
+                .contains("\"floor\":2")
+                .contains("\"availableSeats\":1")
+                .contains("\"label\":\"숭실스퀘어ON(2F)\"")
+                .doesNotContain("seatIds")
+                .doesNotContain("\"seats\"")
+                .doesNotContain("2-A-001")
+                .doesNotContain("A-1");
+    }
+
+    @Test
     void noticeListCompactKeepsDisplayFieldsAndDropsUnusedStatus() {
         LlmChatService chatService = chatService(
                 List.of(new FakeProvider("noop").reply("noop", "noop")),
