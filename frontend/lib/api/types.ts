@@ -237,6 +237,7 @@ export interface ChapelInfo {
   semester: string;
   chapelTime: string;
   chapelRoom: string;
+  seatNumber: string | null;
   absenceAllowedMinutes: number | null;
   absenceUsedMinutes: number;
   result: string;

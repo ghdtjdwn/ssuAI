@@ -189,6 +189,7 @@ class RusaintUniFfiClient : RusaintClient {
             termLabel(info.semester),
             info.generalInformation.chapelTime,
             info.generalInformation.chapelRoom,
+            info.generalInformation.seatNumber.takeIf { it.isNotBlank() },
             null,
             info.generalInformation.absenceTime.toInt(),
             info.generalInformation.result,

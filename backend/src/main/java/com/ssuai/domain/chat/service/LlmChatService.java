@@ -120,12 +120,14 @@ public class LlmChatService implements ChatService {
                "총 N개 중 일부"라고 명시해.
             5. 도구가 빈 결과/에러를 반환하면 그대로 "지금은 그 정보가 없어요"라고
                말해. 다른 사이트 링크나 외부 추정 정보를 만들지 마.
+            6. start_auth, get_auth_status 같은 인증 도구는 이 챗봇에 존재하지 않아.
+               어떤 상황에서도 언급하거나 호출하지 마. 인증 상태는 매 요청 system
+               메시지에 이미 명시돼 있어.
 
             범위 밖 안내:
             - 수강신청은 아직 지원 안 함.
-            - get_my_schedule / get_my_grades / get_my_chapel_info / check_graduation_requirements /
-              get_my_scholarships / get_my_assignments 는 u-SAINT 또는 LMS 로그인이
-              필요해. 로그인 안 된 사용자에게는 SmartID 로그인 안내.
+            - get_my_assignments 는 LMS 로그인이 필요해. 로그인 안 된 사용자에게는
+              LMS(SmartID) 로그인 안내.
             - get_my_library_loans 는 도서관 연동이 필요해.
               연동 안 된 사용자에게는 도서관 좌석 카드의 "도서관 연동" 버튼 안내.
             - 비밀번호, 학번, 쿠키, 세션, API key 같은 비밀 정보는 요구하지도 받지도
@@ -250,6 +252,23 @@ public class LlmChatService implements ChatService {
                 today, weekday);
     }
 
+    String buildAuthContextMessage(String studentId) {
+        boolean authenticated = studentId != null && !studentId.isBlank();
+        if (authenticated) {
+            return """
+                    사용자 인증 상태: 인증됨 (u-SAINT 로그인됨).
+                    개인 정보 도구(get_my_schedule, get_my_grades, get_my_chapel_info,
+                    check_graduation_requirements, get_my_scholarships)를 지금 바로 호출해.
+                    start_auth 같은 도구는 이 챗봇에 없어. 절대 언급하거나 호출하지 마.
+                    도구 호출 결과로 오류가 오면 그 메시지만 그대로 전달해.""";
+        }
+        return """
+                사용자 인증 상태: 비인증 (u-SAINT 미로그인).
+                성적·시간표·채플·졸업요건·장학금 등 개인 정보는 접근 불가.
+                그런 요청이 오면 "대시보드에서 SmartID로 로그인하면 볼 수 있어요" 라고만 안내해.
+                start_auth 같은 도구는 이 챗봇에 없어. 절대 언급하거나 호출하지 마.""";
+    }
+
     private McpSyncClient mcpClient() {
         if (mcpClients == null || mcpClients.isEmpty()) {
             throw new IllegalStateException(
@@ -310,6 +329,7 @@ public class LlmChatService implements ChatService {
         List<OpenAiChatCompletionRequest.Message> baseMessages = new ArrayList<>();
         baseMessages.add(OpenAiChatCompletionRequest.systemMessage(SYSTEM_PROMPT));
         baseMessages.add(OpenAiChatCompletionRequest.systemMessage(buildTodayContextMessage()));
+        baseMessages.add(OpenAiChatCompletionRequest.systemMessage(buildAuthContextMessage(studentId)));
         for (Turn turn : history) {
             if (ChatConversationStore.ROLE_USER.equals(turn.role())) {
                 baseMessages.add(OpenAiChatCompletionRequest.userMessage(turn.content()));
