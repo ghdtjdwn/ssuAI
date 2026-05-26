@@ -44,6 +44,7 @@ class MockSaintChapelConnector implements SaintChapelConnector {
                 "목 10:30-11:20",
                 "한경직기념관 대예배실",
                 null,
+                null,
                 1,
                 "진행중",
                 List.of(

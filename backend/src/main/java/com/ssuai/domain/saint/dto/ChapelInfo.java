@@ -7,6 +7,7 @@ public record ChapelInfo(
         String semester,
         String chapelTime,
         String chapelRoom,
+        String seatNumber,
         Integer absenceAllowedMinutes,
         int absenceUsedMinutes,
         String result,
