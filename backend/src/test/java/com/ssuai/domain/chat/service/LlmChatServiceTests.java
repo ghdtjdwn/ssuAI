@@ -61,6 +61,12 @@ class LlmChatServiceTests {
             mock(com.ssuai.domain.saint.service.SaintScheduleService.class);
     private final com.ssuai.domain.saint.service.SaintGradesService gradesService =
             mock(com.ssuai.domain.saint.service.SaintGradesService.class);
+    private final com.ssuai.domain.saint.service.SaintChapelService chapelService =
+            mock(com.ssuai.domain.saint.service.SaintChapelService.class);
+    private final com.ssuai.domain.saint.service.SaintGraduationService graduationService =
+            mock(com.ssuai.domain.saint.service.SaintGraduationService.class);
+    private final com.ssuai.domain.saint.service.SaintScholarshipService scholarshipService =
+            mock(com.ssuai.domain.saint.service.SaintScholarshipService.class);
     private final com.ssuai.domain.lms.service.LmsAssignmentsService lmsAssignmentsService =
             mock(com.ssuai.domain.lms.service.LmsAssignmentsService.class);
     private final com.ssuai.domain.library.service.LibraryLoansService libraryLoansService =
@@ -289,6 +295,34 @@ class LlmChatServiceTests {
     }
 
     @Test
+    void graduationRequirementsRequestIsNotRejectedAsOutOfScope() {
+        FakeProvider gemini = new FakeProvider("gemini")
+                .reply("gemini-model", "졸업 요건을 확인해드릴게요.");
+        LlmChatService chatService = chatService(List.of(gemini), List.of("gemini"));
+
+        ChatResponse response = chatService.reply("c-test", "졸업요건 알려줘");
+
+        assertThat(response.reply()).isEqualTo("졸업 요건을 확인해드릴게요.");
+        assertThat(gemini.callCount()).isEqualTo(1);
+    }
+
+    @Test
+    void authenticationToolsAreNotExposedToChatProviders() {
+        FakeProvider gemini = new FakeProvider("gemini")
+                .reply("gemini-model", "ok");
+        LlmChatService chatService = chatService(List.of(gemini), List.of("gemini"));
+
+        chatService.reply("c-test", "오늘 학식 뭐야?");
+
+        List<String> toolNames = gemini.request(0).tools().stream()
+                .map(tool -> tool.function().name())
+                .toList();
+        assertThat(toolNames)
+                .contains("get_today_meal")
+                .doesNotContain("start_auth", "get_auth_status", "logout_provider", "logout_all");
+    }
+
+    @Test
     void secretLikeInputReturnsGuidanceWithoutCallingProviders() {
         FakeProvider gemini = new FakeProvider("gemini")
                 .reply("gemini-model", "should not be called");
@@ -445,6 +479,50 @@ class LlmChatServiceTests {
                 .orElseThrow()
                 .content();
         assertThat(toolContent).contains("로그인");
+    }
+
+    @Test
+    void privateChapelToolReturnsLoginGuidanceForAnonymousChat() {
+        FakeProvider provider = new FakeProvider("gemini")
+                .toolCall("gemini-model", new OpenAiToolCall(
+                        "call-1",
+                        "function",
+                        new OpenAiToolCall.FunctionCall("get_my_chapel_info", "{}")))
+                .reply("gemini-model", "u-SAINT 로그인이 필요해요.");
+        LlmChatService chatService = chatService(List.of(provider), List.of("gemini"), List.of(), 0);
+
+        ChatResponse response = chatService.reply("c-test", "내 채플 출석 알려줘", null);
+
+        assertThat(response.reply()).contains("로그인");
+        verify(chapelService, never()).fetchChapelInfo(any(), any(), any());
+        String toolContent = provider.request(1).messages().stream()
+                .filter(message -> "tool".equals(message.role()))
+                .findFirst()
+                .orElseThrow()
+                .content();
+        assertThat(toolContent).contains("로그인");
+    }
+
+    @Test
+    void noticeSearchToolRequiresKeywordBeforeCallingMcp() {
+        FakeProvider provider = new FakeProvider("gemini")
+                .toolCall("gemini-model", new OpenAiToolCall(
+                        "call-1",
+                        "function",
+                        new OpenAiToolCall.FunctionCall("search_notices", "{}")))
+                .reply("gemini-model", "검색어를 입력해 주세요.");
+        LlmChatService chatService = chatService(List.of(provider), List.of("gemini"), List.of(), 0);
+
+        ChatResponse response = chatService.reply("c-test", "공지 검색해줘");
+
+        assertThat(response.reply()).contains("검색어");
+        verify(mcpClient, never()).callTool(argThat(named("search_notices")));
+        String toolContent = provider.request(1).messages().stream()
+                .filter(message -> "tool".equals(message.role()))
+                .findFirst()
+                .orElseThrow()
+                .content();
+        assertThat(toolContent).contains("검색어를 입력해 주세요.");
     }
 
     @Test
@@ -733,6 +811,32 @@ class LlmChatServiceTests {
                 .doesNotContain("이교수");
     }
 
+    @Test
+    void noticeListCompactKeepsDisplayFieldsAndDropsUnusedStatus() {
+        LlmChatService chatService = chatService(
+                List.of(new FakeProvider("noop").reply("noop", "noop")),
+                List.of("noop"));
+        String rawNoticeJson = """
+                {
+                  "items":[
+                    {"title":"장학금 신청 안내","link":"https://example.test/notice/1",
+                     "date":"2026-05-26","status":"진행","department":"학생처","category":"장학"}
+                  ],
+                  "currentPage":1,
+                  "totalPages":2
+                }
+                """;
+
+        String compact = chatService.compactAndCap("get_recent_notices", rawNoticeJson);
+
+        assertThat(compact)
+                .contains("\"title\":\"장학금 신청 안내\"")
+                .contains("\"link\":\"https://example.test/notice/1\"")
+                .contains("\"category\":\"장학\"")
+                .contains("\"department\":\"학생처\"")
+                .doesNotContain("\"status\"");
+    }
+
     private static org.mockito.ArgumentMatcher<McpSchema.CallToolRequest> named(String toolName) {
         return request -> request != null && toolName.equals(request.name());
     }
@@ -784,7 +888,10 @@ class LlmChatServiceTests {
                 gradesService,
                 lmsAssignmentsService,
                 libraryLoansService,
-                List.of(mcpClient)
+                List.of(mcpClient),
+                chapelService,
+                graduationService,
+                scholarshipService
         );
     }
 
@@ -805,7 +912,10 @@ class LlmChatServiceTests {
                 lmsAssignmentsService,
                 libraryLoansService,
                 List.of(mcpClient),
-                clock
+                clock,
+                chapelService,
+                graduationService,
+                scholarshipService
         );
     }
 
@@ -834,7 +944,11 @@ class LlmChatServiceTests {
                                 requiredIntegerSchema("floor", "도서관 층 코드 (-1, 1, 2, 3, 4, 5, 6)")),
                         canonicalTool("search_library_book",
                                 "숭실대학교 중앙도서관 소장 도서를 키워드로 검색합니다.",
-                                requiredStringSchema("query", "검색어 (제목/저자/출판 키워드, 1~64자)"))
+                                requiredStringSchema("query", "검색어 (제목/저자/출판 키워드, 1~64자)")),
+                        canonicalTool("start_auth", "로그인을 시작합니다.", emptyObjectSchema()),
+                        canonicalTool("get_auth_status", "로그인 상태를 확인합니다.", emptyObjectSchema()),
+                        canonicalTool("logout_provider", "연동을 해제합니다.", emptyObjectSchema()),
+                        canonicalTool("logout_all", "모든 연동을 해제합니다.", emptyObjectSchema())
                 ),
                 null
         );
