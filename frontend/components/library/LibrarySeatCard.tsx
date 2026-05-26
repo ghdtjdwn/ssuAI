@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLibrarySeatStatus } from "@/hooks/useLibrarySeatStatus";
-import type { LibraryFloorCode } from "@/lib/api/types";
+import type { LibraryFloorCode, LibrarySeatZone } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
 const FLOOR_OPTIONS: ReadonlyArray<{ code: LibraryFloorCode; label: string }> = [
@@ -21,6 +21,13 @@ const FLOOR_OPTIONS: ReadonlyArray<{ code: LibraryFloorCode; label: string }> = 
 ];
 
 const DEFAULT_FLOOR: LibraryFloorCode = 2;
+const COLLAPSED_SEAT_COUNT = 60;
+
+const SEAT_STATUS_LABEL = {
+  available: "가능",
+  occupied: "사용중",
+  outOfService: "비활성",
+} as const;
 
 function LibrarySeatSkeleton() {
   return (
@@ -31,6 +38,80 @@ function LibrarySeatSkeleton() {
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-12 w-full" />
       </div>
+    </div>
+  );
+}
+
+function SeatDetails({ zone }: { zone: LibrarySeatZone }) {
+  const [expanded, setExpanded] = useState(false);
+  const seats = zone.seats ?? [];
+
+  if (seats.length === 0) {
+    return zone.seatIds.length > 0 ? (
+      <p className="mt-1 truncate text-xs text-muted-foreground">
+        빈 자리: {zone.seatIds.join(", ")}
+      </p>
+    ) : null;
+  }
+
+  const hasMoreSeats = seats.length > COLLAPSED_SEAT_COUNT;
+  const visibleSeats = expanded ? seats : seats.slice(0, COLLAPSED_SEAT_COUNT);
+
+  return (
+    <>
+      <div
+        className="mt-2 flex flex-wrap gap-1"
+        aria-label={`${zone.label} 개별 좌석 현황`}
+      >
+        {visibleSeats.map((seat) => (
+          <span
+            key={seat.id}
+            title={`${seat.label} (${SEAT_STATUS_LABEL[seat.status]})`}
+            className={cn(
+              "inline-flex h-6 min-w-10 items-center justify-center rounded px-1 text-[10px] font-medium",
+              seat.status === "available" &&
+                "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+              seat.status === "occupied" &&
+                "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-400",
+              seat.status === "outOfService" &&
+                "bg-muted text-muted-foreground opacity-50",
+            )}
+          >
+            {seat.label}
+          </span>
+        ))}
+      </div>
+      {hasMoreSeats ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="mt-2 h-7 px-2 text-xs"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? "접기" : `모두 보기 (${seats.length}석)`}
+        </Button>
+      ) : null}
+    </>
+  );
+}
+
+function SeatLegend() {
+  return (
+    <div className="flex gap-3 text-xs text-muted-foreground" aria-label="좌석 상태 범례">
+      <span className="flex items-center gap-1">
+        <span className="inline-block h-2.5 w-2.5 rounded bg-green-200" />
+        가능
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="inline-block h-2.5 w-2.5 rounded bg-red-200" />
+        사용중
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="inline-block h-2.5 w-2.5 rounded bg-muted" />
+        비활성
+      </span>
     </div>
   );
 }
@@ -152,11 +233,7 @@ export function LibrarySeatCard() {
                         <span> / {zone.total}석</span>
                       </p>
                     </div>
-                    {zone.seatIds.length > 0 ? (
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        빈 자리: {zone.seatIds.join(", ")}
-                      </p>
-                    ) : null}
+                    <SeatDetails zone={zone} />
                   </li>
                 ))}
               </ul>
@@ -167,6 +244,10 @@ export function LibrarySeatCard() {
                 description="이 층은 구역별 분류가 제공되지 않습니다."
               />
             )}
+
+            {data.zones.some((zone) => (zone.seats?.length ?? 0) > 0) ? (
+              <SeatLegend />
+            ) : null}
           </div>
         ) : null}
       </CardContent>

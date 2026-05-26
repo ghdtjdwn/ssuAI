@@ -22,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.ssuai.domain.library.dto.LibraryFloor;
+import com.ssuai.domain.library.dto.LibrarySeatItem;
 import com.ssuai.domain.library.dto.LibrarySeatStatusResponse;
 import com.ssuai.domain.library.dto.LibrarySeatZone;
 import com.ssuai.domain.library.service.LibrarySeatService;
@@ -48,7 +49,10 @@ class LibrarySeatControllerTests {
         LibrarySeatStatusResponse response = new LibrarySeatStatusResponse(
                 2, "2층", 344, 230, 112, 2,
                 Instant.parse("2026-05-15T07:30:14Z"),
-                List.of(new LibrarySeatZone("숭실스퀘어ON(2F)", 112, 87, List.of()))
+                List.of(new LibrarySeatZone(
+                        "숭실스퀘어ON(2F)", 112, 87, List.of("2-A-001"),
+                        List.of(new LibrarySeatItem("2-A-001", "A-1", "available"))
+                ))
         );
         when(libraryService.getSeatStatusForSession(eq(LibraryFloor.F2), anyString())).thenReturn(response);
 
@@ -59,6 +63,7 @@ class LibrarySeatControllerTests {
                 .andExpect(jsonPath("$.data.availableSeats").value(230))
                 .andExpect(jsonPath("$.data.totalSeats").value(344))
                 .andExpect(jsonPath("$.data.zones[0].label").value("숭실스퀘어ON(2F)"))
+                .andExpect(jsonPath("$.data.zones[0].seats[0].label").value("A-1"))
                 .andExpect(jsonPath("$.error").value(nullValue()))
                 .andExpect(jsonPath("$.traceId").value(not(emptyOrNullString())));
     }

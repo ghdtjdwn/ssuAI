@@ -887,7 +887,6 @@ public class LlmChatService implements ChatService {
         copyTextIfPresent(node, compact, "label");
         copyIntIfPresent(node, compact, "total");
         copyIntIfPresent(node, compact, "available");
-        copyNonEmptyArray(node, compact, "seatIds");
         return compact;
     }
 
