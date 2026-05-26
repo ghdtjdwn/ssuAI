@@ -172,6 +172,39 @@ export function ChapelCard() {
                 </ul>
               </div>
             )}
+
+            {data.absenceApplications.length > 0 ? (
+              <div>
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">결석 신청 이력</p>
+                <ul className="space-y-2">
+                  {data.absenceApplications.map((application, index) => (
+                    <li
+                      key={`${application.startDate}-${application.reason}-${index}`}
+                      className="flex items-start justify-between gap-2 rounded-md border border-border p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{application.reason}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {application.startDate} ~ {application.endDate} · {application.category}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          application.status === "승인"
+                            ? "default"
+                            : application.status === "거부"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                        className="shrink-0 text-xs"
+                      >
+                        {application.status}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         )}
       </CardContent>

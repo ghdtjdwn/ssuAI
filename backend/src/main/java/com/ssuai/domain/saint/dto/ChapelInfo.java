@@ -11,10 +11,12 @@ public record ChapelInfo(
         Integer absenceAllowedMinutes,
         int absenceUsedMinutes,
         String result,
-        List<ChapelAttendanceEntry> attendances
+        List<ChapelAttendanceEntry> attendances,
+        List<ChapelAbsenceApplication> absenceApplications
 ) {
 
     public ChapelInfo {
         attendances = attendances == null ? List.of() : List.copyOf(attendances);
+        absenceApplications = absenceApplications == null ? List.of() : List.copyOf(absenceApplications);
     }
 }

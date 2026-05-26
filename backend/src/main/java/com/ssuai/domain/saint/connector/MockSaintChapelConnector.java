@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.ssuai.domain.auth.saint.PortalCookies;
+import com.ssuai.domain.saint.dto.ChapelAbsenceApplication;
 import com.ssuai.domain.saint.dto.ChapelAttendanceEntry;
 import com.ssuai.domain.saint.dto.ChapelInfo;
 
@@ -49,6 +50,8 @@ class MockSaintChapelConnector implements SaintChapelConnector {
                 "진행중",
                 List.of(
                         new ChapelAttendanceEntry("2026-03-12", "개강채플", "담당교목", "출석"),
-                        new ChapelAttendanceEntry("2026-03-19", "공동체채플", "담당교목", "결석")));
+                        new ChapelAttendanceEntry("2026-03-19", "공동체채플", "담당교목", "결석")),
+                List.of(new ChapelAbsenceApplication(
+                        "병무관계", "2026.05.14", "2026.05.20", "예비군", "승인")));
     }
 }
