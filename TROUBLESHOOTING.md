@@ -1011,3 +1011,21 @@
 - Verify: `gwCbLocationIsFollowedAsCanvasAuthStartUrl` covers the auth callback
   path, and production logs should show `xn_api_token` in
   `lms auth phase2 merged cookie names`.
+
+---
+
+## 2026-05-26 — main push 이벤트 기록 후 CI run 미생성
+
+- 증상: PR #176 merge와 배포 재트리거용 `main` push가 GitHub repository
+  events에는 `PushEvent`로 기록됐지만, 해당 SHA의 `CI`/`Security` Actions
+  run이 생성되지 않아 backend 이미지 빌드와 `Deploy` workflow가 시작되지 않았다.
+- 원인/제약: GitHub 측에서 push event를 workflow run으로 enqueue하지 않은
+  구체 원인은 repository API로 확인할 수 없었다. 저장소의 `CI` workflow에는
+  `push`/`pull_request` trigger만 있었고, push trigger가 누락될 때 운영자가
+  동일 `main` SHA를 다시 빌드할 수 있는 수동 복구 경로도 없었다.
+- 해결: `.github/workflows/ci.yml`에 `workflow_dispatch`를 추가하고,
+  `main`에서 수동 실행된 CI도 `image-build` job이 실행되도록 gate를 확장했다.
+  자동 `main` push 배포 경로와 PR의 image-build skip 정책은 유지한다.
+- 검증: `gh workflow run ci.yml --ref main`으로 현재 `main` tree를 실행한 뒤
+  `CI`의 backend/frontend/image-build 성공과 이어지는 `Deploy` workflow의
+  성공을 확인한다.
