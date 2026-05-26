@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import { useSaintChapel } from "@/hooks/useSaintChapel";
 import { getSsoInitUrl } from "@/lib/api/auth";
+import type { ChapelInfo } from "@/lib/api/types";
 
 function ChapelSkeleton() {
   return (
@@ -26,6 +27,36 @@ function resultVariant(result: string): BadgeProps["variant"] {
   if (result === "이수") return "default";
   if (result === "미이수") return "destructive";
   return "secondary";
+}
+
+function AbsenceStatus({ chapel }: { chapel: ChapelInfo }) {
+  if (chapel.result === "이수") {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
+        <span aria-hidden="true">✓</span>
+        <span>이수 완료</span>
+      </div>
+    );
+  }
+
+  if (chapel.absenceAllowedMinutes === null) {
+    return null;
+  }
+
+  const remaining = chapel.absenceAllowedMinutes - chapel.absenceUsedMinutes;
+  if (remaining <= 0) {
+    return (
+      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+        결석 한도 도달 - 이제 한 번 더 빠지면 미이수!
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+      결석 {remaining}번 더 가능
+    </div>
+  );
 }
 
 export function ChapelCard() {
@@ -91,17 +122,25 @@ export function ChapelCard() {
                   <dt className="text-muted-foreground">강의실</dt>
                   <dd className="text-right font-medium text-foreground">{data.chapelRoom}</dd>
                 </div>
+                {data.seatNumber ? (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">좌석번호</dt>
+                    <dd className="text-right font-medium text-foreground">{data.seatNumber}</dd>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-3">
                   <dt className="text-muted-foreground">결석</dt>
                   <dd className="text-right font-medium text-foreground">
-                    {data.absenceUsedMinutes}분
+                    {data.absenceUsedMinutes}회
                     {data.absenceAllowedMinutes === null
                       ? ""
-                      : ` / ${data.absenceAllowedMinutes}분 허용`}
+                      : ` / 최대 ${data.absenceAllowedMinutes}회`}
                   </dd>
                 </div>
               </dl>
             </div>
+
+            <AbsenceStatus chapel={data} />
 
             {recentAttendances.length === 0 ? (
               <EmptyState

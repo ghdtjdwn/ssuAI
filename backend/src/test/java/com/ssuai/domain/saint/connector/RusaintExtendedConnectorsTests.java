@@ -96,7 +96,7 @@ class RusaintExtendedConnectorsTests {
             this.sessionJson = sessionJson;
             this.year = year;
             this.semester = semester;
-            return new ChapelInfo(year == null ? 2026 : year, semester, "", "", null, 0, "", List.of());
+            return new ChapelInfo(year == null ? 2026 : year, semester, "", "", null, null, 0, "", List.of());
         }
 
         @Override
