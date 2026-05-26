@@ -14,9 +14,9 @@ const MAX_MESSAGE_LENGTH = 1000;
 
 const SAMPLE_PROMPTS = [
   "오늘 학식 뭐야?",
+  "내 채플 현황 알려줘",
+  "졸업요건 확인해줘",
   "도서관 4층에 자리 있어?",
-  "도서관에 파이썬 책 있어?",
-  "이번 주 기숙사 식단 알려줘",
 ];
 
 interface ChatMessage {

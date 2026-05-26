@@ -137,7 +137,8 @@ public class RealLibrarySeatConnector implements LibrarySeatConnector {
             outOfServiceSeats += roomFixed;
 
             String zoneName = textOr(room.path("name"), requestedFloor.displayLabel());
-            zones.add(new LibrarySeatZone(zoneName, roomTotal, roomAvail, List.of()));
+            // The verified public Pyxis reading-room endpoint exposes counts only.
+            zones.add(new LibrarySeatZone(zoneName, roomTotal, roomAvail, List.of(), List.of()));
         }
 
         if (totalSeats == 0 && zones.isEmpty()) {

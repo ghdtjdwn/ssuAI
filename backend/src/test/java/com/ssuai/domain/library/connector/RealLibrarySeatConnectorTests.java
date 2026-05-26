@@ -66,6 +66,10 @@ class RealLibrarySeatConnectorTests {
         assertThat(response.outOfServiceSeats()).isEqualTo(10); // 10 + 0
         assertThat(response.zones()).hasSize(2);
         assertThat(response.zones().get(0).label()).isEqualTo("숭실스퀘어ON(2F)");
+        assertThat(response.zones()).allSatisfy(zone -> {
+            assertThat(zone.seatIds()).isEmpty();
+            assertThat(zone.seats()).isEmpty();
+        });
         assertThat(response.fetchedAt()).isNotNull();
     }
 

@@ -78,11 +78,18 @@ export interface CampusFacilityListResponse {
 
 export type LibraryFloorCode = 2 | 5 | 6;
 
+export interface LibrarySeatItem {
+  id: string;
+  label: string;
+  status: "available" | "occupied" | "outOfService";
+}
+
 export interface LibrarySeatZone {
   label: string;
   total: number;
   available: number;
   seatIds: string[];
+  seats: LibrarySeatItem[];
 }
 
 export interface LibrarySeatStatusResponse {
