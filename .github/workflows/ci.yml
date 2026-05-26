@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -65,9 +66,9 @@ jobs:
     name: Backend image (ghcr.io, ARM64)
     runs-on: ubuntu-latest
     needs: backend
-    # Build + push only on push to main. PR runs would publish images that
-    # nothing pulls, so we save ghcr.io storage by gating here.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Build + push for automatic or manual main deployments. PR runs would
+    # publish images that nothing pulls, so keep them gated out.
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
       packages: write
