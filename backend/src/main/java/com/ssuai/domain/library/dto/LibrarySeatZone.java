@@ -6,10 +6,12 @@ public record LibrarySeatZone(
         String label,
         int total,
         int available,
-        List<String> seatIds
+        List<String> seatIds,
+        List<LibrarySeatItem> seats
 ) {
 
     public LibrarySeatZone {
         seatIds = seatIds == null ? List.of() : List.copyOf(seatIds);
+        seats = seats == null ? List.of() : List.copyOf(seats);
     }
 }

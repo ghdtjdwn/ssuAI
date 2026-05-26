@@ -25,7 +25,7 @@ class LibrarySeatMcpToolTests {
         LibrarySeatStatusResponse stub = new LibrarySeatStatusResponse(
                 2, "2층", 344, 230, 112, 2,
                 Instant.parse("2026-05-15T10:00:00Z"),
-                List.of(new LibrarySeatZone("숭실스퀘어ON(2F)", 112, 87, List.of()))
+                List.of(new LibrarySeatZone("숭실스퀘어ON(2F)", 112, 87, List.of(), List.of()))
         );
         when(service.getSeatStatus(LibraryFloor.F2)).thenReturn(stub);
         LibrarySeatMcpTool tool = new LibrarySeatMcpTool(service);
