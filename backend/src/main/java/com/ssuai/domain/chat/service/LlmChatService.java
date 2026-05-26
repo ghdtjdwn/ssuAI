@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,6 +27,7 @@ import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -47,8 +49,11 @@ import com.ssuai.domain.library.service.LibraryLoansService;
 import com.ssuai.domain.lms.mcp.LmsToolContext;
 import com.ssuai.domain.lms.service.LmsAssignmentsService;
 import com.ssuai.domain.saint.mcp.SaintToolContext;
+import com.ssuai.domain.saint.service.SaintChapelService;
+import com.ssuai.domain.saint.service.SaintGraduationService;
 import com.ssuai.domain.saint.service.SaintGradesService;
 import com.ssuai.domain.saint.service.SaintScheduleService;
+import com.ssuai.domain.saint.service.SaintScholarshipService;
 import com.ssuai.global.exception.ChatUnavailableException;
 import com.ssuai.global.exception.LibraryAuthRequiredException;
 import com.ssuai.global.exception.LmsSessionExpiredException;
@@ -71,6 +76,11 @@ public class LlmChatService implements ChatService {
             - 캠퍼스 시설 검색 (search_campus_facilities)
             - 중앙도서관 좌석 현황 (get_library_seat_status, floor 코드: -1 B1, 1~6 1~6층)
             - 중앙도서관 도서 검색 (search_library_book, 키워드로 제목/저자/출판 부분 일치)
+            - 학교 공지사항 (get_recent_notices, search_notices, get_active_notices,
+              get_department_notices, get_notice_detail) — 학사/장학/채용/행사 등 전체 공지.
+              사용자가 "공지", "공고", "학사일정", "장학 공지", "채용", "행사" 같은 단어를
+              쓰면 get_recent_notices 또는 search_notices를 먼저 호출해.
+              특정 학과 공지를 원하면 get_department_notices를 호출해.
 
             인증된 본인 데이터 (u-SAINT 로그인 필요):
             - 내 시간표 (get_my_schedule) — 학기별 강의 (요일·교시·과목·강의실).
@@ -79,6 +89,12 @@ public class LlmChatService implements ChatService {
               **중요**: 응답은 `{count, link}` 만 와. 절대 점수/등급/과목명/GPA 수치를
               만들어내지 마. 답은 "성적 페이지에서 N과목 확인 가능합니다 (링크 안내)"
               형태로만 해. 본문 데이터는 사용자가 controller 페이지에서 직접 확인해.
+            - 내 채플 출석 (get_my_chapel_info) — 연도·학기 선택, 생략 시 현재 학기.
+              사용자가 "채플", "예배", "출석" 같은 단어를 쓰면 호출해.
+            - 졸업 요건 (check_graduation_requirements) — 졸업 가능 여부·미충족 항목.
+              사용자가 "졸업", "졸업요건", "졸업 가능" 같은 단어를 쓰면 호출해.
+            - 내 장학금 (get_my_scholarships) — 수혜 장학금 이력.
+              사용자가 "장학금" 관련 질문을 하면 호출해.
 
             인증된 본인 데이터 (LMS 로그인 필요):
             - 내 LMS 과제 (get_my_assignments) — 현재 학기 미제출 과제·퀴즈 목록.
@@ -107,7 +123,8 @@ public class LlmChatService implements ChatService {
 
             범위 밖 안내:
             - 수강신청은 아직 지원 안 함.
-            - get_my_schedule / get_my_grades / get_my_assignments 는 u-SAINT 또는 LMS 로그인이
+            - get_my_schedule / get_my_grades / get_my_chapel_info / check_graduation_requirements /
+              get_my_scholarships / get_my_assignments 는 u-SAINT 또는 LMS 로그인이
               필요해. 로그인 안 된 사용자에게는 SmartID 로그인 안내.
             - get_my_library_loans 는 도서관 연동이 필요해.
               연동 안 된 사용자에게는 도서관 좌석 카드의 "도서관 연동" 버튼 안내.
@@ -142,8 +159,12 @@ public class LlmChatService implements ChatService {
     private static final Locale KOREAN = Locale.KOREAN;
 
     private static final int MAX_CHAT_TOOL_FACILITY_RESULTS = 10;
+    private static final int MAX_CHAT_TOOL_LIST_RESULTS = 20;
+    private static final int MAX_NOTICE_DETAIL_CHARS = 2_000;
     private static final int MAX_TOOL_CONTENT_BYTES = 8 * 1024;
     private static final String TOOL_TRUNCATION_MARKER = "...[truncated]";
+    private static final Set<String> CHAT_EXCLUDED_TOOLS = Set.of(
+            "start_auth", "get_auth_status", "logout_provider", "logout_all");
 
     private final LlmChatProperties properties;
     private final Map<String, LlmProvider> providersByName;
@@ -151,6 +172,9 @@ public class LlmChatService implements ChatService {
     private final ChatConversationStore conversationStore;
     private final SaintScheduleService scheduleService;
     private final SaintGradesService gradesService;
+    private final SaintChapelService chapelService;
+    private final SaintGraduationService graduationService;
+    private final SaintScholarshipService scholarshipService;
     private final LmsAssignmentsService lmsAssignmentsService;
     private final LibraryLoansService libraryLoansService;
     private final Clock clock;
@@ -158,6 +182,7 @@ public class LlmChatService implements ChatService {
 
     private final List<McpSyncClient> mcpClients;
 
+    @Autowired
     public LlmChatService(
             LlmChatProperties properties,
             List<LlmProvider> providers,
@@ -167,11 +192,14 @@ public class LlmChatService implements ChatService {
             SaintGradesService gradesService,
             LmsAssignmentsService lmsAssignmentsService,
             LibraryLoansService libraryLoansService,
-            @Lazy List<McpSyncClient> mcpClients
+            @Lazy List<McpSyncClient> mcpClients,
+            SaintChapelService chapelService,
+            SaintGraduationService graduationService,
+            SaintScholarshipService scholarshipService
     ) {
         this(properties, providers, objectMapper, conversationStore,
                 scheduleService, gradesService, lmsAssignmentsService, libraryLoansService,
-                mcpClients, Clock.system(KST));
+                mcpClients, Clock.system(KST), chapelService, graduationService, scholarshipService);
     }
 
     LlmChatService(
@@ -184,7 +212,10 @@ public class LlmChatService implements ChatService {
             LmsAssignmentsService lmsAssignmentsService,
             LibraryLoansService libraryLoansService,
             List<McpSyncClient> mcpClients,
-            Clock clock
+            Clock clock,
+            SaintChapelService chapelService,
+            SaintGraduationService graduationService,
+            SaintScholarshipService scholarshipService
     ) {
         this.properties = properties;
         this.providersByName = providers.stream()
@@ -193,6 +224,9 @@ public class LlmChatService implements ChatService {
         this.conversationStore = conversationStore;
         this.scheduleService = scheduleService;
         this.gradesService = gradesService;
+        this.chapelService = chapelService;
+        this.graduationService = graduationService;
+        this.scholarshipService = scholarshipService;
         this.lmsAssignmentsService = lmsAssignmentsService;
         this.libraryLoansService = libraryLoansService;
         this.mcpClients = mcpClients;
@@ -447,6 +481,7 @@ public class LlmChatService implements ChatService {
             McpSchema.ListToolsResult listing = client.listTools();
             List<OpenAiChatCompletionRequest.Tool> tools = listing.tools().stream()
                     .filter(Objects::nonNull)
+                    .filter(tool -> !CHAT_EXCLUDED_TOOLS.contains(tool.name()))
                     .map(this::mapMcpToolToOpenAi)
                     .toList();
             log.info("mcp chat tools discovered: count={}", tools.size());
@@ -525,11 +560,68 @@ public class LlmChatService implements ChatService {
                         toolName, studentId, () -> scheduleService.fetchSchedule(studentId));
                 case "get_my_grades" -> dispatchPrivateSaintTool(
                         toolName, studentId, () -> gradesService.fetchGrades(studentId));
+                case "get_my_chapel_info" -> {
+                    Integer year = optionalIntArgument(toolCall, "year").orElse(null);
+                    String rawSemester = optionalArgument(toolCall, "semester");
+                    String semester = rawSemester.isBlank() ? null : rawSemester;
+                    yield dispatchPrivateSaintTool(
+                            toolName, studentId,
+                            () -> chapelService.fetchChapelInfo(studentId, year, semester));
+                }
+                case "check_graduation_requirements" -> dispatchPrivateSaintTool(
+                        toolName, studentId,
+                        () -> graduationService.fetchGraduationRequirements(studentId));
+                case "get_my_scholarships" -> {
+                    Integer year = optionalIntArgument(toolCall, "year").orElse(null);
+                    yield dispatchPrivateSaintTool(
+                            toolName, studentId,
+                            () -> scholarshipService.fetchScholarships(studentId, year));
+                }
                 case "get_my_assignments" -> dispatchPrivateLmsTool(
                         toolName, studentId, () -> lmsAssignmentsService.fetchAssignments(studentId));
                 case "get_my_library_loans" -> dispatchPrivateLibraryTool(
                         toolName, () -> libraryLoansService.getLoansForSession(
                                 LibraryToolContext.currentSessionKey()));
+                case "get_recent_notices" -> {
+                    LinkedHashMap<String, Object> args = new LinkedHashMap<>();
+                    String category = optionalArgument(toolCall, "category").trim();
+                    if (!category.isBlank()) {
+                        args.put("category", category);
+                    }
+                    optionalIntArgument(toolCall, "page").ifPresent(page -> args.put("page", page));
+                    yield callMcp(toolName, args);
+                }
+                case "search_notices" -> {
+                    String keyword = optionalArgument(toolCall, "keyword").trim();
+                    if (keyword.isBlank()) {
+                        yield toolError("검색어를 입력해 주세요.");
+                    }
+                    LinkedHashMap<String, Object> args = new LinkedHashMap<>();
+                    args.put("keyword", keyword);
+                    String category = optionalArgument(toolCall, "category").trim();
+                    if (!category.isBlank()) {
+                        args.put("category", category);
+                    }
+                    optionalIntArgument(toolCall, "page").ifPresent(page -> args.put("page", page));
+                    yield callMcp(toolName, args);
+                }
+                case "list_notice_categories" -> callMcp(toolName, Map.of());
+                case "get_notice_detail" -> callMcp(
+                        toolName, Map.of("url", requiredArgument(toolCall, "url")));
+                case "get_active_notices" -> {
+                    LinkedHashMap<String, Object> args = new LinkedHashMap<>();
+                    String category = optionalArgument(toolCall, "category").trim();
+                    if (!category.isBlank()) {
+                        args.put("category", category);
+                    }
+                    yield callMcp(toolName, args);
+                }
+                case "get_department_notices" -> {
+                    LinkedHashMap<String, Object> args = new LinkedHashMap<>();
+                    args.put("department", requiredArgument(toolCall, "department"));
+                    optionalIntArgument(toolCall, "page").ifPresent(page -> args.put("page", page));
+                    yield callMcp(toolName, args);
+                }
                 default -> toolError("지원하지 않는 도구입니다: " + toolName);
             };
         } catch (IllegalArgumentException | IllegalStateException exception) {
@@ -677,8 +769,15 @@ public class LlmChatService implements ChatService {
                 case "search_library_book" -> compactLibraryBookSearchNode(tree);
                 case "get_my_schedule" -> compactScheduleNode(tree);
                 case "get_my_grades" -> compactGradesNode(tree);
+                case "get_my_chapel_info" -> compactChapelNode(tree);
+                case "check_graduation_requirements" -> compactGraduationNode(tree);
+                case "get_my_scholarships" -> compactScholarshipsNode(tree);
                 case "get_my_assignments" -> compactAssignmentsNode(tree);
                 case "get_my_library_loans" -> compactLoansNode(tree);
+                case "get_recent_notices", "search_notices", "get_active_notices",
+                     "get_department_notices" -> compactNoticeListNode(tree);
+                case "get_notice_detail" -> compactNoticeDetailNode(tree);
+                case "list_notice_categories" -> tree;
                 default -> tree;
             };
             return capLength(objectMapper.writeValueAsString(compacted));
@@ -831,6 +930,56 @@ public class LlmChatService implements ChatService {
         return compact;
     }
 
+    private ObjectNode compactChapelNode(JsonNode node) {
+        ObjectNode compact = objectMapper.createObjectNode();
+        copyIntIfPresent(node, compact, "year");
+        copyTextIfPresent(node, compact, "semester");
+        copyIntIfPresent(node, compact, "absenceAllowedMinutes");
+        copyIntIfPresent(node, compact, "absenceUsedMinutes");
+        copyTextIfPresent(node, compact, "result");
+        return compact;
+    }
+
+    private ObjectNode compactGraduationNode(JsonNode node) {
+        ObjectNode compact = objectMapper.createObjectNode();
+        copyBooleanIfPresent(node, compact, "isGraduatable");
+        ArrayNode unmetRequirements = objectMapper.createArrayNode();
+        int unmetCount = 0;
+        JsonNode requirements = node.get("requirements");
+        if (requirements != null && requirements.isArray()) {
+            for (JsonNode requirement : requirements) {
+                if (!requirement.path("satisfied").asBoolean(false)) {
+                    unmetCount++;
+                    JsonNode name = requirement.get("name");
+                    if (name != null && !name.isNull() && !name.asText("").isBlank()) {
+                        unmetRequirements.add(name.asText());
+                    }
+                }
+            }
+        }
+        compact.put("unmetRequirementCount", unmetCount);
+        compact.set("unmetRequirements", unmetRequirements);
+        return compact;
+    }
+
+    private ArrayNode compactScholarshipsNode(JsonNode node) {
+        ArrayNode compact = objectMapper.createArrayNode();
+        if (node == null || !node.isArray()) {
+            return compact;
+        }
+        int limit = Math.min(node.size(), MAX_CHAT_TOOL_LIST_RESULTS);
+        for (int index = 0; index < limit; index++) {
+            JsonNode item = node.get(index);
+            ObjectNode entry = objectMapper.createObjectNode();
+            copyTextIfPresent(item, entry, "name");
+            copyIntIfPresent(item, entry, "year");
+            copyTextIfPresent(item, entry, "semester");
+            copyLongIfPresent(item, entry, "receivedAmount");
+            compact.add(entry);
+        }
+        return compact;
+    }
+
     private static int countGradeCourses(JsonNode node) {
         if (node == null) {
             return 0;
@@ -876,6 +1025,42 @@ public class LlmChatService implements ChatService {
         JsonNode loans = node.path("loans");
         if (loans.isArray()) {
             compact.set("loans", filterArray(loans, this::compactLoanItemNode));
+        }
+        return compact;
+    }
+
+    private ObjectNode compactNoticeListNode(JsonNode node) {
+        ObjectNode compact = objectMapper.createObjectNode();
+        copyIntIfPresent(node, compact, "currentPage");
+        copyIntIfPresent(node, compact, "totalPages");
+        ArrayNode items = objectMapper.createArrayNode();
+        JsonNode sourceItems = node.get("items");
+        if (sourceItems != null && sourceItems.isArray()) {
+            int limit = Math.min(sourceItems.size(), MAX_CHAT_TOOL_LIST_RESULTS);
+            for (int index = 0; index < limit; index++) {
+                JsonNode item = sourceItems.get(index);
+                ObjectNode notice = objectMapper.createObjectNode();
+                copyTextIfPresent(item, notice, "title");
+                copyTextIfPresent(item, notice, "category");
+                copyTextIfPresent(item, notice, "date");
+                copyTextIfPresent(item, notice, "link");
+                copyTextIfPresent(item, notice, "department");
+                items.add(notice);
+            }
+        }
+        compact.set("items", items);
+        return compact;
+    }
+
+    private ObjectNode compactNoticeDetailNode(JsonNode node) {
+        ObjectNode compact = objectMapper.createObjectNode();
+        copyTextIfPresent(node, compact, "title");
+        JsonNode bodyText = node.get("bodyText");
+        if (bodyText != null && !bodyText.isNull() && !bodyText.asText("").isBlank()) {
+            String text = bodyText.asText();
+            compact.put("bodyText", text.length() <= MAX_NOTICE_DETAIL_CHARS
+                    ? text
+                    : text.substring(0, MAX_NOTICE_DETAIL_CHARS) + "...");
         }
         return compact;
     }
@@ -946,6 +1131,20 @@ public class LlmChatService implements ChatService {
         JsonNode value = source.get(field);
         if (value != null && !value.isNull() && value.isNumber()) {
             target.put(field, value.asInt());
+        }
+    }
+
+    private static void copyLongIfPresent(JsonNode source, ObjectNode target, String field) {
+        JsonNode value = source.get(field);
+        if (value != null && !value.isNull() && value.isNumber()) {
+            target.put(field, value.asLong());
+        }
+    }
+
+    private static void copyBooleanIfPresent(JsonNode source, ObjectNode target, String field) {
+        JsonNode value = source.get(field);
+        if (value != null && !value.isNull() && value.isBoolean()) {
+            target.put(field, value.asBoolean());
         }
     }
 
@@ -1057,18 +1256,19 @@ public class LlmChatService implements ChatService {
 
     /**
      * Catches messages the chatbot can't usefully serve from any of its
-     * tools — LMS / 수강신청 / 졸업요건 / 개인정보 — and short-circuits
+     * tools — 수강신청 / 개인정보 — and short-circuits
      * to {@link #SCOPE_GUIDANCE} so the LLM doesn't hallucinate. Note
      * that "성적", "시간표", "GPA" are intentionally **not** in this list:
      * those are now real tools ({@code get_my_schedule},
-     * {@code get_my_grades}) and the LLM is allowed to call them. The
+     * {@code get_my_grades}, {@code check_graduation_requirements}) and
+     * the LLM is allowed to call them. The
      * authenticated-vs-anonymous gating happens inside
      * {@code executeToolCall} which returns {@link #SAINT_SESSION_GUIDANCE}
      * when the chat lacks a student id.
      */
     private static boolean looksLikeOutOfScopeRequest(String message) {
         String normalized = normalize(message);
-        return containsAny(normalized, "수강신청", "졸업요건", "개인정보");
+        return containsAny(normalized, "수강신청", "개인정보");
     }
 
     private static boolean looksLikeSecretInput(String message) {
