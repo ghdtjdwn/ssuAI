@@ -1,5 +1,6 @@
 package com.ssuai.domain.saint.connector
 
+import com.ssuai.domain.saint.dto.ChapelAbsenceApplication
 import com.ssuai.domain.saint.dto.ChapelAttendanceEntry
 import com.ssuai.domain.saint.dto.ChapelInfo
 import com.ssuai.domain.saint.dto.CourseGrade
@@ -20,6 +21,7 @@ import dev.eatsteak.rusaint.ffi.ScholarshipsApplicationBuilder
 import dev.eatsteak.rusaint.ffi.StudentInformationApplicationBuilder
 import dev.eatsteak.rusaint.ffi.USaintSession
 import dev.eatsteak.rusaint.ffi.USaintSessionBuilder
+import dev.eatsteak.rusaint.model.ChapelAbsenceRequest
 import dev.eatsteak.rusaint.model.ChapelAttendance
 import dev.eatsteak.rusaint.model.ChapelInformation
 import dev.eatsteak.rusaint.model.ClassGrade
@@ -194,6 +196,7 @@ class RusaintUniFfiClient : RusaintClient {
             info.generalInformation.absenceTime.toInt(),
             info.generalInformation.result,
             info.attendances.map(::mapChapelAttendance),
+            info.absenceRequests.map(::mapChapelAbsenceApplication),
         )
 
     private fun mapChapelAttendance(attendance: ChapelAttendance): ChapelAttendanceEntry =
@@ -202,6 +205,15 @@ class RusaintUniFfiClient : RusaintClient {
             attendance.title,
             attendance.instructor,
             attendance.attendance,
+        )
+
+    private fun mapChapelAbsenceApplication(request: ChapelAbsenceRequest): ChapelAbsenceApplication =
+        ChapelAbsenceApplication(
+            request.absenceDetail,
+            request.absenceStart,
+            request.absenceEnd,
+            request.absenceReasonKr,
+            request.status,
         )
 
     private fun mapGraduationRequirement(requirement: GraduationRequirement): GraduationRequirementItem =

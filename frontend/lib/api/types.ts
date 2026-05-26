@@ -239,6 +239,14 @@ export interface ChapelAttendanceEntry {
   status: string;
 }
 
+export interface ChapelAbsenceApplication {
+  category: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: string;
+}
+
 export interface ChapelInfo {
   year: number;
   semester: string;
@@ -249,6 +257,7 @@ export interface ChapelInfo {
   absenceUsedMinutes: number;
   result: string;
   attendances: ChapelAttendanceEntry[];
+  absenceApplications: ChapelAbsenceApplication[];
 }
 
 export interface GraduationRequirementItem {

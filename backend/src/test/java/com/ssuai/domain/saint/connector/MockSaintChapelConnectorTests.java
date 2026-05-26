@@ -27,6 +27,11 @@ class MockSaintChapelConnectorTests {
         assertThat(response.semester()).isEqualTo("1학기");
         assertThat(response.attendances()).hasSize(2);
         assertThat(response.absenceAllowedMinutes()).isNull();
+        assertThat(response.absenceApplications()).singleElement().satisfies(application -> {
+            assertThat(application.category()).isEqualTo("병무관계");
+            assertThat(application.reason()).isEqualTo("예비군");
+            assertThat(application.status()).isEqualTo("승인");
+        });
     }
 
     @Test
