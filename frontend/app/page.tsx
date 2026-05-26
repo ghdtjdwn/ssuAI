@@ -11,8 +11,12 @@ import { LibrarySeatCard } from "@/components/library/LibrarySeatCard";
 import { AssignmentsCard } from "@/components/lms/AssignmentsCard";
 import { TodayMealCard } from "@/components/meal/TodayMealCard";
 import { WeeklyMealCard } from "@/components/meal/WeeklyMealCard";
+import { NoticesCard } from "@/components/notice/NoticesCard";
+import { ChapelCard } from "@/components/saint/ChapelCard";
 import { GradesCard } from "@/components/saint/GradesCard";
+import { GraduationCard } from "@/components/saint/GraduationCard";
 import { ScheduleCard } from "@/components/saint/ScheduleCard";
+import { ScholarshipsCard } from "@/components/saint/ScholarshipsCard";
 import { buttonVariants } from "@/components/ui/button";
 
 export default function Home() {
@@ -46,7 +50,11 @@ export default function Home() {
         <DormWeeklyCard />
         <LibrarySeatCard />
         <LibraryBookSearchCard />
+        <NoticesCard />
         <ScheduleCard />
+        <ChapelCard />
+        <GraduationCard />
+        <ScholarshipsCard />
         <GradesCard />
         <AssignmentsCard />
         <LibraryLoansCard />
