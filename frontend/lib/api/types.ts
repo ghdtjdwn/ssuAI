@@ -209,3 +209,64 @@ export interface ChatResponse {
   conversationId: string;
   reply: string;
 }
+
+export interface NoticeItem {
+  title: string;
+  link: string;
+  date: string;
+  status: string;
+  department: string;
+  category: string;
+}
+
+export interface NoticeListResponse {
+  items: NoticeItem[];
+  currentPage: number;
+  totalPages: number;
+}
+
+export interface ChapelAttendanceEntry {
+  date: string;
+  title: string;
+  instructor: string;
+  status: string;
+}
+
+export interface ChapelInfo {
+  year: number;
+  semester: string;
+  chapelTime: string;
+  chapelRoom: string;
+  absenceAllowedMinutes: number | null;
+  absenceUsedMinutes: number;
+  result: string;
+  attendances: ChapelAttendanceEntry[];
+}
+
+export interface GraduationRequirementItem {
+  name: string;
+  category: string;
+  required: number;
+  completed: number;
+  remaining: number;
+  satisfied: boolean;
+}
+
+export interface GraduationStatus {
+  isGraduatable: boolean;
+  studentName: string;
+  department: string;
+  grade: number;
+  completedPoints: number;
+  graduationPoints: number;
+  requirements: GraduationRequirementItem[];
+}
+
+export interface ScholarshipEntry {
+  year: number;
+  semester: string;
+  name: string;
+  receivedAmount: number;
+  receiveType: string;
+  status: string;
+}
