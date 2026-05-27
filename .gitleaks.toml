@@ -16,10 +16,3 @@ paths = [
     '''docs/security\.md''',
     '''docs/architecture\.md''',
 ]
-
-[[allowlists]]
-description = "ssuAI: deploy templates with placeholder values"
-paths = [
-    '''deploy/charts/ssuai-backend/templates/secret\.example\.yaml''',
-    '''deploy/argocd/image-updater/secret\.example\.yaml''',
-]
