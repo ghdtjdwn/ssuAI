@@ -13,9 +13,6 @@ jobs:
   frontend:
     name: Frontend (pnpm, Node 20)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -25,7 +22,7 @@ jobs:
         with:
           node-version: '20'
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Lint

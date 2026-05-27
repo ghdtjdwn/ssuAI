@@ -19,13 +19,20 @@ Thumbs.db
 .env.*
 !.env.example
 
-# Build artifacts (frontend and root tooling)
+# Dependencies and Next.js build artifacts
+node_modules/
+.next/
 build/
 out/
 dist/
+*.tsbuildinfo
 
 # Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Local crawl/export artifacts
 .tmp/

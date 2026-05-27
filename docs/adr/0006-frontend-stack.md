@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-05-07
-- **Scope**: `frontend/`
+- **Scope**: repository-root Next.js application (`app/`, `components/`, `hooks/`, `lib/`)
 
 ## Context
 
@@ -13,6 +13,9 @@ production deployment decisions for Task 06.
 The architecture document already names Next.js App Router, TypeScript,
 Tailwind CSS, shadcn/ui, and TanStack Query as the intended frontend shape.
 This ADR records that stack as the implementation decision for the MVP.
+
+After the MCP server was split into its own repository, the web application
+was promoted from the former `frontend/` workspace to this repository root.
 
 ## Decision
 
