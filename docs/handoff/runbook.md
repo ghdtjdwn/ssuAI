@@ -36,7 +36,7 @@ Trigger 문구: "토큰 끝났어", "다른 AI로 갈게", "다른 클로드로 
    - 다음 agent 가 Claude 이면 opener 첫 줄은 반드시 `/model opusplan`.
    - 다음 agent 가 Codex 이면 `/model opusplan` 을 쓰지 말고, 기본
      `ssuai` profile 기준으로 시작한다고 적는다. 설계 세션이 필요할 때만
-     `codex --profile ssuai-deep -C C:/Users/akftj/ssuAI` 를 명시한다.
+     `codex --profile ssuai-deep -C C:/Users/akftj/mp/ssuAI` 를 명시한다.
 
 4. Handoff 문서 자체를 commit/push — `chore/handoff-<date>` 브랜치 PR
    또는 main 직 push. 메타데이터만이므로 auto-merge 정책 적용.
