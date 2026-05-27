@@ -2,8 +2,9 @@
 
 - **Status**: Accepted (`feat/chatbot-slice` merged; chatbot live at https://ssuai.vercel.app/chat with 9-provider fallback)
 - **Date**: 2026-05-12
-- **Scope**: `backend/src/main/java/com/ssuai/domain/chat/`,
-  `frontend/app/chat/`, LLM provider configuration, chat tool usage.
+- **Scope**: `app/chat/` in this repository and
+  `src/main/java/com/ssuai/domain/chat/` in `ssuMCP`,
+  LLM provider configuration, chat tool usage.
 
 ## Context
 

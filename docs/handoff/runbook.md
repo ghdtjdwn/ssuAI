@@ -53,7 +53,7 @@ Trigger 문구: "토큰 끝났어", "다른 AI로 갈게", "다른 클로드로 
 
 ## Troubleshooting log policy
 
-`TROUBLESHOOTING.md` 추가 기준 — portfolio interview 에서 꺼낼 만한
+`../../ssuMCP/TROUBLESHOOTING.md` 추가 기준 — portfolio interview 에서 꺼낼 만한
 case 만:
 - 실제 bug, failed/flaky verification
 - 배포/CI 실패
