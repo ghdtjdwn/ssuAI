@@ -19,7 +19,7 @@ Thumbs.db
 .env.*
 !.env.example
 
-# Build artifacts (per-language .gitignore exists in backend/, frontend/, etc.)
+# Build artifacts (frontend and root tooling)
 build/
 out/
 dist/
@@ -30,12 +30,6 @@ dist/
 # Local crawl/export artifacts
 .tmp/
 exports/
-backend/exports/
-backend/meals.json
-backend/weekly-meals-*.json
-
-# Generated deployment manifests with environment-specific host/origin/email.
-deploy/generated/
 
 # Root-level scratch files (debugging dumps kept locally, never shared)
 /.tmp_*
@@ -53,6 +47,3 @@ secrets/
 /rusaint/
 /ssugrade/
 /.antigravitycli/
-
-# ssufid Rust library (local reference clone, not part of the build)
-backend/ssufid/
