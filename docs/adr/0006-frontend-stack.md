@@ -1,66 +1,46 @@
-# ADR 0006 - Frontend MVP stack
+# ADR 0006 — 프론트엔드 MVP 스택
 
 - **Status**: Accepted
 - **Date**: 2026-05-07
-- **Scope**: repository-root Next.js application (`app/`, `components/`, `hooks/`, `lib/`)
+- **Scope**: 저장소 루트 Next.js 애플리케이션 (`app/`, `components/`, `hooks/`, `lib/`)
 
-## Context
+## 맥락
 
-Task 05 adds the first web dashboard for the local MVP. The frontend must prove
-the existing REST envelope end to end, stay small enough to review, and leave
-production deployment decisions for Task 06.
+Task 05에서 로컬 MVP용 첫 웹 대시보드를 추가한다. 프론트엔드는 기존 REST envelope을 end-to-end로 검증하고, 리뷰 가능한 수준으로 작게 유지하며, 프로덕션 배포 결정은 Task 06에 넘겨야 한다.
 
-The architecture document already names Next.js App Router, TypeScript,
-Tailwind CSS, shadcn/ui, and TanStack Query as the intended frontend shape.
-This ADR records that stack as the implementation decision for the MVP.
+아키텍처 문서에 이미 Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query가 의도된 프론트엔드 형태로 명시되어 있다. 이 ADR은 그 스택을 MVP 구현 결정으로 공식화한다.
 
-After the MCP server was split into its own repository, the web application
-was promoted from the former `frontend/` workspace to this repository root.
+MCP 서버가 별도 저장소로 분리된 이후, 웹 애플리케이션은 기존 `frontend/` 워크스페이스에서 이 저장소 루트로 승격되었다.
 
-## Decision
+## 결정
 
-Use:
+다음 스택을 사용한다:
 
-- Next.js 15 App Router with TypeScript strict mode.
-- Tailwind CSS for styling.
-- shadcn/ui copy-in primitives for basic controls and cards.
-- TanStack Query v5 for server state, retries, stale times, and independent
-  card loading/error states.
-- Direct browser fetches to the Spring Boot backend, with dev-profile CORS for
-  `http://localhost:3000`.
+- Next.js 15 App Router + TypeScript strict mode
+- Tailwind CSS (스타일링)
+- shadcn/ui copy-in 컴포넌트 (기본 컨트롤, 카드)
+- TanStack Query v5 (서버 상태 관리, 리트라이, stale time, 카드 개별 로딩/에러 상태)
+- Spring Boot 백엔드로의 직접 브라우저 fetch (dev 프로파일에서 `http://localhost:3000` CORS 허용)
 
-The frontend reads `NEXT_PUBLIC_SSUAI_API_BASE` from env and unwraps the
-backend `ApiResponse<T>` envelope in one typed API client.
+프론트엔드는 env에서 `NEXT_PUBLIC_SSUAI_API_BASE`를 읽고, 타입 안전 API 클라이언트에서 백엔드의 `ApiResponse<T>` envelope을 언래핑한다.
 
-## Consequences
+## 결과
 
-**Good**
+**장점**
 
-- The dashboard uses the same backend contract that future web and chatbot
-  surfaces will depend on.
-- Each card can fail, retry, and show `traceId` without breaking the rest of
-  the page.
-- shadcn components stay in the repository, so there is no UI framework runtime
-  to configure or replace later.
+- 대시보드가 미래의 웹·챗봇 표면이 의존하게 될 동일한 백엔드 계약을 사용한다.
+- 각 카드가 독립적으로 실패·리트라이·`traceId` 표시를 처리해도 나머지 페이지에 영향을 주지 않는다.
+- shadcn 컴포넌트가 저장소 안에 소스 코드로 존재하므로 나중에 설정하거나 교체할 UI 프레임워크 런타임이 없다.
 
-**Cost**
+**비용**
 
-- Next.js is heavier than a plain SPA for a local-only dashboard.
-- Direct fetches make CORS visible in development, so production CORS must be
-  handled deliberately in Task 06.
-- shadcn copy-in components are source code the project owns; future changes
-  require normal code review.
+- Next.js는 로컬 전용 대시보드치고 일반 SPA보다 무겁다.
+- 직접 fetch 방식은 개발 중 CORS를 드러나게 하므로, Task 06에서 프로덕션 CORS를 의도적으로 처리해야 한다.
+- shadcn copy-in 컴포넌트는 프로젝트가 소유하는 소스 코드이므로, 향후 변경 시 일반적인 코드 리뷰가 필요하다.
 
-## Alternatives considered
+## 검토한 대안
 
-- **Vite SPA** - smaller and fast for local development, but it would diverge
-  from the architecture lock and defer decisions around routing, deployment,
-  and server/client boundaries.
-- **SWR instead of TanStack Query** - enough for simple fetches, but weaker for
-  shared query keys, retry policy, and future invalidation once personalization
-  arrives.
-- **MUI or Chakra instead of shadcn/ui** - faster to assemble initially, but
-  adds a heavier runtime design system and makes the portfolio code less
-  explicit.
-- **Next.js rewrites instead of CORS** - hides browser CORS during development,
-  but it also hides the production policy that Task 06 must make explicit.
+- **Vite SPA** — 작고 로컬 개발이 빠르지만, 아키텍처 결정과 어긋나며 라우팅·배포·서버/클라이언트 경계 결정을 미루게 된다.
+- **SWR 대신 TanStack Query** — 단순 fetch에는 충분하지만, 공유 query key·재시도 정책·개인화 기능 추가 시 필요한 무효화 처리가 약하다.
+- **MUI 또는 Chakra 대신 shadcn/ui** — 초기 조립이 빠르지만 무거운 런타임 디자인 시스템을 추가하고 포트폴리오 코드가 덜 명시적이 된다.
+- **CORS 대신 Next.js rewrites** — 개발 중 브라우저 CORS를 숨기지만, Task 06에서 명시해야 할 프로덕션 정책도 함께 숨겨버린다.
