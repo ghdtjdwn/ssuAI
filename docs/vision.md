@@ -109,7 +109,8 @@ provider 정책으로 전송한다.
 | 5 | LMS 동영상 다운로드·오디오 추출·자막 추출·STT (Task 21) | 계획 중 |
 | 6 | AI 일일 브리핑 — 연동 데이터 종합 기반 오늘의 할 일·추천 계획 | 계획 중 |
 | 7 | 알림, 모바일 표면, 추가 안전한 자동화 | 미정 |
-| 8 | 시스템 검증 및 성능 최적화 — 부하 테스트·병목 진단·최적화 | 모든 기능 완성 후 최종 단계 |
+| 8 | 운영 안정성 강화 — Circuit Breaker·Rate Limiting·IP 차단 대비 | Phase 8 부하 테스트 전 선행 |
+| 9 | 시스템 검증 및 성능 최적화 — 부하 테스트·병목 진단·최적화 | 모든 기능 완성 후 최종 단계 |
 
 ## 6-1. AI 일일 브리핑
 
@@ -260,6 +261,64 @@ ssuMCP는 `WeeklyMealCache`, `LibraryBookCache`, `SaintScheduleCache`, `LibraryS
 | 캐시 미스 시 외부 호출 수 | - | 1회 (single-flight 검증) |
 
 Grafana 대시보드 스크린샷 + k6 HTML 리포트를 함께 기록해 포트폴리오에 첨부한다.
+
+---
+
+## 6-3. 운영 안정성 강화 — Circuit Breaker·Rate Limiting·IP 차단 대비
+
+Phase 9 부하 테스트 전에 먼저 수행한다. 외부 학교 시스템에 대한 요청이 안정적으로 제어되지 않으면 부하 테스트 자체가 의미 없다.
+
+### 배경: 현재 IP 차단 위험도
+
+| 데이터 소스 | 요청 빈도 | 위험도 |
+| --- | --- | --- |
+| 학식 사이트 (soongguri.com) | 주 1회 (WeeklyMealCache) | 낮음 |
+| 공지사항 (scatch.ssu.ac.kr) | 5분 TTL 캐시 | 낮음 |
+| 도서관 좌석 (oasis.ssu.ac.kr) | 30초 TTL 캐시 | 중간 |
+| u-SAINT / LMS | 사용자 SSO 세션, 1시간 TTL 캐시 | 낮음-중간 |
+
+학식은 캐시 설계 덕분에 위험이 거의 없다. 가장 위험한 엔드포인트는 도서관 좌석(30초 TTL)이다.
+
+---
+
+### 1. Circuit Breaker 패턴 추가 (Resilience4j)
+
+연속 오류 발생 시 해당 커넥터로의 요청을 자동 차단하고 일정 시간 후 재시도하는 패턴.
+
+```
+정상 → 오류 N회 연속 → Circuit OPEN (외부 요청 차단)
+→ 일정 시간 후 1회 테스트 → 성공 시 Circuit CLOSE → 재개
+```
+
+`build.gradle`에 `spring-boot-starter-resilience4j` 추가 후 각 Real 커넥터에 `@CircuitBreaker` 어노테이션을 붙인다. Circuit이 열리면 Mock 커넥터 응답이나 캐시된 마지막 데이터를 반환하고, MCP 도구 응답에 "현재 학교 서버 연결이 불안정합니다" 메시지를 포함시킨다.
+
+**포트폴리오 포인트**: "외부 의존 시스템 장애가 전체 서비스 장애로 전파되지 않도록 Circuit Breaker 패턴을 적용했다"는 설명이 가능해진다.
+
+### 2. Rate Limiting (Token Bucket) 구현 확인
+
+`architecture.md` §11에 "커넥터별 최대 1 req/sec 토큰 버킷 구현" 계획이 명시되어 있다. 실제 구현 여부를 확인하고, 없다면 추가한다. 특히 `RealLibrarySeatConnector`에 필수다.
+
+### 3. Exponential Backoff 추가
+
+`ConnectorException` 발생 시 즉시 재시도하지 않고 간격을 늘린다: 1초 → 2초 → 4초 → 8초. 오류 상황에서 학교 서버를 반복적으로 때리지 않게 된다.
+
+---
+
+### 실제로 IP 차단됐을 때 대응 절차
+
+**즉시 대응 (5분 내)**
+
+1. Oracle Cloud 콘솔 → Networking → Reserved Public IPs → 기존 IP 해제
+2. 새 공인 IP 발급
+3. DuckDNS에서 `ssumcp.duckdns.org` → 새 IP로 업데이트
+4. Kubernetes Service/Ingress 확인
+
+**중기 대응**
+
+- Circuit Breaker가 열린 상태이면 Mock 모드로 서비스 계속 가능
+- 차단된 커넥터만 `ssuai.connector.<name>=mock`으로 전환해 나머지 기능 유지
+
+**예방이 최선**: Circuit Breaker + Rate Limiting이 제대로 동작한다면 IP 차단 자체가 발생하기 어렵다. 서버가 요청을 자제하기 때문이다.
 
 ---
 
