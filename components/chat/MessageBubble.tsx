@@ -8,9 +8,10 @@ interface MessageBubbleProps {
   role: ChatMessageRole;
   content: string;
   isLoading?: boolean;
+  model?: string | null;
 }
 
-export function MessageBubble({ role, content, isLoading = false }: MessageBubbleProps) {
+export function MessageBubble({ role, content, isLoading = false, model }: MessageBubbleProps) {
   const isUser = role === "user";
 
   return (
@@ -29,7 +30,14 @@ export function MessageBubble({ role, content, isLoading = false }: MessageBubbl
             답변 준비 중...
           </span>
         ) : (
-          <p className="whitespace-pre-wrap">{content}</p>
+          <>
+            <p className="whitespace-pre-wrap">{content}</p>
+            {!isUser && model ? (
+              <p className="mt-2 text-right text-[10px] text-muted-foreground opacity-60">
+                {model}
+              </p>
+            ) : null}
+          </>
         )}
       </div>
     </div>
