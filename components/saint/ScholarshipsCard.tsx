@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import { useSaintScholarships } from "@/hooks/useSaintScholarships";
+import { useSaintSessionGuard } from "@/hooks/useSaintSessionGuard";
 import { getSsoInitUrl } from "@/lib/api/auth";
 
 function ScholarshipsSkeleton() {
@@ -29,6 +30,7 @@ export function ScholarshipsCard() {
   const { accessToken, isAuthenticated, isLoading: authLoading } = useSaintAuth();
   const { data, error, isLoading, refetch } = useSaintScholarships(accessToken);
   const errorState = getErrorStateDetails(error);
+  useSaintSessionGuard(errorState?.code);
 
   return (
     <Card className="h-full">
@@ -54,14 +56,10 @@ export function ScholarshipsCard() {
         {isAuthenticated && isLoading && <ScholarshipsSkeleton />}
 
         {errorState && errorState.code === "SAINT_SESSION_EXPIRED" ? (
-          <div className="flex flex-col items-start gap-3 rounded-md border border-border bg-muted/40 p-4">
+          <div className="rounded-md border border-border bg-muted/40 p-4">
             <p className="text-sm text-muted-foreground">
-              세션이 만료됐습니다. 다시 로그인하면 장학금 이력을 볼 수 있습니다.
+              세션이 만료됐어요. 잠시 후 자동으로 로그인 화면으로 이동합니다.
             </p>
-            <Button size="sm" onClick={() => (window.location.href = getSsoInitUrl())}>
-              <LogIn className="h-4 w-4" aria-hidden="true" />
-              다시 로그인
-            </Button>
           </div>
         ) : errorState ? (
           <ErrorState
