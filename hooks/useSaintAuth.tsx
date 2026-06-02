@@ -35,12 +35,16 @@ export function SaintAuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const hasHydrated = useRef(false);
+  // Stores the access token TTL returned by the backend so the auto-refresh
+  // timer can fire ~2 min before actual expiry instead of using a hardcoded value.
+  const accessTtlRef = useRef<number>(900);
 
   const refresh = useCallback(async (): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const { accessToken: newAccess } = await refreshAccessToken();
+      const { accessToken: newAccess, accessTtlSeconds } = await refreshAccessToken();
       const me = await fetchMe(newAccess);
+      accessTtlRef.current = accessTtlSeconds;
       setAccessToken(newAccess);
       setUser(me);
       return true;
@@ -77,6 +81,16 @@ export function SaintAuthProvider({ children }: { children: ReactNode }) {
     hasHydrated.current = true;
     void refresh();
   }, [refresh]);
+
+  // Proactively refresh the access token 2 min before it expires so the
+  // user is never silently logged out mid-session. The timer resets each
+  // time a new access token is issued (accessToken state change).
+  useEffect(() => {
+    if (!accessToken) return;
+    const delay = Math.max(0, (accessTtlRef.current - 120) * 1000);
+    const timer = setTimeout(() => void refresh(), delay);
+    return () => clearTimeout(timer);
+  }, [accessToken, refresh]);
 
   const value: SaintAuthState = {
     user,
