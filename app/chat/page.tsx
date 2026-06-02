@@ -1,6 +1,8 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import { HeaderAuthStatus } from "@/components/auth/HeaderAuthStatus";
+import { UserGreeting } from "@/components/auth/UserGreeting";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -14,14 +16,18 @@ export default function ChatPage() {
             ssuAI Chat
           </h1>
         </div>
-        <Link
-          href="/"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-          aria-label="대시보드"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          <span className="hidden sm:inline">대시보드</span>
-        </Link>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <HeaderAuthStatus />
+          <UserGreeting />
+          <Link
+            href="/"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+            aria-label="대시보드"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">대시보드</span>
+          </Link>
+        </div>
       </header>
       <ChatPanel />
     </main>
