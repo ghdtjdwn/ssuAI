@@ -1,3 +1,7 @@
+// Prevent Vercel edge caching so auth components always render with the
+// latest JS bundles rather than a stale cached HTML shell.
+export const dynamic = "force-dynamic";
+
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
