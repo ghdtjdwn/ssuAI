@@ -215,6 +215,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   conversationId: string;
   reply: string;
+  model?: string | null;
 }
 
 export interface NoticeItem {
