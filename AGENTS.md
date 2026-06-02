@@ -77,6 +77,8 @@ context 에서 작업.
 
 ## Implementation Workflow
 - `git -C C:/Users/akftj/mp/ssuAI status --short --branch` 로 시작
+- 일반 작업에서 읽지 말 것: `node_modules/`, `.next/`, `scratch/`,
+  `.codex/`, 오래된 `docs/tasks/` 전체. 관련 태스크가 명시한 파일만 좁게 읽는다.
 - 프론트엔드 검증: `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm build`
 - git 커밋/push: `git -C C:/Users/akftj/mp/ssuAI <subcommand>` 또는 Bash 툴 사용
 - 한 feature = 한 PR. 너무 크면 분할

@@ -20,15 +20,6 @@ export function getLibrarySeatStatus(floor: LibraryFloorCode) {
   });
 }
 
-export function captureLibrarySession(token: string) {
-  return fetchJson<null>("/api/library/session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ token }),
-  });
-}
-
 export function loginLibrary(loginId: string, password: string) {
   return fetchJson<null>("/api/library/login", {
     method: "POST",
