@@ -23,6 +23,7 @@ interface ChatMessage {
   id: string;
   role: ChatMessageRole;
   content: string;
+  model?: string | null;
 }
 
 function nextMessageId() {
@@ -67,7 +68,7 @@ export function ChatPanel() {
       setConversationId(response.conversationId);
       setMessages((current) => [
         ...current,
-        { id: nextMessageId(), role: "assistant", content: response.reply },
+        { id: nextMessageId(), role: "assistant", content: response.reply, model: response.model },
       ]);
       setLastFailedMessage(null);
     } catch (error) {
@@ -135,7 +136,7 @@ export function ChatPanel() {
         ) : null}
 
         {messages.map((message) => (
-          <MessageBubble key={message.id} role={message.role} content={message.content} />
+          <MessageBubble key={message.id} role={message.role} content={message.content} model={message.model} />
         ))}
 
         {isSending ? <MessageBubble role="assistant" content="" isLoading /> : null}
