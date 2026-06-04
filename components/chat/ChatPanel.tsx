@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
 const MAX_MESSAGE_LENGTH = 1000;
 
 const SAMPLE_PROMPTS = [
+  "졸업까지 어떤 조건들이 남았어?",
   "오늘 학식 뭐야?",
-  "내 채플 현황 알려줘",
-  "졸업요건 확인해줘",
-  "도서관 4층에 자리 있어?",
+  "도서관 5층 빈 자리 있어?",
+  "이번 주 마감인 과제 있어?",
 ];
 
 interface ChatMessage {
