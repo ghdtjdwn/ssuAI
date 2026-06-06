@@ -14,7 +14,7 @@ function errorMessageForCode(code: string): string {
     case "INVALID_STATE":
       return "인증 요청이 만료되었거나 유효하지 않습니다. MCP 클라이언트에서 start_auth를 다시 호출해 주세요.";
     case "AUTH_FAILED":
-      return "로그인에 실패했습니다. 학번과 비밀번호를 확인해 주세요.";
+      return "학번 또는 비밀번호가 올바르지 않습니다. MCP 클라이언트에서 start_auth를 다시 호출한 뒤 재시도해 주세요.";
     default:
       return "로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   }
@@ -32,7 +32,7 @@ function McpLibraryAuthContent() {
   );
   const loginIdRef = useRef<HTMLInputElement>(null);
 
-  const disabled = pageState === "submitting" || pageState === "success" || pageState === "invalid_state";
+  const disabled = pageState !== "idle";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
