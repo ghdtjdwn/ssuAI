@@ -31,6 +31,12 @@ AI rotation: Claude (설계/검수) ↔ Codex or AGY (구현).
 Codex 토큰 소진 → `agy -m gemini-3.5-flash` 실행 → **"task 읽어"** 한 마디.
 동일한 `.codex/current-task.md` 를 읽고 즉시 이어서 작업한다.
 
+Claude 토큰 소진/부재 → Codex/AGY 단독 작업 모드. 구현 AI 는 Claude의 추가
+task/검수를 기다리지 않고 현재 task를 끝까지 수행하고, 완료 후
+`C:/Users/akftj/mp/codex_work_alone.md` 에 작업 설명·판단·테스트·커밋/PR/머지·수정
+파일 목록을 누적 기록한다. Claude가 복귀하면 이 파일과 DONE 블록의 수정 파일
+목록만 기준으로 검수한다.
+
 **구현 AI 픽업**: 사용자가 **"task 읽어"** 를 입력하면 `.codex/current-task.md` 를
 즉시 읽고 실행. 세션 시작 시에도 이 파일을 먼저 확인한다.
 "no active task" 면 사용자에게 다음 task 요청.
