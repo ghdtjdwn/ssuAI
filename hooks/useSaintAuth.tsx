@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { callLogout, fetchMe, refreshAccessToken, type AuthMe } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/types";
@@ -31,6 +32,7 @@ export interface SaintAuthState {
 const SaintAuthContext = createContext<SaintAuthState | null>(null);
 
 export function SaintAuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthMe | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,7 +71,12 @@ export function SaintAuthProvider({ children }: { children: ReactNode }) {
     }
     setAccessToken(null);
     setUser(null);
-  }, []);
+    // Drop cached private data so a different account on the same browser
+    // never sees the previous user's grades/assignments/loans.
+    queryClient.removeQueries({ queryKey: ["saint"] });
+    queryClient.removeQueries({ queryKey: ["lms"] });
+    queryClient.removeQueries({ queryKey: ["library"] });
+  }, [queryClient]);
 
   // Try to hydrate on first mount. If the user has a valid refresh cookie
   // from a previous SSO flow, they will appear logged in without clicking

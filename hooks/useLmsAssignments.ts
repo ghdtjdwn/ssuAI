@@ -7,7 +7,7 @@ import { FIVE_MINUTES_MS } from "@/lib/query";
 
 export function useLmsAssignments(accessToken: string | null) {
   return useQuery({
-    queryKey: ["lms", "assignments", accessToken],
+    queryKey: ["lms", "assignments"],
     queryFn: () => getLmsAssignments(accessToken!),
     enabled: !!accessToken,
     staleTime: FIVE_MINUTES_MS,

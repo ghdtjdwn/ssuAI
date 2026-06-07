@@ -7,7 +7,7 @@ import { ONE_HOUR_MS } from "@/lib/query";
 
 export function useSaintGraduation(accessToken: string | null) {
   return useQuery({
-    queryKey: ["saint", "graduation", accessToken],
+    queryKey: ["saint", "graduation"],
     queryFn: () => getSaintGraduation(accessToken!),
     enabled: !!accessToken,
     staleTime: ONE_HOUR_MS,

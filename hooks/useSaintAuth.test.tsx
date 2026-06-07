@@ -1,9 +1,18 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SaintAuthProvider, useSaintAuth } from "./useSaintAuth";
 import { callLogout, fetchMe, refreshAccessToken } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/types";
+
+function renderWithClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 vi.mock("@/lib/api/auth", () => ({
   refreshAccessToken: vi.fn(),
@@ -51,7 +60,7 @@ describe("SaintAuthProvider", () => {
       enrollmentStatus: "재학",
     });
 
-    render(
+    renderWithClient(
       <SaintAuthProvider>
         <AuthHarness />
       </SaintAuthProvider>,
@@ -70,7 +79,7 @@ describe("SaintAuthProvider", () => {
       new ApiError("UNAUTHORIZED", "unauthorized", "trace-1", 401),
     );
 
-    render(
+    renderWithClient(
       <SaintAuthProvider>
         <AuthHarness />
       </SaintAuthProvider>,
@@ -97,7 +106,7 @@ describe("SaintAuthProvider", () => {
     });
     vi.mocked(callLogout).mockResolvedValue();
 
-    render(
+    renderWithClient(
       <SaintAuthProvider>
         <AuthHarness />
       </SaintAuthProvider>,
@@ -132,7 +141,7 @@ describe("SaintAuthProvider", () => {
     );
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    render(
+    renderWithClient(
       <SaintAuthProvider>
         <AuthHarness />
       </SaintAuthProvider>,
@@ -172,7 +181,7 @@ describe("SaintAuthProvider", () => {
       );
     }
 
-    render(
+    renderWithClient(
       <SaintAuthProvider>
         <Caller />
       </SaintAuthProvider>,

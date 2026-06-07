@@ -7,7 +7,7 @@ import { ONE_HOUR_MS } from "@/lib/query";
 
 export function useSaintChapel(accessToken: string | null) {
   return useQuery({
-    queryKey: ["saint", "chapel", accessToken],
+    queryKey: ["saint", "chapel"],
     queryFn: () => getSaintChapel(accessToken!),
     enabled: !!accessToken,
     staleTime: ONE_HOUR_MS,
