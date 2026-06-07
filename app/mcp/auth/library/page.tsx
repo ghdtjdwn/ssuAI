@@ -14,10 +14,14 @@ function errorMessageForCode(code: string): string {
     case "INVALID_STATE":
       return "인증 요청이 만료되었거나 유효하지 않습니다. MCP 클라이언트에서 start_auth를 다시 호출해 주세요.";
     case "AUTH_FAILED":
-      return "학번 또는 비밀번호가 올바르지 않습니다. MCP 클라이언트에서 start_auth를 다시 호출한 뒤 재시도해 주세요.";
+      return "학번 또는 비밀번호가 올바르지 않습니다. 다시 입력해 주세요.";
     default:
       return "로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   }
+}
+
+function isRetryable(pageState: PageState): boolean {
+  return pageState === "idle" || pageState === "auth_failed";
 }
 
 function McpLibraryAuthContent() {
@@ -49,6 +53,8 @@ function McpLibraryAuthContent() {
       setPageState(code === "AUTH_FAILED" ? "auth_failed" : "server_error");
     }
   }
+
+  const formDisabled = !isRetryable(pageState);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-6 px-4 py-12 sm:px-6">
@@ -91,7 +97,7 @@ function McpLibraryAuthContent() {
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
               placeholder="20221528"
-              disabled={disabled}
+              disabled={formDisabled}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             />
           </div>
@@ -109,7 +115,7 @@ function McpLibraryAuthContent() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={disabled}
+              disabled={formDisabled}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             />
           </div>
@@ -122,7 +128,7 @@ function McpLibraryAuthContent() {
 
           <button
             type="submit"
-            disabled={disabled || !loginId.trim() || !password}
+            disabled={formDisabled || !loginId.trim() || !password}
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
           >
             {pageState === "submitting" ? "로그인 중…" : "도서관 로그인"}

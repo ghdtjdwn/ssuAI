@@ -100,9 +100,27 @@ describe("McpLibraryAuthPage", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "로그인에 실패했습니다. 학번과 비밀번호를 확인해 주세요.",
+        "학번 또는 비밀번호가 올바르지 않습니다. 다시 입력해 주세요.",
       );
     });
+  });
+
+  it("form remains enabled after AUTH_FAILED so user can retry without start_auth", async () => {
+    mockComplete.mockRejectedValue(new ApiError("AUTH_FAILED", "auth failed", "", 401));
+    const user = userEvent.setup();
+    render(<McpLibraryAuthPage />);
+
+    await user.type(screen.getByLabelText("학번"), "20221528");
+    await user.type(screen.getByLabelText("비밀번호 (유세인트 비밀번호)"), "wrong");
+    await user.click(screen.getByRole("button", { name: "도서관 로그인" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+
+    expect(screen.getByLabelText("학번")).not.toBeDisabled();
+    expect(screen.getByLabelText("비밀번호 (유세인트 비밀번호)")).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "도서관 로그인" })).not.toBeDisabled();
   });
 
   it("shows invalid state error when server rejects state", async () => {
