@@ -7,7 +7,7 @@ import { ONE_HOUR_MS } from "@/lib/query";
 
 export function useSaintScholarships(accessToken: string | null) {
   return useQuery({
-    queryKey: ["saint", "scholarships", accessToken],
+    queryKey: ["saint", "scholarships"],
     queryFn: () => getSaintScholarships(accessToken!),
     enabled: !!accessToken,
     staleTime: ONE_HOUR_MS,

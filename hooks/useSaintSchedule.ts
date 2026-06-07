@@ -7,7 +7,7 @@ import { ONE_HOUR_MS } from "@/lib/query";
 
 export function useSaintSchedule(accessToken: string | null) {
   return useQuery({
-    queryKey: ["saint", "schedule", accessToken],
+    queryKey: ["saint", "schedule"],
     queryFn: () => getSaintSchedule(accessToken!),
     enabled: !!accessToken,
     staleTime: ONE_HOUR_MS,
