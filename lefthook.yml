@@ -3,6 +3,3 @@ pre-commit:
   commands:
     gitleaks:
       run: gitleaks protect --staged --redact --config .gitleaks.toml
-    sync-agents-md:
-      glob: "CLAUDE.md"
-      run: sh -c 'cp CLAUDE.md AGENTS.md && sed -i 1s/.*/#\ AGENTS.md/ AGENTS.md && git add AGENTS.md'
