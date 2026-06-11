@@ -1,55 +1,41 @@
 # AGENTS.md — ssuAI
 
-ssuAI 는 **숭실대학교 AI 웹/앱 클라이언트**다.
-MCP 서버는 별도 repo **[ghdtjdwn/ssuMCP](https://github.com/ghdtjdwn/ssuMCP)** 에서 운영하고,
-ssuAI 는 그 MCP 서버를 소비하는 프론트엔드 — 카드형 대시보드 + 자연어 챗봇 + AI 에이전트.
+ssuAI is the **Soongsil University AI web/app client**. The MCP server lives in a separate repo, **[ghdtjdwn/ssuMCP](https://github.com/ghdtjdwn/ssuMCP)**; ssuAI is the consuming frontend — card dashboard + natural-language chatbot + AI agent.
 
-**🏆 Flagship — 도서관 좌석 자동 예약 에이전트.** *"이 자리 예약해줘"*
+**🏆 Flagship — library seat auto-reservation agent.** *"이 자리 예약해줘"*
 
-> **워크플로우 원본: `../AGENTS.md` (mp 루트).** Claude(Fable 5)가 설계·구현·테스트,
-> Codex가 commit/push/PR/merge/배포 확인을 전담한다. 핵심 규칙 요약은 아래 인라인.
-> (CLAUDE.md 는 `@AGENTS.md` 1줄 import — 미러 동기화 불필요)
+> **Workflow source of truth: `../AGENTS.md` (mp root).** Claude = design / spec / review; Codex = ALL git & deploy execution. Core rules are inlined below for executors that read only this file.
+> (`CLAUDE.md` is a 1-line `@AGENTS.md` import — no mirror sync needed.)
 
-## 문서
+## Docs
 
-- `docs/vision.md` — 장기 방향 / `docs/product.md` — 현재 출시 범위 (**관련 섹션만 read**)
-- MCP 서버 아키텍처·보안: `../ssuMCP/docs/`
+- `docs/vision.md` — long-term direction / `docs/product.md` — current release scope (**read relevant sections ONLY**)
+- MCP server architecture & security: `../ssuMCP/docs/`
 
-## 핵심 규칙 (원본: ../AGENTS.md)
+## Core Rules (source: ../AGENTS.md)
 
-1. **Authorship** — author/committer = 본인 계정(ghdtjdwn). AI attribution
-   (`Co-Authored-By: Claude`, `🤖 Generated with…`, "Claude"/"Anthropic"/"Codex" 표기) 절대 금지.
-   커밋 후 `git log -1 --format='%an <%ae> | %cn <%ce>'` 확인.
-2. **의사결정** — 스펙·방법·로직·프레임워크 결정 전 반드시 웹검색 → 포트폴리오 가치(최우선)·
-   트렌드 적합성·완성/증명 가능성 평가 → 사용자에게 보고 후 확정. 즉흥 결정 금지.
-   목표는 취업 직행 수준의 최고 포트폴리오 — 더 좋은 방향이 있으면 갈아엎기 옵션까지 보고.
-3. **사용자 확인 필수** — prod 환경변수 변경, major dep bump, force-push, DB 마이그레이션.
-   그 외 테스트·커밋·푸시·PR·머지(tests pass + 런타임 영향 없음)·main pull·배포 확인은 자율 실행.
-4. **트러블슈팅** — 트리거 발생 시 **즉시** `../ssuMCP/TROUBLESHOOTING.md` 기록.
-   필수 포함: 틀린 가설 / 실제 원인 / 핵심 파일·커밋 / 포트폴리오 포인트 / 면접 예상 질문 2~3개.
-5. **문서 최신화** — 큰 작업 완료 시 `../MASTERPLAN.md` + 변경 영역 `docs/` 즉시 갱신.
-   기록은 학습 교재 수준: 배경 / 검토한 대안과 기각 이유 / 선택 근거(출처) / 동작 원리까지.
-   (사용자가 완성 후 기록을 뜯어보며 공부해 면접을 준비한다 — 요약·생략 금지)
-6. **단독 모드** — 사용자가 한쪽 토큰 소진을 알리면 남은 AI가 설계→구현→테스트→커밋→배포
-   확인까지 전부 수행. 진행 기준은 `../MASTERPLAN.md` "다음 작업", 완료 시 현황 갱신.
-   Codex 단독 시 문서·단순 작업은 `-p git`(mini) 프로필로 토큰 절약.
+1. **Authorship** — commit author/committer = ghdtjdwn. AI attribution ABSOLUTELY FORBIDDEN: no `Co-Authored-By: Claude`, no `🤖 Generated with…`, no "Claude" / "Anthropic" / "Codex" / "Gemini" anywhere. Post-commit check: `git log -1 --format='%an <%ae> | %cn <%ce>'`.
+2. **Decisions** (spec / method / logic / framework) — web search FIRST → evaluate ① portfolio value (top priority) ② trend fit ③ completion & provability → report to the user and finalize TOGETHER. NO improvised decisions. Target: top-tier, job-winning portfolio — IF a better direction exists (incl. teardown), report it as an option.
+3. **User confirmation REQUIRED** — prod env-var change, major dependency bump, force-push, DB migration. Everything else is autonomous: tests, commit, push, PR, merge (tests pass + no runtime impact), main pull, deploy verification.
+4. **Troubleshooting** — on ANY trigger, record IMMEDIATELY in `../ssuMCP/TROUBLESHOOTING.md`. REQUIRED fields: wrong hypothesis / actual cause / key files & commits / portfolio point / 2–3 expected interview questions. Records are human-facing → write in KOREAN.
+5. **Docs sync** — after each major unit, update `../MASTERPLAN.md` + affected `docs/` in the same flow. Study-grade records in KOREAN: background / alternatives + rejection reasons / rationale (incl. sources) / how it works. NO summarizing away.
+6. **Solo mode** — when the user reports one AI's usage-limit outage, the remaining AI runs design → implement → test → commit → push → deploy verification end-to-end. Work basis: `../MASTERPLAN.md` "다음 작업"; update status on completion. Codex solo: docs / simple work via `-p git` (mini) to save tokens.
 
-## 개발 규칙
+## Dev Rules
 
-- 검증: `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm build`
-- 일반 작업에서 읽지 말 것: `node_modules/`, `.next/`, `scratch/`, 오래된 `docs/tasks/` 전체
-- Branch: `feat/` `fix/` `refactor/` `chore/` `docs/` + kebab-case. 한 feature = 한 PR.
+- Verification: `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm build`
+- DO NOT read in routine work: `node_modules/`, `.next/`, `scratch/`, the entire stale `docs/tasks/`
+- Branch: `feat/` `fix/` `refactor/` `chore/` `docs/` + kebab-case. One feature = one PR.
 - Commit: Conventional Commits (`feat(frontend): ...`)
-- pre-commit: lefthook → gitleaks (secret 유출 검사)
-- 배포: main push → Vercel 자동 (`https://ssuai.vercel.app`, force-dynamic)
+- pre-commit: lefthook → gitleaks (secret-leak scan)
+- Deploy: main push → Vercel auto (`https://ssuai.vercel.app`, force-dynamic)
 
 ## Credentials
 
-1. `C:/Users/akftj/mp/myInfo.txt` — 학번·비밀번호·서버 IP 등
-2. `C:/Users/akftj/mp/ssuAI/.env.local` — 프론트 환경변수
-3. 위에 없을 때만 사용자에게 요청
+1. `C:/Users/akftj/mp/myInfo.txt` — student ID, password, server IP, etc.
+2. `C:/Users/akftj/mp/ssuAI/.env.local` — frontend env vars
+3. ONLY if absent above → ask the user
 
 ## User Context
 
-숭실대 컴퓨터학부 3학년. 취업 직행을 노리는 포트폴리오 프로젝트 — 트렌드 기술을
-실제 운영·수치로 증명하는 최고 수준 결과물 지향. 과한 추상화 금지. 간결한 한국어 응답 선호.
+SSU Computer Science junior. Job-direct portfolio project — top-tier results proven with real operation and numbers, using trending tech. NO over-abstraction. The user prefers concise KOREAN responses — always reply to the user in Korean.
