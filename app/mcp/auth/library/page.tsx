@@ -36,8 +36,6 @@ function McpLibraryAuthContent() {
   );
   const loginIdRef = useRef<HTMLInputElement>(null);
 
-  const disabled = pageState !== "idle";
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!state || !loginId.trim() || !password) return;
