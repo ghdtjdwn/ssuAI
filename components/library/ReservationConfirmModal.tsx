@@ -12,6 +12,8 @@ interface ReservationConfirmModalProps {
   onSuccess: () => void;
 }
 
+const SUCCESS_CLOSE_DELAY_MS = 1500;
+
 export function ReservationConfirmModal({
   pendingAction,
   onClose,
@@ -37,7 +39,7 @@ export function ReservationConfirmModal({
         timerRef.current = setTimeout(() => {
           onSuccess();
           onClose();
-        }, 1500);
+        }, SUCCESS_CLOSE_DELAY_MS);
       } else {
         setErrorMessage(`예약 실패: ${res.message}`);
       }

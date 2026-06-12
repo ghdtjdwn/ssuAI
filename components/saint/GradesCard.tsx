@@ -83,9 +83,9 @@ export function GradesCard() {
               />
             ) : (
               <ul className="space-y-1">
-                {data.history.map((row, i) => (
+                {data.history.map((row) => (
                   <li
-                    key={i}
+                    key={`${row.year}-${row.term}`}
                     className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
                   >
                     <span className="text-muted-foreground">

@@ -14,6 +14,8 @@ import {
 } from "@/lib/api/library";
 import { ApiError, type LibraryFloorCode } from "@/lib/api/types";
 
+const MAX_RECOMMENDATIONS = 5;
+
 interface SeatRecommendationPanelProps {
   floor: LibraryFloorCode;
   onReservationSuccess?: () => void;
@@ -91,7 +93,7 @@ export function SeatRecommendationPanel({
   return (
     <>
       <ul className="mt-2 space-y-2">
-        {recommendations.slice(0, 5).map((seat) => (
+        {recommendations.slice(0, MAX_RECOMMENDATIONS).map((seat) => (
           <li
             key={seat.externalSeatId}
             className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm"
