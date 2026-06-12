@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLibrarySeatSse } from "@/hooks/useLibrarySeatSse";
 import { useLibrarySeatStatus } from "@/hooks/useLibrarySeatStatus";
 import type { LibraryFloorCode, LibrarySeatZone } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const SEAT_STATUS_LABEL = {
   occupied: "사용중",
   outOfService: "비활성",
 } as const;
+
 
 function LibrarySeatSkeleton() {
   return (
@@ -120,12 +122,18 @@ export function LibrarySeatCard() {
   const [floor, setFloor] = useState<LibraryFloorCode>(DEFAULT_FLOOR);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { data, error, isLoading, isFetching, refetch } = useLibrarySeatStatus(floor);
+
+  useLibrarySeatSse(floor, () => {
+    void refetch();
+  });
+
   const errorState = getErrorStateDetails(error);
   const needsAuth = errorState?.code === "LIBRARY_SESSION_REQUIRED";
   const usagePercent =
     data && data.totalSeats > 0
       ? Math.round(((data.totalSeats - data.availableSeats) / data.totalSeats) * 100)
       : 0;
+
 
   return (
     <Card className="h-full">
