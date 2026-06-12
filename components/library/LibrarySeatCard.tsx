@@ -122,6 +122,7 @@ function SeatLegend() {
 export function LibrarySeatCard() {
   const [floor, setFloor] = useState<LibraryFloorCode>(DEFAULT_FLOOR);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRecommendations, setShowRecommendations] = useState(false);
   const { data, error, isLoading, isFetching, refetch } = useLibrarySeatStatus(floor);
 
   const handleSeatUpdate = useCallback(() => {
@@ -164,12 +165,21 @@ export function LibrarySeatCard() {
           })}
         </div>
 
-        <details className="mb-4">
-          <summary className="cursor-pointer text-sm font-medium text-foreground">
-            추천 좌석 예약
-          </summary>
-          <SeatRecommendationPanel floor={floor} />
-        </details>
+        <div className="mb-4">
+          <button
+            type="button"
+            className="cursor-pointer text-sm font-medium text-foreground"
+            onClick={() => setShowRecommendations((prev) => !prev)}
+          >
+            {showRecommendations ? "▲ 추천 좌석 예약 닫기" : "▼ 추천 좌석 예약"}
+          </button>
+          {showRecommendations ? (
+            <SeatRecommendationPanel
+              floor={floor}
+              onReservationSuccess={() => setShowRecommendations(false)}
+            />
+          ) : null}
+        </div>
 
         {isLoading ? <LibrarySeatSkeleton /> : null}
 

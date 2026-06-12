@@ -44,6 +44,8 @@ export function useCurrentWait() {
     queryKey: ["library", "wait"],
     queryFn: () => getCurrentWait(),
     staleTime: 10_000,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
     retry: (failureCount, error) => {
       if (isNonRetryableWaitError(error)) return false;
       return failureCount < 2;

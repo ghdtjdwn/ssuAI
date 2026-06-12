@@ -16,12 +16,17 @@ import { ApiError, type LibraryFloorCode } from "@/lib/api/types";
 
 interface SeatRecommendationPanelProps {
   floor: LibraryFloorCode;
+  onReservationSuccess?: () => void;
 }
 
-export function SeatRecommendationPanel({ floor }: SeatRecommendationPanelProps) {
+export function SeatRecommendationPanel({
+  floor,
+  onReservationSuccess,
+}: SeatRecommendationPanelProps) {
   const [pendingAction, setPendingAction] = useState<LibraryReservationPrepareResponse | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [preparingId, setPreparingId] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     data: recommendations,
@@ -45,6 +50,7 @@ export function SeatRecommendationPanel({ floor }: SeatRecommendationPanelProps)
   const needsAuth = error instanceof ApiError && error.code === "LIBRARY_SESSION_REQUIRED";
 
   async function handleReserve(externalSeatId: number) {
+    setErrorMessage(null);
     setPreparingId(externalSeatId);
     try {
       const action = await prepareReservation({ type: "RESERVE", seatId: externalSeatId });
@@ -52,6 +58,8 @@ export function SeatRecommendationPanel({ floor }: SeatRecommendationPanelProps)
     } catch (err) {
       if (err instanceof ApiError && err.code === "LIBRARY_SESSION_REQUIRED") {
         setShowLoginModal(true);
+      } else {
+        setErrorMessage("좌석 예약 준비 중 오류가 발생했습니다. 다시 시도해주세요.");
       }
     } finally {
       setPreparingId(null);
@@ -108,11 +116,18 @@ export function SeatRecommendationPanel({ floor }: SeatRecommendationPanelProps)
         ))}
       </ul>
 
+      {errorMessage ? (
+        <p className="mt-2 text-sm text-destructive">{errorMessage}</p>
+      ) : null}
+
       {pendingAction ? (
         <ReservationConfirmModal
           pendingAction={pendingAction}
           onClose={() => setPendingAction(null)}
-          onSuccess={() => setPendingAction(null)}
+          onSuccess={() => {
+            setPendingAction(null);
+            onReservationSuccess?.();
+          }}
         />
       ) : null}
 
