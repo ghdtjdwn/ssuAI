@@ -8,7 +8,13 @@ import { ApiError, type LibrarySeatStatusResponse } from "@/lib/api/types";
 import { renderWithProviders } from "@/test-utils/render-with-providers";
 
 vi.mock("@/lib/api/library", () => ({
+  cancelWait: vi.fn(),
+  confirmReservation: vi.fn(),
+  getCurrentWait: vi.fn(),
+  getLibrarySeatRecommendations: vi.fn().mockResolvedValue([]),
   getLibrarySeatStatus: vi.fn(),
+  prepareReservation: vi.fn(),
+  registerWait: vi.fn(),
 }));
 
 const floorTwo: LibrarySeatStatusResponse = {

@@ -47,6 +47,8 @@ export function LibraryLoginModal({ onClose }: LibraryLoginModalProps) {
       setConnected(true);
       await queryClient.invalidateQueries({ queryKey: ["library", "loans"] });
       await queryClient.invalidateQueries({ queryKey: ["library", "seats"] });
+      await queryClient.invalidateQueries({ queryKey: ["library", "recommendations"] });
+      await queryClient.invalidateQueries({ queryKey: ["library", "wait"] });
       setTimeout(onClose, 800);
     } catch {
       setError("로그인에 실패했습니다. 학번과 비밀번호를 확인해주세요.");

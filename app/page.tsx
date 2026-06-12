@@ -10,6 +10,7 @@ import { FacilitySearchCard } from "@/components/facility/FacilitySearchCard";
 import { LibraryBookSearchCard } from "@/components/library/LibraryBookSearchCard";
 import { LibraryLoansCard } from "@/components/library/LibraryLoansCard";
 import { LibrarySeatCard } from "@/components/library/LibrarySeatCard";
+import { WaitStatusCard } from "@/components/library/WaitStatusCard";
 import { AssignmentsCard } from "@/components/lms/AssignmentsCard";
 import { TodayMealCard } from "@/components/meal/TodayMealCard";
 import { WeeklyMealCard } from "@/components/meal/WeeklyMealCard";
@@ -50,6 +51,7 @@ export default function Home() {
         <FacilitySearchCard />
         <WeeklyMealCard />
         <DormWeeklyCard />
+        <WaitStatusCard />
         <LibrarySeatCard />
         <LibraryBookSearchCard />
         <NoticesCard />

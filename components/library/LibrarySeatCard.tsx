@@ -4,6 +4,7 @@ import { BookOpen, LogIn } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { LibraryLoginModal } from "@/components/library/LibraryLoginModal";
+import { SeatRecommendationPanel } from "@/components/library/SeatRecommendationPanel";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState, getErrorStateDetails } from "@/components/shared/ErrorState";
 import { Badge } from "@/components/ui/badge";
@@ -162,6 +163,13 @@ export function LibrarySeatCard() {
             );
           })}
         </div>
+
+        <details className="mb-4">
+          <summary className="cursor-pointer text-sm font-medium text-foreground">
+            추천 좌석 예약
+          </summary>
+          <SeatRecommendationPanel floor={floor} />
+        </details>
 
         {isLoading ? <LibrarySeatSkeleton /> : null}
 
