@@ -1,7 +1,7 @@
 "use client";
 
 import { BookOpen, LogIn } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { LibraryLoginModal } from "@/components/library/LibraryLoginModal";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -123,9 +123,11 @@ export function LibrarySeatCard() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { data, error, isLoading, isFetching, refetch } = useLibrarySeatStatus(floor);
 
-  useLibrarySeatSse(floor, () => {
+  const handleSeatUpdate = useCallback(() => {
     void refetch();
-  });
+  }, [refetch]);
+
+  useLibrarySeatSse(floor, handleSeatUpdate);
 
   const errorState = getErrorStateDetails(error);
   const needsAuth = errorState?.code === "LIBRARY_SESSION_REQUIRED";
