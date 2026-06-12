@@ -13,6 +13,15 @@ import {
 } from "@/lib/api/library";
 import { ApiError } from "@/lib/api/types";
 
+const TERMINAL_WAIT_STATUSES = new Set([
+  "SUCCEEDED",
+  "FAILED_RACE",
+  "FAILED_AUTH",
+  "FAILED_UPSTREAM",
+  "CANCELLED",
+  "EXPIRED",
+]);
+
 function isNonRetryableWaitError(error: unknown) {
   return (
     error instanceof ApiError &&
@@ -44,7 +53,11 @@ export function useCurrentWait() {
     queryKey: ["library", "wait"],
     queryFn: () => getCurrentWait(),
     staleTime: 10_000,
-    refetchInterval: 5_000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status && TERMINAL_WAIT_STATUSES.has(status)) return false;
+      return 5_000;
+    },
     refetchIntervalInBackground: false,
     retry: (failureCount, error) => {
       if (isNonRetryableWaitError(error)) return false;
