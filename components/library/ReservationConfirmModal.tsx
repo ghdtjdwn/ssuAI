@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useConfirmReservation } from "@/hooks/useLibraryReservation";
@@ -18,22 +18,31 @@ export function ReservationConfirmModal({
   onSuccess,
 }: ReservationConfirmModalProps) {
   const confirm = useConfirmReservation();
-  const [result, setResult] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   async function handleConfirm() {
+    setErrorMessage(null);
     try {
       const res = await confirm.mutateAsync();
       if (res.status === "SUCCESS") {
-        setResult("예약이 완료되었습니다.");
-        setTimeout(() => {
+        setSuccessMessage("예약이 완료되었습니다.");
+        timerRef.current = setTimeout(() => {
           onSuccess();
           onClose();
         }, 1500);
       } else {
-        setResult(`예약 실패: ${res.message}`);
+        setErrorMessage(`예약 실패: ${res.message}`);
       }
     } catch {
-      setResult("예약 처리 중 오류가 발생했습니다.");
+      setErrorMessage("예약 처리 중 오류가 발생했습니다.");
     }
   }
 
@@ -53,21 +62,28 @@ export function ReservationConfirmModal({
           유효시간: {new Date(pendingAction.expiresAt).toLocaleTimeString()}까지
         </p>
 
-        {result ? (
-          <p className="mt-4 text-sm font-medium">{result}</p>
+        {successMessage ? (
+          <p className="mt-4 text-sm font-medium text-green-600 dark:text-green-400">
+            {successMessage}
+          </p>
         ) : (
-          <div className="mt-6 flex gap-3">
-            <Button variant="outline" onClick={onClose} className="flex-1">
-              취소
-            </Button>
-            <Button
-              onClick={() => void handleConfirm()}
-              disabled={confirm.isPending}
-              className="flex-1"
-            >
-              {confirm.isPending ? "처리 중..." : "예약 확정"}
-            </Button>
-          </div>
+          <>
+            {errorMessage ? (
+              <p className="mt-3 text-sm text-destructive">{errorMessage}</p>
+            ) : null}
+            <div className="mt-6 flex gap-3">
+              <Button variant="outline" onClick={onClose} className="flex-1">
+                취소
+              </Button>
+              <Button
+                onClick={() => void handleConfirm()}
+                disabled={confirm.isPending}
+                className="flex-1"
+              >
+                {confirm.isPending ? "처리 중..." : "예약 확정"}
+              </Button>
+            </div>
+          </>
         )}
       </div>
     </div>
