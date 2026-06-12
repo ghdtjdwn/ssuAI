@@ -10,6 +10,8 @@ import { loginLibrary } from "@/lib/api/library";
 import { encryptLibraryPassword } from "@/lib/crypto";
 import { useQueryClient } from "@tanstack/react-query";
 
+const MODAL_CLOSE_DELAY_MS = 800;
+
 interface LibraryLoginModalProps {
   onClose: () => void;
 }
@@ -49,7 +51,7 @@ export function LibraryLoginModal({ onClose }: LibraryLoginModalProps) {
       await queryClient.invalidateQueries({ queryKey: ["library", "seats"] });
       await queryClient.invalidateQueries({ queryKey: ["library", "recommendations"] });
       await queryClient.invalidateQueries({ queryKey: ["library", "wait"] });
-      setTimeout(onClose, 800);
+      setTimeout(onClose, MODAL_CLOSE_DELAY_MS);
     } catch {
       setError("로그인에 실패했습니다. 학번과 비밀번호를 확인해주세요.");
     } finally {

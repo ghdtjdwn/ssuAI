@@ -17,12 +17,16 @@ export function useLibrarySeatSse(floor: number, onUpdate: () => void) {
     });
 
     eventSource.addEventListener("seat-update", (event) => {
-      console.log("Real-time seat update received:", event.data);
+      if (process.env.NODE_ENV === "development") {
+        console.log("Real-time seat update received:", event.data);
+      }
       onUpdateRef.current();
     });
 
     eventSource.onerror = (err) => {
-      console.error("SSE connection error:", err);
+      if (process.env.NODE_ENV === "development") {
+        console.error("SSE connection error:", err);
+      }
     };
 
     return () => {

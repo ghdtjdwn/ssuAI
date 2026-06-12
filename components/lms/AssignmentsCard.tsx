@@ -95,10 +95,10 @@ export function AssignmentsCard() {
             />
           ) : (
             <ul className="space-y-2">
-              {data.items.map((item, i) => {
+              {data.items.map((item) => {
                 const due = formatDue(item.dueDate);
                 return (
-                  <li key={i} className="rounded-md border border-border p-3">
+                  <li key={`${item.courseName}-${item.title}-${item.dueDate ?? "no-due"}`} className="rounded-md border border-border p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-foreground">
