@@ -1,6 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export function useLibrarySeatSse(floor: number, onUpdate: () => void) {
+  const onUpdateRef = useRef(onUpdate);
+
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
+
   useEffect(() => {
     if (typeof window === "undefined" || typeof EventSource === "undefined") {
       return;
@@ -12,7 +18,7 @@ export function useLibrarySeatSse(floor: number, onUpdate: () => void) {
 
     eventSource.addEventListener("seat-update", (event) => {
       console.log("Real-time seat update received:", event.data);
-      onUpdate();
+      onUpdateRef.current();
     });
 
     eventSource.onerror = (err) => {
@@ -22,6 +28,6 @@ export function useLibrarySeatSse(floor: number, onUpdate: () => void) {
     return () => {
       eventSource.close();
     };
-  }, [floor, onUpdate]);
+  }, [floor]);
 }
 
