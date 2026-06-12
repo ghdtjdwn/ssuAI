@@ -1,5 +1,29 @@
 # ssuAI Product Document
 
+## 2026-06-13 추가: 웹 예약 UX
+
+### 배경
+
+도서관 좌석 예약은 백엔드의 `prepare`/`confirm` 계약이 먼저 있어야 안전하게 제품 화면에 올릴 수 있다.
+PR-C1에서 웹 REST 경로가 `main`에 들어왔으므로, 이번 범위는 대시보드에서 추천 좌석을 보고 직접 예약을 확정하는 최소 UX를 제공한다.
+
+### 구현 범위
+
+- `SeatRecommendationPanel`: 현재 선택한 층의 추천 좌석 5개를 보여주고 각 좌석에 예약 버튼을 제공한다.
+- `ReservationConfirmModal`: `prepare` 결과의 요약과 만료 시간을 보여준 뒤 사용자가 한 번 더 확정해야 `confirm`을 호출한다.
+- `WaitStatusCard`: 활성 대기 intent가 있으면 상태, 시도 횟수, 만료 시간, 취소 버튼을 대시보드에 표시한다.
+
+### 선택 이유와 기각안
+
+- 선택: 기존 `fetchJson` + React Query 패턴을 그대로 사용한다. API envelope, 쿠키 포함 요청, 캐시 무효화 방식이 이미 좌석/대출 카드와 맞기 때문에 새 client 계층을 만들 필요가 없다.
+- 기각: 추천 카드에서 바로 예약 POST를 호출하는 방식은 실수 클릭과 좌석 경합 시 사용자 설명이 약하다.
+- 기각: 챗봇 전용 예약 UX는 flagship agent 서사에는 좋지만, 포트폴리오 화면에서 실제 운영 기능을 즉시 증명하기 어렵다.
+
+### human-approval 의미
+
+예약은 `prepare -> confirm` 2단계로 나눈다. `prepare`는 서버가 실행할 액션을 요약하고 짧은 만료 시간을 부여하며, `confirm`은 사용자가 화면에서 명시적으로 승인한 뒤에만 실행된다.
+이 구조는 실수 예약을 줄이고, 면접에서 "민감한 write action은 사용자 승인 후 실행한다"는 설계를 코드와 화면으로 설명할 수 있게 한다.
+
 > 현재 구현 범위 문서. 기준일: 2026-06-06. 장기 방향은
 > [vision.md](vision.md), 서버 도구 계약은
 > [ssuMCP MCP tools](https://github.com/hoeongj/ssuMCP/blob/main/docs/mcp-tools.md)를 따른다.
