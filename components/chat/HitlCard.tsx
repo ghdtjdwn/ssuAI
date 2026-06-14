@@ -14,6 +14,7 @@ interface HitlCardProps {
 
 function formatDetails(details: Record<string, unknown> | undefined): string {
   if (!details) return "";
+  if (details.message) return String(details.message);
   const parts: string[] = [];
   if (details.seatCode) parts.push(`좌석 ${String(details.seatCode)}`);
   if (details.roomName) parts.push(String(details.roomName));
