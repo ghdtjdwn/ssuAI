@@ -1,6 +1,6 @@
 # ADR 0001 — Agent SSE Chat UI & HITL Integration
 
-- **Status**: Proposed (PR #194 created, pending merge)
+- **Status**: Accepted (PR #194 merged 2026-06-14)
 - **Date**: 2026-06-14
 - **Scope**: ssuAI's chat panel, agent streaming API client, and Human-In-The-Loop (HITL) reservation workflow.
 
