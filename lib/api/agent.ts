@@ -8,7 +8,7 @@ const SSUAGENT_BASE =
 export type AgentEvent =
   | { type: "text"; content: string }
   | { type: "handoff"; agent: string; message: string }
-  | { type: "tool"; name: string }
+  | { type: "tool"; name: string; label?: string }
   | { type: "interrupt"; data: InterruptData }
   | { type: "error"; message: string }
   | { type: "done" };
