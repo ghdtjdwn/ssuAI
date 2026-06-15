@@ -6,8 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { LibraryReservationIntentView } from "@/lib/api/library";
 import * as api from "@/lib/api/library";
+import { ApiError } from "@/lib/api/types";
 
-import { useCurrentWait } from "./useLibraryReservation";
+import { isLibraryAuthError, useCurrentWait } from "./useLibraryReservation";
 
 vi.mock("@/lib/api/library", () => ({
   cancelWait: vi.fn(),
@@ -22,6 +23,33 @@ function createWrapper(client: QueryClient) {
     return createElement(QueryClientProvider, { client }, children);
   };
 }
+
+describe("isLibraryAuthError", () => {
+  it("returns true for LIBRARY_SESSION_REQUIRED code", () => {
+    const err = new ApiError("LIBRARY_SESSION_REQUIRED", "msg", "t", 200);
+    expect(isLibraryAuthError(err)).toBe(true);
+  });
+
+  it("returns true for 401 status", () => {
+    const err = new ApiError("UNAUTHORIZED", "msg", "t", 401);
+    expect(isLibraryAuthError(err)).toBe(true);
+  });
+
+  it("returns true for 404 status", () => {
+    const err = new ApiError("NOT_FOUND", "msg", "t", 404);
+    expect(isLibraryAuthError(err)).toBe(true);
+  });
+
+  it("returns false for non-ApiError", () => {
+    expect(isLibraryAuthError(new Error("generic"))).toBe(false);
+    expect(isLibraryAuthError(null)).toBe(false);
+  });
+
+  it("returns false for unrelated ApiError", () => {
+    const err = new ApiError("SERVER_ERROR", "msg", "t", 500);
+    expect(isLibraryAuthError(err)).toBe(false);
+  });
+});
 
 describe("useCurrentWait", () => {
   it("calls getCurrentWait API", async () => {

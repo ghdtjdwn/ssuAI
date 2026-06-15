@@ -1,7 +1,6 @@
 "use client";
 
-import { useCancelWait, useCurrentWait } from "@/hooks/useLibraryReservation";
-import { ApiError } from "@/lib/api/types";
+import { isLibraryAuthError, useCancelWait, useCurrentWait } from "@/hooks/useLibraryReservation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,11 +29,7 @@ export function WaitStatusCard() {
   const { data: intent, error, isLoading } = useCurrentWait();
   const cancelMutation = useCancelWait();
 
-  if (
-    !isLoading &&
-    error instanceof ApiError &&
-    (error.httpStatus === 404 || error.httpStatus === 401 || error.code === "LIBRARY_SESSION_REQUIRED")
-  ) {
+  if (!isLoading && isLibraryAuthError(error)) {
     return null;
   }
   if (!intent && !isLoading) return null;
