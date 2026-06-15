@@ -120,7 +120,7 @@ export function ChatPanel() {
         } else if (event.type === "handoff") {
           appendStatus(`[${event.agent}] ${event.message}`);
         } else if (event.type === "tool") {
-          appendStatus(`도구 실행: ${event.name}`);
+          appendStatus(event.label ?? `도구 실행: ${event.name}`);
         } else if (event.type === "interrupt") {
           finalizeAssistantMessage();
           setPendingInterrupt(event.data);
