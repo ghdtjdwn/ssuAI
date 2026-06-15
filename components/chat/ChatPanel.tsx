@@ -126,6 +126,11 @@ export function ChatPanel() {
           setPendingInterrupt(event.data);
           setIsStreaming(false);
           return; // stream ends after interrupt
+        } else if (event.type === "error") {
+          finalizeAssistantMessage();
+          setIsStreaming(false);
+          setError(event.message);
+          return;
         } else if (event.type === "done") {
           finalizeAssistantMessage();
           setIsStreaming(false);

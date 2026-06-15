@@ -10,6 +10,7 @@ export type AgentEvent =
   | { type: "handoff"; agent: string; message: string }
   | { type: "tool"; name: string }
   | { type: "interrupt"; data: InterruptData }
+  | { type: "error"; message: string }
   | { type: "done" };
 
 export interface InterruptData {
