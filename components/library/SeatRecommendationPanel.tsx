@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LibraryLoginModal } from "@/components/library/LibraryLoginModal";
 import { ReservationConfirmModal } from "@/components/library/ReservationConfirmModal";
 import { Button } from "@/components/ui/button";
+import { isLibraryAuthError } from "@/hooks/useLibraryReservation";
 import {
   getLibrarySeatRecommendations,
   prepareReservation,
@@ -39,12 +40,7 @@ export function SeatRecommendationPanel({
     queryFn: () => getLibrarySeatRecommendations(floor),
     staleTime: 30_000,
     retry: (failureCount, err) => {
-      if (
-        err instanceof ApiError &&
-        (err.httpStatus === 401 || err.code === "LIBRARY_SESSION_REQUIRED")
-      ) {
-        return false;
-      }
+      if (isLibraryAuthError(err)) return false;
       return failureCount < 2;
     },
   });

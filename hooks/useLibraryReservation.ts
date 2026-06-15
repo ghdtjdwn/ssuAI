@@ -22,7 +22,7 @@ const TERMINAL_WAIT_STATUSES = new Set([
   "EXPIRED",
 ]);
 
-function isNonRetryableWaitError(error: unknown) {
+export function isLibraryAuthError(error: unknown): boolean {
   return (
     error instanceof ApiError &&
     (error.httpStatus === 404 ||
@@ -60,7 +60,7 @@ export function useCurrentWait() {
     },
     refetchIntervalInBackground: false,
     retry: (failureCount, error) => {
-      if (isNonRetryableWaitError(error)) return false;
+      if (isLibraryAuthError(error)) return false;
       return failureCount < 2;
     },
   });
