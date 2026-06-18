@@ -86,6 +86,7 @@ describe("McpLibraryAuthPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveTextContent("로그인이 완료되었습니다.");
     });
+    expect(screen.getByRole("status")).toHaveTextContent("서버에 저장되지 않습니다");
     expect(screen.queryByRole("button", { name: "도서관 로그인" })).not.toBeInTheDocument();
   });
 

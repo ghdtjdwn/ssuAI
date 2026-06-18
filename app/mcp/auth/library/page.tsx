@@ -76,6 +76,7 @@ function McpLibraryAuthContent() {
           <p className="mt-1 text-muted-foreground">
             MCP 클라이언트로 돌아가 방금 요청을 다시 실행하세요.
           </p>
+          <p className="mt-3 font-medium">🔒 입력하신 로그인 정보는 서버에 저장되지 않습니다.</p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4" aria-label="도서관 MCP 로그인 폼">
