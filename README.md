@@ -52,11 +52,13 @@ ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
 |------|------|
 | SAINT (SmartID SSO) | 시간표, 성적, 채플 출석, 졸업 요건, 장학금 |
 | LMS (Canvas SSO) | 과제·퀴즈 목록 |
-| 도서관 | 층별 좌석 현황, 본인 대출 현황 |
+| 도서관 | 층별 좌석 현황, 본인 대출 현황, 좌석 추천·예약(확인 모달)·대기 현황 (🏆 플래그십 예약 UX, PR #189) |
 
-### 챗봇
+### 챗봇 / AI 에이전트
 
 대시보드와 동일한 데이터 범위에 대해 자연어로 질문할 수 있다. 공개 질문은 즉시 응답하고, 개인 데이터 질문은 연동 세션이 있는 경우에만 응답한다.
+
+`/chat`은 LangGraph 기반 멀티 에이전트(ssuAgent)와 **SSE 스트리밍**으로 연결된다. 에이전트 전환(Handoff)·도구 실행·텍스트가 실시간으로 표시되고, 도서관 예약처럼 학교 상태를 바꾸는 액션은 **HITL(Human-In-The-Loop) 승인 카드**(`HitlCard`)로 멈춰 사용자가 승인해야 실행을 재개(`/agent/resume`)한다. JWT는 ssuMCP `/api/mcp/auth/web-session`으로 휘발성 `mcp_session_id`와 교환해 토큰 노출 없이 도구를 실행한다. 설계 근거는 [ADR 0001](docs/adr/0001-agent-sse-chat-hitl.md).
 
 ---
 
