@@ -63,7 +63,7 @@ ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
 좌석 예약·이석·반납은 backend MCP의 `prepare_* → confirm_action` 2단계 확인을 그대로 화면에 옮긴 UX로 제공한다(PR #189 배포):
 
 - `SeatRecommendationPanel` — 선택한 층의 추천 좌석 5개 + 좌석별 예약 버튼
-- `ReservationConfirmModal` — `prepare` 요약·만료 시간을 보여주고 사용자가 한 번 더 확정해야 `confirm` 호출
+- `ReservationConfirmModal` — `prepare` 요약·만료 시간을 보여주고 사용자가 한 번 더 확정해야 `confirm` 호출. confirm 결과는 `SUCCESS`(예약 완료) / `PROCESSING`(동기 confirm이 타임아웃됐지만 백엔드 워커가 백그라운드에서 예약을 이어 처리 — "백그라운드에서 처리 중" 안내, 실패로 보지 않음) / 그 외 실패(`FAILED_RACE`·`TIMEOUT`·`FAILED_AUTH`·`FAILED_UPSTREAM` → "예약 실패" 안내)로 분기한다
 - `WaitStatusCard` — 활성 대기(`wait_for_library_seat`) intent의 상태·시도 횟수·만료·취소 버튼
 
 민감한 write action을 "사용자 명시 승인 후에만 실행"하는 설계를 코드와 화면으로 동시에 증명한다.
