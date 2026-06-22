@@ -34,8 +34,16 @@ export function ReservationConfirmModal({
     setErrorMessage(null);
     try {
       const res = await confirm.mutateAsync();
-      if (res.status === "SUCCESS") {
-        setSuccessMessage("예약이 완료되었습니다.");
+      if (res.status === "SUCCESS" || res.status === "PROCESSING") {
+        // PROCESSING: the synchronous confirm timed out but a background worker
+        // continues the reservation and usually still succeeds. Treat it as an
+        // in-progress (non-error) outcome and refresh the seat view so the
+        // worker's eventual result is reflected.
+        setSuccessMessage(
+          res.status === "SUCCESS"
+            ? "예약이 완료되었습니다."
+            : "예약을 백그라운드에서 처리 중이에요. 잠시 후 좌석 상태를 확인해주세요.",
+        );
         timerRef.current = setTimeout(() => {
           onSuccess();
           onClose();
