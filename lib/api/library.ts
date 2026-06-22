@@ -72,7 +72,7 @@ export interface LibraryReservationPrepareResponse {
 }
 
 export interface LibraryReservationConfirmResponse {
-  status: "SUCCESS" | "FAILED_RACE" | "TIMEOUT" | "FAILED_AUTH" | "FAILED_UPSTREAM";
+  status: "SUCCESS" | "PROCESSING" | "FAILED_RACE" | "TIMEOUT" | "FAILED_AUTH" | "FAILED_UPSTREAM";
   intentId: number | null;
   message: string;
 }
