@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 
+import { getSsoInitUrl } from "@/lib/api/auth";
+import { useSaintAuth } from "@/hooks/useSaintAuth";
+
 interface CircuitBreakerInfo {
   name: string;
   state: string;
@@ -47,8 +50,17 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  // Admin is owner-only on the backend (ssuai.admin.student-ids → 403). The page
+  // requires a login before it even calls the API; a logged-in non-owner still
+  // gets a 403 from the backend, surfaced as an access-denied message below.
+  const { isAuthenticated, isLoading: authLoading } = useSaintAuth();
 
   useEffect(() => {
+    // Not logged in: skip the API call entirely (the component early-returns the
+    // login prompt below, so the dashboard's loading state is never shown).
+    if (!isAuthenticated) {
+      return;
+    }
     let cancelled = false;
 
     fetchResilienceApi()
@@ -83,9 +95,10 @@ export default function AdminDashboardPage() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   function handleRefresh() {
+    if (!isAuthenticated) return;
     setLoading(true);
     setError(null);
     fetchResilienceApi()
@@ -97,6 +110,31 @@ export default function AdminDashboardPage() {
         setError(e instanceof Error ? e.message : "알 수 없는 오류");
       })
       .finally(() => setLoading(false));
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-8 flex items-center justify-center">
+        <p className="text-slate-400 text-sm">인증 확인 중…</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-8 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-xl font-bold text-slate-100">관리자 대시보드</h1>
+          <p className="text-slate-400 text-sm">이 페이지는 로그인이 필요합니다.</p>
+          <a
+            href={getSsoInitUrl()}
+            className="inline-block px-4 py-2 text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-white rounded-lg transition"
+          >
+            u-SAINT 로그인
+          </a>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -137,7 +175,9 @@ export default function AdminDashboardPage() {
 
           {error && (
             <div className="mb-4 p-4 bg-red-950/50 border border-red-800 rounded-lg text-red-400 text-sm">
-              API 호출 실패: {error}
+              {error.includes("403")
+                ? "이 대시보드는 관리자 전용입니다. 접근 권한이 없습니다."
+                : `API 호출 실패: ${error}`}
             </div>
           )}
 
