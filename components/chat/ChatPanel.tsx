@@ -58,10 +58,15 @@ function getOrCreateThreadId(): string {
   return fresh;
 }
 
+function clearThread() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(THREAD_ID_KEY);
+}
+
 export function ChatPanel() {
   const { accessToken, isAuthenticated } = useSaintAuth();
 
-  const [threadId] = useState<string>(getOrCreateThreadId);
+  const [threadId, setThreadId] = useState<string>(getOrCreateThreadId);
   const [mcpSessionId, setMcpSessionId] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -74,19 +79,48 @@ export function ChatPanel() {
 
   const streamingContentRef = useRef<string>("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const previousIsAuthenticatedRef = useRef(isAuthenticated);
 
   // Obtain mcp_session_id when JWT is available
   useEffect(() => {
     if (!isAuthenticated || !accessToken || mcpSessionId) return;
+    let cancelled = false;
     createMcpWebSession(accessToken)
-      .then((res) => setMcpSessionId(res.mcpSessionId))
+      .then((res) => {
+        if (!cancelled) {
+          setMcpSessionId(res.mcpSessionId);
+        }
+      })
       .catch(() => {
+        if (cancelled) return;
         // Not fatal: mcp_session_id remains null; only public tools will work
         if (process.env.NODE_ENV === "development") {
           console.warn("Could not obtain mcp_session_id; public tools only.");
         }
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated, accessToken, mcpSessionId]);
+
+  useEffect(() => {
+    const wasAuthenticated = previousIsAuthenticatedRef.current;
+    previousIsAuthenticatedRef.current = isAuthenticated;
+    if (!wasAuthenticated || isAuthenticated) return;
+
+    setMcpSessionId(null);
+    clearThread();
+    setThreadId(getOrCreateThreadId());
+    setMessages([]);
+    streamingContentRef.current = "";
+    setStreamingContent("");
+    setInput("");
+    setIsStreaming(false);
+    setPendingInterrupt(null);
+    setError(null);
+    setIsResumingHitl(false);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
