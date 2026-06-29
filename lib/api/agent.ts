@@ -1,8 +1,9 @@
 import { fetchJson } from "./client";
 
-const SSUAGENT_BASE =
-  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SSUAGENT_BASE_URL?.trim()) ||
-  "https://ssuagent.duckdns.org";
+// The browser calls the same-origin Next proxy (/api/agent/*), which injects the
+// X-Agent-Key credential server-side and forwards to ssuAgent — so the key is never
+// shipped to the client (security follow-up #11). See lib/server/agentProxy.ts.
+const AGENT_PROXY_BASE = "/api/agent";
 
 // SSE event types from ssuAgent
 export type AgentEvent =
@@ -72,7 +73,7 @@ export async function startAgentStream(
   threadId: string,
   mcpSessionId: string | null,
 ): Promise<Response> {
-  const response = await fetch(`${SSUAGENT_BASE}/agent/stream`, {
+  const response = await fetch(`${AGENT_PROXY_BASE}/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, thread_id: threadId, mcp_session_id: mcpSessionId }),
@@ -90,7 +91,7 @@ export async function resumeAgentStream(
   actionId: number | null,
   mcpSessionId: string | null,
 ): Promise<Response> {
-  const response = await fetch(`${SSUAGENT_BASE}/agent/resume`, {
+  const response = await fetch(`${AGENT_PROXY_BASE}/resume`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
