@@ -6,4 +6,4 @@
   [ssuMCP/docs/architecture.md](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/architecture.md)
 - Local workspace path: `../../ssuMCP/docs/architecture.md`
 
-이 파일은 과거 `docs/tasks/` 및 ADR의 상대 링크 호환을 위해 유지합니다.
+이 파일은 ADR의 상대 링크 호환을 위해 유지합니다.

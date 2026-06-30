@@ -22,18 +22,20 @@
 
 ```
 브라우저
-   │  fetch /api/*  (same-origin)
+   │  fetch /api/*  ·  /api/agent/*   (same-origin)
    ▼
 Next.js 서버 (Vercel)
-   │  rewrites → NEXT_PUBLIC_SSUAI_API_BASE
-   ▼
-ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
-   │  REST API
-   ▼
-학교 시스템 (학식 · 도서관 · LMS · u-SAINT)
+   ├─ /api/*        → rewrites ──────────────────────────┐
+   └─ /api/agent/*  → proxy (X-Agent-Key 주입) → ssuAgent  │
+                                                  │ MCP    │ REST
+                                                  ▼        ▼
+                              ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
+                                                  │  REST API
+                                                  ▼
+                              학교 시스템 (학식 · 도서관 · LMS · u-SAINT)
 ```
 
-브라우저는 항상 같은 origin의 `/api/*`만 호출한다. Next.js `rewrites`가 실제 ssuMCP 서버로 투명하게 전달하므로 CORS가 없고, API 키와 세션이 브라우저에 노출되지 않는다.
+브라우저는 항상 같은 origin의 `/api/*`·`/api/agent/*`만 호출한다. 대시보드·조회 요청은 Next.js `rewrites`가 ssuMCP로 투명하게 전달하고, 챗봇 요청은 서버 전용 proxy가 `/api/agent/*`를 LangGraph 에이전트(ssuAgent)로 전달하며 `X-Agent-Key`를 주입한다(ssuAgent는 다시 MCP로 ssuMCP를 호출). CORS가 없고, API 키·에이전트 키·세션이 브라우저에 노출되지 않는다.
 
 ---
 
@@ -62,7 +64,7 @@ ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
 
 ### 도서관 좌석 예약 (플래그십)
 
-좌석 예약·이석·반납은 backend MCP의 `prepare_* → confirm_action` 2단계 확인을 그대로 화면에 옮긴 UX로 제공한다(PR #189 배포):
+좌석 예약·이석·반납은 backend MCP의 `prepare_* → confirm_action` 2단계 확인을 그대로 화면에 옮긴 UX로 제공한다:
 
 - `SeatRecommendationPanel` — 선택한 층의 추천 좌석 5개 + 좌석별 예약 버튼
 - `ReservationConfirmModal` — `prepare` 요약·만료 시간을 보여주고 사용자가 한 번 더 확정해야 `confirm` 호출. confirm 결과는 `SUCCESS`(예약 완료) / `PROCESSING`(동기 confirm이 타임아웃됐지만 백엔드 워커가 백그라운드에서 예약을 이어 처리 — "백그라운드에서 처리 중" 안내, 실패로 보지 않음) / 그 외 실패(`FAILED_RACE`·`TIMEOUT`·`FAILED_AUTH`·`FAILED_UPSTREAM` → "예약 실패" 안내)로 분기한다
@@ -183,7 +185,7 @@ pnpm build
 
 - [제품 현황 및 범위](docs/product.md)
 - [장기 비전과 로드맵](docs/vision.md)
-- [보안 정책](docs/security.md)
+- [보안 정책 (ssuMCP)](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/security.md)
 
 ---
 

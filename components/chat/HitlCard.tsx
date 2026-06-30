@@ -33,9 +33,6 @@ export function HitlCard({ interrupt, onApprove, onReject, isProcessing }: HitlC
       {summary ? (
         <p className="mt-1 text-amber-800 dark:text-amber-200">{summary}</p>
       ) : null}
-      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-        action_id: {interrupt.action_id ?? "—"}
-      </p>
       <div className="mt-3 flex gap-2">
         <Button
           size="sm"

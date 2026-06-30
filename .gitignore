@@ -54,3 +54,12 @@ secrets/
 /rusaint/
 /ssugrade/
 /.antigravitycli/
+
+# AI-assistant local config (not part of the project)
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.claude/
+.codex/
+# lefthook installs this locally (machine-specific path); managed via `pnpm lefthook install`
+.githooks/pre-commit
