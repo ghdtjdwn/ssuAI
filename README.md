@@ -58,6 +58,8 @@ ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
 
 대시보드와 동일한 데이터 범위에 대해 자연어로 질문할 수 있다. 공개 질문은 즉시 응답하고, 개인 데이터 질문은 연동 세션이 있는 경우에만 응답한다.
 
+`/chat`은 LangGraph 기반 멀티 에이전트(ssuAgent)와 SSE 스트리밍으로 연결된다. 에이전트 전환(Handoff)·도구 실행·텍스트가 실시간 표시되고, 도서관 예약처럼 학교 상태를 바꾸는 액션은 HITL 승인 카드(HitlCard)로 멈춰 사용자 승인 후 `/agent/resume`으로 재개한다.
+
 ### 도서관 좌석 예약 (플래그십)
 
 좌석 예약·이석·반납은 backend MCP의 `prepare_* → confirm_action` 2단계 확인을 그대로 화면에 옮긴 UX로 제공한다(PR #189 배포):
@@ -171,6 +173,9 @@ pnpm build
 | 변수 | 설명 |
 |------|------|
 | `NEXT_PUBLIC_SSUAI_API_BASE` | ssuMCP 서버 URL |
+| `SSUAGENT_BASE_URL` | (서버 전용) `/api/agent` 프록시가 전달하는 ssuAgent 서버 URL. 미설정 시 `NEXT_PUBLIC_SSUAGENT_BASE_URL` → `https://ssuagent.duckdns.org` 순으로 폴백 |
+| `NEXT_PUBLIC_SSUAGENT_BASE_URL` | (공개·레거시) ssuAgent 서버 URL 폴백값. 주로 로컬 개발용 |
+| `AGENT_API_KEY` | (서버 전용) `/api/agent` 프록시가 ssuAgent 호출 시 주입하는 `X-Agent-Key` 자격증명. 브라우저에 노출되지 않으며, 미설정 시 헤더를 보내지 않아 게이트가 no-op이 됨 |
 
 ---
 
