@@ -105,6 +105,6 @@ MCP Inspector로 별도 확인한다.
 
 ## 6. 문서 관리
 
-`docs/tasks/`와 `docs/dev-log.md`는 구현 과정의 역사 기록이다. 과거
-`frontend/`와 `backend/` 경로 또는 이전 단계 상태는 당시 맥락으로 남긴다.
+프론트엔드 설계 결정은 `docs/adr/`에, 장기 방향은 `docs/vision.md`에 기록한다.
+서버 구현 계약·운영 자료의 기준은 ssuMCP 저장소(`../ssuMCP/docs/`)다.
 현재 범위 판단은 이 문서와 서버의 활성 문서를 우선한다.

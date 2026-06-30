@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 import { getSsoInitUrl } from "@/lib/api/auth";
 import { useSaintAuth } from "@/hooks/useSaintAuth";

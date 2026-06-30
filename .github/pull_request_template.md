@@ -16,4 +16,4 @@
 - [ ] ...
 
 ## Linked task
-<!-- Link to docs/tasks/<NN>-...md for durable specs, a GitHub issue, or "ad-hoc" if neither applies. -->
+<!-- Link to a GitHub issue or ADR for durable specs, or "ad-hoc" if neither applies. -->
