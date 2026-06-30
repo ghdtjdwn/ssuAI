@@ -12,6 +12,20 @@
 
 ---
 
+## 미리보기
+
+로그인 없이 보이는 대시보드. 학식·시설·도서관·공지부터 u-SAINT/LMS 연동 개인 정보까지 한 화면의 카드로 모았다.
+
+![대시보드 — 오늘의 학식 · 시설 검색 · 주간 식단](docs/assets/dashboard.png)
+
+| 도서관 좌석 실시간 현황 · 도서 검색 | 개인 학사 정보 (로그인 연동) |
+|---|---|
+| ![도서관 좌석 실시간 현황과 도서 검색](docs/assets/dashboard-library.png) | ![채플 · 졸업요건 · 장학 · 성적 · LMS · 대출 연동 카드](docs/assets/dashboard-academic.png) |
+
+> 챗봇(`/chat`)과 도서관 좌석 예약 HITL 승인 카드는 로그인 후 동작한다.
+
+---
+
 ## 왜 만들었나
 
 [ssuMCP](https://github.com/ghdtjdwn/ssuMCP)가 MCP 서버로 학교 데이터를 제공하지만, Claude Desktop이 없는 사람도 쓸 수 있어야 했다. 브라우저에서 바로 접근할 수 있는 챗봇과 대시보드를 만들어 ssuMCP의 웹 클라이언트로 만든 게 ssuAI다.
