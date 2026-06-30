@@ -63,3 +63,4 @@ GEMINI.md
 .codex/
 # lefthook installs this locally (machine-specific path); managed via `pnpm lefthook install`
 .githooks/pre-commit
+.githooks/commit-msg
