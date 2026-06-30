@@ -106,7 +106,7 @@ provider 정책으로 전송한다.
 | 1 | 식단·시설·공지 조회, 웹 대시보드와 챗봇 | 완료 |
 | 2 | 도서 검색 및 도서관 좌석 조회 | 완료 |
 | 3 | SAINT/LMS/LIBRARY 인증과 개인 MCP 도구 | 완료 |
-| 4 | 도서관 좌석 예약 action infrastructure 및 confirmation UX | backend MCP 배포, frontend UX·실사용 검증 필요 |
+| 4 | 도서관 좌석 예약 action infrastructure 및 confirmation UX | 완료 (일부 엣지 경로 E2E는 현장 재검증 잔여) |
 | 5 | LMS 동영상 다운로드·오디오 추출·자막 추출·STT (Task 21) | 계획 중 |
 | 6 | AI 일일 브리핑 — 연동 데이터 종합 기반 오늘의 할 일·추천 계획 | 계획 중 |
 | 7 | 알림, 모바일 표면, 추가 안전한 자동화 | 미정 |
