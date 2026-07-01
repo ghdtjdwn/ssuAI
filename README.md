@@ -193,6 +193,7 @@ pnpm build
 | 변수 | 설명 |
 |------|------|
 | `NEXT_PUBLIC_SSUAI_API_BASE` | ssuMCP 서버 URL |
+| `SSUAI_API_PROXY_TARGET` | (서버 전용) `/api/*` 프록시 대상 오버라이드. 설정 시 `NEXT_PUBLIC_SSUAI_API_BASE`보다 우선 |
 | `SSUAGENT_BASE_URL` | (서버 전용) `/api/agent` 프록시가 전달하는 ssuAgent 서버 URL. 미설정 시 `NEXT_PUBLIC_SSUAGENT_BASE_URL` → `https://ssuagent.duckdns.org` 순으로 폴백 |
 | `NEXT_PUBLIC_SSUAGENT_BASE_URL` | (공개·레거시) ssuAgent 서버 URL 폴백값. 주로 로컬 개발용 |
 | `AGENT_API_KEY` | (서버 전용) `/api/agent` 프록시가 ssuAgent 호출 시 주입하는 `X-Agent-Key` 자격증명. 브라우저에 노출되지 않으며, 미설정 시 헤더를 보내지 않아 게이트가 no-op이 됨 |
