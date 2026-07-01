@@ -8,7 +8,7 @@
 <!-- Stop-and-flag decisions, scope deviations, or one non-obvious choice beyond the acceptance criteria. -->
 
 ## Troubleshooting log
-<!-- TROUBLESHOOTING.md decision: Added / Not needed, plus the short reason. -->
+<!-- Troubleshooting record decision: Added / Not needed, plus the short reason. -->
 
 ## Test plan
 <!-- Verification commands and final results. Mark intentionally skipped commands with the reason. -->

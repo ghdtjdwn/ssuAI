@@ -85,6 +85,22 @@ ssuAgent는 `thread_id`를 생성 당시의 `mcp_session_id`에 바인딩하고,
 
 ---
 
+## 2026-06-30 보강 — 네트워크 경로 반전: 브라우저 직접 호출 → Next.js 서버 프록시 (#11)
+
+### 배경
+
+「검토한 대안 §2」의 결정(브라우저 → `ssuagent.duckdns.org` 직접 호출 + CORS `allow_origins=["*"]`)은 **폐기되었습니다**. ssuAgent `/agent/*`에 API 키 인증이 강제되면서(보안 후속 #11), 키를 브라우저에 노출하지 않고 주입할 서버 측 경로가 필요해졌습니다.
+
+### 선택한 방식
+
+`/api/agent/{stream,resume}` Next.js Route Handler 프록시(`lib/server/agentProxy.ts`)가 server-only `AGENT_API_KEY`를 `X-Agent-Key` 헤더로 주입하고 SSE 응답을 pass-through 스트리밍합니다. 브라우저 코드는 same-origin `/api/agent/*`만 호출합니다(`lib/api/agent.ts`).
+
+- 당초 프록시를 기각했던 사유(이중 트래픽·스트림 지연)보다, **키를 서버에만 두는 인증 경계**가 우선한다고 재평가했습니다. SSE pass-through는 버퍼링 없이 릴레이해 체감 지연은 무시할 수준입니다.
+- `NEXT_PUBLIC_SSUAGENT_BASE_URL`은 로컬 개발·레거시 폴백으로만 남습니다. 키 미설정 시 헤더를 생략해 ssuAgent 게이트가 no-op인 하위호환을 유지합니다.
+- 「트레이드오프 — CORS 의존성」 항목도 이 전환으로 해소되었습니다(브라우저는 더 이상 cross-origin 호출을 하지 않음).
+
+---
+
 ## 3 Core Interview Questions (예상 면접 질문)
 
 ### Q1. EventSource API를 사용하지 않고 `fetch`와 `ReadableStream`으로 SSE를 직접 파싱한 구체적인 이유는 무엇인가요?
