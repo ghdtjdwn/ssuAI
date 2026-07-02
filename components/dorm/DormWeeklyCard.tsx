@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState, getErrorStateDetails } from "@/components/shared/ErrorState";
 import { WeeklyMealSkeleton } from "@/components/meal/WeeklyMealSkeleton";
 import { WeeklyMealStrip } from "@/components/meal/WeeklyMealStrip";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDormWeeklyMeal } from "@/hooks/useDormWeeklyMeal";
 import { formatShortKoreanDate } from "@/lib/utils";
 
@@ -16,10 +16,13 @@ export function DormWeeklyCard() {
   const range = data ? `${formatShortKoreanDate(data.startDate)} - ${formatShortKoreanDate(data.endDate)}` : "이번 주";
 
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle>기숙사 주간 식단</CardTitle>
-        <CardDescription>{range}</CardDescription>
+    <Card className="h-full animate-fadeUp">
+      <CardHeader className="flex-row items-center justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <Building2 size={18} className="shrink-0 text-mint" aria-hidden="true" />
+          <CardTitle>기숙사 주간 식단</CardTitle>
+        </div>
+        <span className="shrink-0 font-mono text-[11.5px] text-subtle">{range}</span>
       </CardHeader>
       <CardContent>
         {isLoading ? <WeeklyMealSkeleton /> : null}

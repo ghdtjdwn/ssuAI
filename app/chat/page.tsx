@@ -2,38 +2,15 @@
 // latest JS bundles rather than a stale cached HTML shell.
 export const dynamic = "force-dynamic";
 
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
-
-import { HeaderAuthStatus } from "@/components/auth/HeaderAuthStatus";
-import { UserGreeting } from "@/components/auth/UserGreeting";
 import { ChatPanel } from "@/components/chat/ChatPanel";
-import { buttonVariants } from "@/components/ui/button";
 
 export default function ChatPage() {
+  // AppShell owns the chrome: 60px top bar + main padding (pt-5, pb-24 under
+  // the mobile tab bar, lg:pb-10). Pin the page to the remaining viewport so
+  // the thread scrolls internally and the composer stays at the bottom.
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-4 px-4 py-6 sm:gap-5 sm:px-6 lg:px-8">
-      <header className="flex items-center justify-between gap-3 border-b border-border pb-5 sm:gap-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-muted-foreground sm:text-sm">Soongsil University</p>
-          <h1 className="mt-1 truncate text-2xl font-semibold tracking-normal text-foreground sm:mt-2 sm:text-3xl">
-            ssuAI Chat
-          </h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <HeaderAuthStatus />
-          <UserGreeting />
-          <Link
-            href="/"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-            aria-label="대시보드"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">대시보드</span>
-          </Link>
-        </div>
-      </header>
+    <div className="flex h-[calc(100dvh-176px)] min-h-[24rem] flex-col lg:h-[calc(100dvh-120px)]">
       <ChatPanel />
-    </main>
+    </div>
   );
 }

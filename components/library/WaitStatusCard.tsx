@@ -1,9 +1,13 @@
 "use client";
 
+import { Hourglass } from "lucide-react";
+
 import { isLibraryAuthError, useCancelWait, useCurrentWait } from "@/hooks/useLibraryReservation";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/toast";
 
 const STATUS_LABEL: Record<string, string> = {
   WAITING_FOR_SEAT: "좌석 대기 중",
@@ -25,9 +29,17 @@ const TERMINAL_STATUSES = new Set([
   "EXPIRED",
 ]);
 
+function statusBadgeVariant(status: string) {
+  if (status === "SUCCEEDED") return "success" as const;
+  if (status === "WAITING_FOR_SEAT" || status === "RESERVING") return "warning" as const;
+  if (status.startsWith("FAILED")) return "destructive" as const;
+  return "secondary" as const;
+}
+
 export function WaitStatusCard() {
   const { data: intent, error, isLoading } = useCurrentWait();
   const cancelMutation = useCancelWait();
+  const { toast } = useToast();
 
   if (!isLoading && isLibraryAuthError(error)) {
     return null;
@@ -37,23 +49,31 @@ export function WaitStatusCard() {
   const isTerminal = intent && TERMINAL_STATUSES.has(intent.status);
 
   return (
-    <Card className="h-full border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
-      <CardHeader>
-        <CardTitle className="text-base">대기 좌석 예약</CardTitle>
+    <Card className="h-full border-warning/25 bg-warning-bg/40">
+      <CardHeader className="flex-row items-center gap-2 space-y-0">
+        <Hourglass size={16} className="text-warning" aria-hidden />
+        <CardTitle className="text-[14px]">내 좌석 · 대기 상태</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <p className="text-sm text-muted-foreground">확인 중...</p>
         ) : intent ? (
           <div className="space-y-3">
-            <div>
-              <p className="text-sm font-medium">{STATUS_LABEL[intent.status] ?? intent.status}</p>
-              <p className="text-xs text-muted-foreground">
-                시도: {intent.attemptCount}회 · 만료:{" "}
-                {new Date(intent.expiresAt).toLocaleTimeString()}
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={statusBadgeVariant(intent.status)}>
+                  {STATUS_LABEL[intent.status] ?? intent.status}
+                </Badge>
+              </div>
+              <p className="text-[12px] text-muted-foreground">
+                시도 <span className="font-mono font-bold text-foreground">{intent.attemptCount}</span>회
+                {" · "}만료{" "}
+                <span className="font-mono font-bold text-foreground">
+                  {new Date(intent.expiresAt).toLocaleTimeString()}
+                </span>
               </p>
               {intent.outcomeMessage ? (
-                <p className="mt-1 text-xs text-muted-foreground">{intent.outcomeMessage}</p>
+                <p className="text-[12px] text-muted-foreground">{intent.outcomeMessage}</p>
               ) : null}
             </div>
             {!isTerminal ? (
@@ -61,7 +81,12 @@ export function WaitStatusCard() {
                 size="sm"
                 variant="outline"
                 disabled={cancelMutation.isPending}
-                onClick={() => void cancelMutation.mutateAsync()}
+                onClick={() => {
+                  void cancelMutation
+                    .mutateAsync()
+                    .then(() => toast("info", "좌석 대기를 취소했어요."))
+                    .catch(() => toast("error", "대기 취소에 실패했어요. 다시 시도해주세요."));
+                }}
               >
                 {cancelMutation.isPending ? "취소 중..." : "대기 취소"}
               </Button>

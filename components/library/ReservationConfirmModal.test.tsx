@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "@/test-utils/render-with-providers";
+import { ToastProvider } from "@/components/ui/toast";
 import { confirmReservation } from "@/lib/api/library";
 import type {
   LibraryReservationConfirmResponse,
@@ -25,11 +26,13 @@ function renderModal() {
   const onClose = vi.fn();
   const onSuccess = vi.fn();
   renderWithProviders(
-    <ReservationConfirmModal
-      pendingAction={pendingAction}
-      onClose={onClose}
-      onSuccess={onSuccess}
-    />,
+    <ToastProvider>
+      <ReservationConfirmModal
+        pendingAction={pendingAction}
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
+    </ToastProvider>,
   );
   return { onClose, onSuccess };
 }

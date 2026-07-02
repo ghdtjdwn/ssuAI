@@ -1,8 +1,10 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "next-themes";
 import { useState } from "react";
 
+import { ToastProvider } from "@/components/ui/toast";
 import { LibraryAuthProvider } from "@/contexts/LibraryAuthContext";
 import { SaintAuthProvider } from "@/hooks/useSaintAuth";
 import { ApiError } from "@/lib/api/types";
@@ -34,9 +36,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SaintAuthProvider>
-        <LibraryAuthProvider>{children}</LibraryAuthProvider>
-      </SaintAuthProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <SaintAuthProvider>
+          <LibraryAuthProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </LibraryAuthProvider>
+        </SaintAuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

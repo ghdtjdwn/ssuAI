@@ -1,68 +1,7 @@
 export const dynamic = "force-dynamic";
 
-import { MessageCircle } from "lucide-react";
-import Link from "next/link";
-
-import { HeaderAuthStatus } from "@/components/auth/HeaderAuthStatus";
-import { UserGreeting } from "@/components/auth/UserGreeting";
-import { DormWeeklyCard } from "@/components/dorm/DormWeeklyCard";
-import { FacilitySearchCard } from "@/components/facility/FacilitySearchCard";
-import { LibraryBookSearchCard } from "@/components/library/LibraryBookSearchCard";
-import { LibraryLoansCard } from "@/components/library/LibraryLoansCard";
-import { LibrarySeatCard } from "@/components/library/LibrarySeatCard";
-import { WaitStatusCard } from "@/components/library/WaitStatusCard";
-import { AssignmentsCard } from "@/components/lms/AssignmentsCard";
-import { TodayMealCard } from "@/components/meal/TodayMealCard";
-import { WeeklyMealCard } from "@/components/meal/WeeklyMealCard";
-import { NoticesCard } from "@/components/notice/NoticesCard";
-import { ChapelCard } from "@/components/saint/ChapelCard";
-import { GradesCard } from "@/components/saint/GradesCard";
-import { GraduationCard } from "@/components/saint/GraduationCard";
-import { ScheduleCard } from "@/components/saint/ScheduleCard";
-import { ScholarshipsCard } from "@/components/saint/ScholarshipsCard";
-import { buttonVariants } from "@/components/ui/button";
+import { HomeView } from "@/components/home/HomeView";
 
 export default function Home() {
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 lg:px-8">
-      <header className="flex items-center justify-between gap-3 border-b border-border pb-5 sm:gap-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-muted-foreground sm:text-sm">Soongsil University</p>
-          <h1 className="mt-1 truncate text-2xl font-semibold tracking-normal text-foreground sm:mt-2 sm:text-3xl">
-            ssuAI
-          </h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <HeaderAuthStatus />
-          <UserGreeting />
-          <Link
-            href="/chat"
-            className={buttonVariants({ variant: "default", size: "sm" })}
-            aria-label="Chat"
-          >
-            <MessageCircle className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Chat</span>
-          </Link>
-        </div>
-      </header>
-
-      <section className="grid gap-4 md:grid-cols-2">
-        <TodayMealCard />
-        <FacilitySearchCard />
-        <WeeklyMealCard />
-        <DormWeeklyCard />
-        <WaitStatusCard />
-        <LibrarySeatCard />
-        <LibraryBookSearchCard />
-        <NoticesCard />
-        <ScheduleCard />
-        <ChapelCard />
-        <GraduationCard />
-        <ScholarshipsCard />
-        <GradesCard />
-        <AssignmentsCard />
-        <LibraryLoansCard />
-      </section>
-    </main>
-  );
+  return <HomeView />;
 }

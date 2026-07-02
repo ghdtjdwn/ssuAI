@@ -1,12 +1,13 @@
 "use client";
 
-import { CalendarDays, LogIn } from "lucide-react";
+import { CalendarDays, Church, LogIn } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState, getErrorStateDetails } from "@/components/shared/ErrorState";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DonutGauge } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import { useSaintChapel } from "@/hooks/useSaintChapel";
@@ -25,15 +26,15 @@ function ChapelSkeleton() {
 }
 
 function resultVariant(result: string): BadgeProps["variant"] {
-  if (result === "이수") return "default";
+  if (result === "이수") return "success";
   if (result === "미이수") return "destructive";
-  return "secondary";
+  return "default";
 }
 
 function AbsenceStatus({ chapel }: { chapel: ChapelInfo }) {
   if (chapel.result === "이수") {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
+      <div className="flex items-center gap-2 rounded-control bg-success-bg px-3 py-2 text-sm font-semibold text-success">
         <span aria-hidden="true">✓</span>
         <span>이수 완료</span>
       </div>
@@ -47,14 +48,14 @@ function AbsenceStatus({ chapel }: { chapel: ChapelInfo }) {
   const remaining = chapel.absenceAllowedMinutes - chapel.absenceUsedMinutes;
   if (remaining <= 0) {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+      <div className="rounded-control bg-danger-bg px-3 py-2 text-sm font-semibold text-danger">
         결석 한도 도달 - 이제 한 번 더 빠지면 미이수!
       </div>
     );
   }
 
   return (
-    <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+    <div className="rounded-control bg-muted px-3 py-2 text-sm text-muted-foreground">
       결석 {remaining}번 더 가능
     </div>
   );
@@ -68,18 +69,27 @@ export function ChapelCard() {
   const recentAttendances = data
     ? [...data.attendances].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
     : [];
+  const attendedCount = data
+    ? data.attendances.filter((attendance) => attendance.status.includes("출석")).length
+    : 0;
+  const totalSessions = data ? data.attendances.length : 0;
 
   return (
     <Card className="h-full">
-      <CardHeader>
-        <CardTitle>채플</CardTitle>
-        <CardDescription>출석 현황</CardDescription>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <div className="flex items-center gap-2">
+          <Church size={19} className="text-primary" aria-hidden />
+          <CardTitle>채플</CardTitle>
+        </div>
+        {data && !errorState ? (
+          <Badge variant={resultVariant(data.result)}>{data.result}</Badge>
+        ) : null}
       </CardHeader>
       <CardContent>
         {authLoading && <ChapelSkeleton />}
 
         {!authLoading && !isAuthenticated && (
-          <div className="flex flex-col items-start gap-3 rounded-md border border-border bg-muted/40 p-4">
+          <div className="flex flex-col items-start gap-3 rounded-control bg-muted/60 p-4">
             <p className="text-sm text-muted-foreground">
               채플 출석 현황은 u-SAINT 로그인이 필요합니다.
             </p>
@@ -93,7 +103,7 @@ export function ChapelCard() {
         {isAuthenticated && isLoading && <ChapelSkeleton />}
 
         {errorState && errorState.code === "SAINT_SESSION_EXPIRED" ? (
-          <div className="rounded-md border border-border bg-muted/40 p-4">
+          <div className="rounded-control bg-muted/60 p-4">
             <p className="text-sm text-muted-foreground">
               세션이 만료됐어요. 잠시 후 자동으로 로그인 화면으로 이동합니다.
             </p>
@@ -109,9 +119,18 @@ export function ChapelCard() {
 
         {data && !errorState && (
           <div className="space-y-4">
-            <div className="rounded-md border border-border bg-muted/40 p-4">
-              <Badge variant={resultVariant(data.result)}>{data.result}</Badge>
-              <dl className="mt-3 space-y-1 text-sm">
+            <div className="flex items-start gap-4">
+              {totalSessions > 0 ? (
+                <DonutGauge
+                  value={attendedCount}
+                  max={totalSessions}
+                  size={76}
+                  strokeWidth={8}
+                  tone="primary"
+                  className="shrink-0"
+                />
+              ) : null}
+              <dl className="min-w-0 flex-1 space-y-1.5 text-sm">
                 <div className="flex justify-between gap-3">
                   <dt className="text-muted-foreground">채플 시간</dt>
                   <dd className="text-right font-medium text-foreground">{data.chapelTime}</dd>
@@ -123,12 +142,14 @@ export function ChapelCard() {
                 {data.seatNumber ? (
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted-foreground">좌석번호</dt>
-                    <dd className="text-right font-medium text-foreground">{data.seatNumber}</dd>
+                    <dd className="text-right font-mono font-semibold text-primary">
+                      {data.seatNumber}
+                    </dd>
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-3">
                   <dt className="text-muted-foreground">결석</dt>
-                  <dd className="text-right font-medium text-foreground">
+                  <dd className="text-right font-mono font-medium text-foreground">
                     {data.absenceUsedMinutes}회
                     {data.absenceAllowedMinutes === null
                       ? ""
@@ -148,21 +169,24 @@ export function ChapelCard() {
               />
             ) : (
               <div>
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">최근 출석 기록</p>
-                <ul className="space-y-2">
+                <p className="mb-2 text-xs font-bold text-muted-foreground">최근 출석 기록</p>
+                <ul className="divide-y divide-hairline border-t border-hairline">
                   {recentAttendances.map((attendance) => (
                     <li
                       key={`${attendance.date}-${attendance.title}`}
-                      className="flex items-start justify-between gap-2 rounded-md border border-border p-3"
+                      className="flex items-start justify-between gap-2 py-2.5"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground">{attendance.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {attendance.date}
+                        <p className="text-sm font-semibold text-foreground">{attendance.title}</p>
+                        <p className="mt-0.5 text-xs text-subtle">
+                          <span className="font-mono">{attendance.date}</span>
                           {attendance.instructor ? ` · ${attendance.instructor}` : ""}
                         </p>
                       </div>
-                      <Badge variant="outline" className="shrink-0 text-xs">
+                      <Badge
+                        variant={attendance.status.includes("출석") ? "success" : "secondary"}
+                        className="shrink-0"
+                      >
                         {attendance.status}
                       </Badge>
                     </li>
@@ -173,28 +197,28 @@ export function ChapelCard() {
 
             {data.absenceApplications.length > 0 ? (
               <div>
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">결석 신청 이력</p>
-                <ul className="space-y-2">
+                <p className="mb-2 text-xs font-bold text-muted-foreground">결석 신청 이력</p>
+                <ul className="divide-y divide-hairline border-t border-hairline">
                   {data.absenceApplications.map((application, index) => (
                     <li
                       key={`${application.startDate}-${application.reason}-${index}`}
-                      className="flex items-start justify-between gap-2 rounded-md border border-border p-3"
+                      className="flex items-start justify-between gap-2 py-2.5"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground">{application.reason}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm font-semibold text-foreground">{application.reason}</p>
+                        <p className="mt-0.5 text-xs text-subtle">
                           {application.startDate} ~ {application.endDate} · {application.category}
                         </p>
                       </div>
                       <Badge
                         variant={
                           application.status === "승인"
-                            ? "default"
+                            ? "success"
                             : application.status === "거부"
                               ? "destructive"
                               : "secondary"
                         }
-                        className="shrink-0 text-xs"
+                        className="shrink-0"
                       >
                         {application.status}
                       </Badge>

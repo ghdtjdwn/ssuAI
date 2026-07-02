@@ -11,7 +11,7 @@ vi.mock("@/lib/api/library", () => ({
   cancelWait: vi.fn(),
   confirmReservation: vi.fn(),
   getCurrentWait: vi.fn(),
-  getLibrarySeatRecommendations: vi.fn().mockResolvedValue([]),
+  getLibrarySeatRecommendations: vi.fn().mockResolvedValue({ recommendations: [] }),
   getLibrarySeatStatus: vi.fn(),
   prepareReservation: vi.fn(),
   registerWait: vi.fn(),

@@ -47,13 +47,42 @@ export function logoutLibrary() {
 
 // --- Reservation types ---
 
+export interface LibrarySeatAttributes {
+  window: boolean;
+  outlet: boolean;
+  standing: boolean;
+  edge: boolean;
+  quiet: boolean;
+  nearEntrance: boolean;
+}
+
 export interface LibrarySeatRecommendation {
-  externalSeatId: number;
   seatId: string;
+  /** Numeric-string external seat id — the value `prepare`'s numeric seatId expects. */
+  externalSeatId: string;
   label: string;
+  roomCode: string;
   roomName: string;
+  zone: string | null;
+  seatType: string | null;
+  audience: string | null;
+  status: string | null;
+  score: number;
+  matchedPreferences: string[];
+  missingPreferences: string[];
+  attributes: LibrarySeatAttributes | null;
+  note: string | null;
+}
+
+export interface LibrarySeatRecommendationResponse {
   floor: number;
-  attributes: string[];
+  floorLabel: string;
+  requestedLimit: number;
+  availabilitySource: string;
+  message: string | null;
+  excludedRooms: string[];
+  warnings: string[];
+  recommendations: LibrarySeatRecommendation[];
 }
 
 export type ReservationType = "RESERVE" | "CANCEL" | "SWAP";
@@ -108,9 +137,12 @@ export function getLibrarySeatRecommendations(
   const params = new URLSearchParams({ floor: String(floor) });
   if (roomIds) params.set("roomIds", roomIds);
   if (attributes) params.set("attributes", attributes);
-  return fetchJson<LibrarySeatRecommendation[]>(`/api/library/reservations/recommend?${params}`, {
-    credentials: "include",
-  });
+  return fetchJson<LibrarySeatRecommendationResponse>(
+    `/api/library/reservations/recommend?${params}`,
+    {
+      credentials: "include",
+    },
+  );
 }
 
 export function prepareReservation(req: LibraryReservationPrepareRequest) {

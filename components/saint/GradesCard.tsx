@@ -1,11 +1,11 @@
 "use client";
 
-import { GraduationCap, LogIn } from "lucide-react";
+import { LogIn, Star } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState, getErrorStateDetails } from "@/components/shared/ErrorState";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import { useSaintGrades } from "@/hooks/useSaintGrades";
@@ -31,15 +31,15 @@ export function GradesCard() {
 
   return (
     <Card className="h-full">
-      <CardHeader>
-        <CardTitle>내 성적</CardTitle>
-        <CardDescription>u-SAINT 누적 성적</CardDescription>
+      <CardHeader className="flex-row items-center gap-2 space-y-0">
+        <Star size={19} className="text-primary" aria-hidden />
+        <CardTitle>누적 성적</CardTitle>
       </CardHeader>
       <CardContent>
         {authLoading && <GradesSkeleton />}
 
         {!authLoading && !isAuthenticated && (
-          <div className="flex flex-col items-start gap-3 rounded-md border border-border bg-muted/40 p-4">
+          <div className="flex flex-col items-start gap-3 rounded-control bg-muted/60 p-4">
             <p className="text-sm text-muted-foreground">
               성적은 u-SAINT 로그인이 필요합니다.
             </p>
@@ -53,7 +53,7 @@ export function GradesCard() {
         {isAuthenticated && isLoading && <GradesSkeleton />}
 
         {errorState && errorState.code === "SAINT_SESSION_EXPIRED" ? (
-          <div className="rounded-md border border-border bg-muted/40 p-4">
+          <div className="rounded-control bg-muted/60 p-4">
             <p className="text-sm text-muted-foreground">
               세션이 만료됐어요. 잠시 후 자동으로 로그인 화면으로 이동합니다.
             </p>
@@ -64,38 +64,47 @@ export function GradesCard() {
 
         {data && !errorState && (
           <>
-            <div className="mb-4 rounded-md border border-border bg-muted/40 p-4">
-              <p className="text-xs text-muted-foreground">누적 평점 (학업)</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums text-foreground">
+            <div className="mb-4">
+              <p className="font-mono text-[30px] font-bold leading-none text-primary">
                 {data.academicRecord.gpa.toFixed(2)}
+                <span className="ml-1 text-sm font-semibold text-subtle">/ 4.5</span>
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                취득학점 {data.academicRecord.earnedCredits} · 신청학점{" "}
-                {data.academicRecord.requestedCredits}
+              <p className="mt-2 text-xs text-muted-foreground">
+                취득{" "}
+                <span className="font-mono font-semibold text-foreground">
+                  {data.academicRecord.earnedCredits}
+                </span>
+                학점 · 신청{" "}
+                <span className="font-mono font-semibold text-foreground">
+                  {data.academicRecord.requestedCredits}
+                </span>
+                학점
               </p>
             </div>
 
             {data.history.length === 0 ? (
               <EmptyState
-                icon={<GraduationCap className="h-6 w-6" aria-hidden="true" />}
+                icon={<Star className="h-6 w-6" aria-hidden="true" />}
                 title="성적 내역이 없습니다"
                 description="학기별 성적 정보를 가져올 수 없어요."
               />
             ) : (
-              <ul className="space-y-1">
+              <ul className="divide-y divide-hairline border-t border-hairline">
                 {data.history.map((row) => (
                   <li
                     key={`${row.year}-${row.term}`}
-                    className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+                    className="flex items-center justify-between gap-3 py-2 text-sm"
                   >
-                    <span className="text-muted-foreground">
+                    <span className="text-[12.5px] text-muted-foreground">
                       {row.year}년 {row.term}학기
                     </span>
-                    <div className="flex items-center gap-3 tabular-nums">
-                      <span className="text-xs text-muted-foreground">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs text-subtle">
                         {row.earnedCredits}학점
                       </span>
-                      <span className="font-medium text-foreground">{row.gpa.toFixed(2)}</span>
+                      <span className="font-mono text-[13px] font-bold text-foreground">
+                        {row.gpa.toFixed(2)}
+                      </span>
                     </div>
                   </li>
                 ))}

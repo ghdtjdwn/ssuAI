@@ -1,6 +1,16 @@
 import type { Metadata, Viewport } from "next";
+import { JetBrains_Mono } from "next/font/google";
+
+import { AppShell } from "@/components/shell/AppShell";
+
 import { Providers } from "./providers";
 import "./globals.css";
+
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-jetbrains",
+});
 
 export const metadata: Metadata = {
   title: "ssuAI",
@@ -21,9 +31,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
-      <body>
-        <Providers>{children}</Providers>
+    <html lang="ko" suppressHydrationWarning>
+      <body className={jetbrains.variable}>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   );

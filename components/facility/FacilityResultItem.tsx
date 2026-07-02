@@ -14,30 +14,33 @@ function joinContact(facility: CampusFacility) {
 
 export function FacilityResultItem({ facility }: FacilityResultItemProps) {
   return (
-    <article className="rounded-md border border-border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <article className="rounded-[12px] border border-hairline bg-surface p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2.5">
         <div className="min-w-0 space-y-1">
-          <h4 className="text-sm font-semibold text-foreground">{facility.name}</h4>
-          <p className="text-xs text-muted-foreground">{facility.aliases.join(", ")}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h4 className="text-[13.5px] font-bold text-foreground">{facility.name}</h4>
+            <Badge>{facility.categoryLabel}</Badge>
+          </div>
+          {facility.aliases.length > 0 ? (
+            <p className="text-[11px] text-subtle">{facility.aliases.join(", ")}</p>
+          ) : null}
         </div>
-        <Badge variant="secondary">{facility.categoryLabel}</Badge>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-[7px] bg-muted px-2 py-1 font-mono text-[11px] font-bold text-muted-foreground">
+          <MapPin className="h-3 w-3" aria-hidden="true" />
+          {facility.location || "위치 정보 없음"}
+        </span>
       </div>
 
-      <dl className="mt-4 space-y-2 text-sm">
+      <dl className="mt-3 space-y-1.5 text-[12.5px]">
         <div className="flex gap-2">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <dt className="sr-only">위치</dt>
-          <dd className="text-foreground">{facility.location || "위치 정보 없음"}</dd>
-        </div>
-        <div className="flex gap-2">
-          <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Phone className="mt-0.5 h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
           <dt className="sr-only">연락처</dt>
-          <dd className="text-foreground">{joinContact(facility)}</dd>
+          <dd className="text-muted-foreground">{joinContact(facility)}</dd>
         </div>
         <div className="flex gap-2">
-          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
           <dt className="sr-only">운영 시간</dt>
-          <dd className="space-y-1 text-foreground">
+          <dd className="space-y-0.5 text-muted-foreground">
             {facility.weekdayHours.length > 0 ? (
               <p>평일: {facility.weekdayHours.join(", ")}</p>
             ) : null}
@@ -52,7 +55,7 @@ export function FacilityResultItem({ facility }: FacilityResultItemProps) {
       </dl>
 
       {facility.notes.length > 0 ? (
-        <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+        <ul className="mt-2.5 list-disc space-y-0.5 pl-5 text-[11px] text-subtle">
           {facility.notes.map((note) => (
             <li key={note}>{note}</li>
           ))}
