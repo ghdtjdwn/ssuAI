@@ -15,27 +15,25 @@ export function MessageBubble({ role, content, isLoading = false, model }: Messa
   const isUser = role === "user";
 
   return (
-    <div className={cn("flex w-full", isUser ? "justify-end" : "justify-start")}>
+    <div className={cn("flex w-full animate-fadeIn", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[min(42rem,86%)] break-words rounded-md px-4 py-3 text-sm leading-6",
+          "max-w-[min(42rem,85%)] break-words px-4 py-3 text-[15px] leading-[1.55]",
           isUser
-            ? "bg-primary text-primary-foreground"
-            : "border border-border bg-muted text-foreground",
+            ? "rounded-card rounded-tr-[4px] bg-primary text-primary-foreground"
+            : "rounded-card rounded-tl-[4px] border border-hairline bg-surface text-foreground shadow-e1",
         )}
       >
         {isLoading ? (
-          <span className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 size={15} className="shrink-0 animate-spin" aria-hidden="true" />
             답변 준비 중...
           </span>
         ) : (
           <>
             <p className="whitespace-pre-wrap">{content}</p>
             {!isUser && model ? (
-              <p className="mt-2 text-right text-[10px] text-muted-foreground opacity-60">
-                {model}
-              </p>
+              <p className="mt-2 text-right font-mono text-[10px] text-subtle">{model}</p>
             ) : null}
           </>
         )}

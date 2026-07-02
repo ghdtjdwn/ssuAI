@@ -1,5 +1,6 @@
 "use client";
 
+import { Bot, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -14,6 +15,15 @@ const ERROR_MESSAGES: Record<string, string> = {
   lms_unknown: "LMS 로그인 처리 중 알 수 없는 오류가 발생했어요. 다시 시도해 주세요.",
   unknown: "알 수 없는 오류가 발생했어요. 다시 시도해 주세요.",
 };
+
+function PendingLine({ label }: { label: string }) {
+  return (
+    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 size={16} className="animate-spin text-primary" aria-hidden />
+      {label}
+    </p>
+  );
+}
 
 function AuthReturnContent() {
   const params = useSearchParams();
@@ -47,18 +57,21 @@ function AuthReturnContent() {
   const pending = (ok || lmsOk) && !refreshSettled;
 
   if (pending) {
-    return <p className="text-sm text-muted-foreground">로그인 처리 중…</p>;
+    return <PendingLine label="로그인 처리 중…" />;
   }
 
   if (refreshFailed) {
     return (
       <>
-        <h1 className="text-2xl font-semibold">세션을 만들지 못했어요</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-[19px] font-extrabold text-foreground">세션을 만들지 못했어요</h1>
+        <p className="text-sm leading-relaxed text-muted-foreground">
           SSO 는 통과했지만 ssuAI 세션 갱신에 실패했습니다. 잠시 후 다시
           시도해 주세요.
         </p>
-        <Link href="/auth/login" className="text-sm underline">
+        <Link
+          href="/auth/login"
+          className="text-sm font-semibold text-primary underline underline-offset-2"
+        >
           다시 로그인하기
         </Link>
       </>
@@ -77,9 +90,12 @@ function AuthReturnContent() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">로그인 실패</h1>
-      <p className="text-sm text-muted-foreground">{message}</p>
-      <Link href="/auth/login" className="text-sm underline">
+      <h1 className="text-[19px] font-extrabold text-foreground">로그인 실패</h1>
+      <p className="text-sm leading-relaxed text-muted-foreground">{message}</p>
+      <Link
+        href="/auth/login"
+        className="text-sm font-semibold text-primary underline underline-offset-2"
+      >
         다시 시도
       </Link>
     </>
@@ -88,10 +104,23 @@ function AuthReturnContent() {
 
 export default function AuthReturnPage() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-4 px-4 py-12 sm:px-6">
-      <Suspense fallback={<p className="text-sm text-muted-foreground">로딩 중…</p>}>
-        <AuthReturnContent />
-      </Suspense>
+    <main className="flex min-h-dvh items-center justify-center bg-background px-4 py-12 sm:px-6">
+      <div className="w-full max-w-md animate-fadeUp rounded-card border border-hairline bg-surface p-8 shadow-e2">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-primary shadow-[0_2px_8px_rgba(11,77,162,.28)]">
+            <Bot size={22} className="text-white" aria-hidden />
+          </span>
+          <div>
+            <p className="text-[15px] font-extrabold leading-tight text-foreground">ssuAI</p>
+            <p className="text-[11px] leading-tight text-subtle">숭실대 어시스턴트</p>
+          </div>
+        </div>
+        <div className="mt-6 flex flex-col gap-3">
+          <Suspense fallback={<PendingLine label="로딩 중…" />}>
+            <AuthReturnContent />
+          </Suspense>
+        </div>
+      </div>
     </main>
   );
 }

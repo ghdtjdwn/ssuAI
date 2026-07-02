@@ -16,8 +16,8 @@ function LoansSkeleton() {
   return (
     <div className="space-y-2">
       {[1, 2].map((i) => (
-        <div key={i} className="rounded-md border border-border p-3">
-          <Skeleton className="mb-1 h-4 w-3/4" />
+        <div key={i} className="rounded-control border border-hairline p-3">
+          <Skeleton className="mb-1.5 h-4 w-3/4" />
           <Skeleton className="h-3 w-1/3" />
         </div>
       ))}
@@ -34,15 +34,22 @@ export function LibraryLoansCard() {
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>대출 현황</CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle>대출 현황</CardTitle>
+          {data && !errorState ? (
+            <span className="font-mono text-[13px] font-bold text-primary" aria-label={`대출 ${data.total}권`}>
+              {data.total}권
+            </span>
+          ) : null}
+        </div>
         <CardDescription>중앙도서관 현재 대출 도서</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {isLoading && <LoansSkeleton />}
 
         {needsAuth ? (
-          <div className="flex flex-col items-start gap-3 rounded-md border border-border bg-muted/40 p-4">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col items-start gap-3 rounded-control border border-dashed border-border bg-muted/40 p-4">
+            <p className="text-[13px] text-muted-foreground">
               대출 현황은 도서관 연동이 필요합니다.
             </p>
             <Button size="sm" onClick={() => setShowLoginModal(true)}>
@@ -74,22 +81,21 @@ export function LibraryLoansCard() {
             ) : (
               <ul className="space-y-2">
                 {data.loans.map((loan) => (
-                  <li key={loan.id} className="rounded-md border border-border p-3">
+                  <li
+                    key={loan.id}
+                    className="rounded-control border border-hairline bg-surface p-3 shadow-e1"
+                  >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium leading-snug text-foreground">
+                      <p className="text-[13px] font-bold leading-snug text-foreground">
                         {loan.title}
                       </p>
                       <div className="flex shrink-0 gap-1">
-                        {loan.isOverdue && (
-                          <Badge variant="destructive" className="text-xs">연체</Badge>
-                        )}
-                        {loan.isRenewable && (
-                          <Badge variant="secondary" className="text-xs">연장가능</Badge>
-                        )}
+                        {loan.isOverdue && <Badge variant="destructive">연체</Badge>}
+                        {loan.isRenewable && <Badge variant="secondary">연장가능</Badge>}
                       </div>
                     </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      반납기한: {loan.dueDate}
+                    <p className="mt-1 text-[12px] text-muted-foreground">
+                      반납기한 <span className="font-mono font-bold text-foreground">{loan.dueDate}</span>
                       {loan.author ? ` · ${loan.author}` : ""}
                     </p>
                   </li>

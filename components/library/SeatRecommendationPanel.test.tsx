@@ -8,7 +8,17 @@ vi.mock("@/lib/api/library", () => ({
   cancelWait: vi.fn(),
   confirmReservation: vi.fn(),
   getCurrentWait: vi.fn(),
-  getLibrarySeatRecommendations: vi.fn().mockResolvedValue([]),
+  // Real web API wraps items in a LibrarySeatRecommendationResponse envelope.
+  getLibrarySeatRecommendations: vi.fn().mockResolvedValue({
+    floor: 2,
+    floorLabel: "2층",
+    requestedLimit: 5,
+    availabilitySource: "live_per_seat",
+    message: null,
+    excludedRooms: [],
+    warnings: [],
+    recommendations: [],
+  }),
   prepareReservation: vi.fn(),
   registerWait: vi.fn(),
 }));

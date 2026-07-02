@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, LogIn } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronUp, LogIn } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { LibraryLoginModal } from "@/components/library/LibraryLoginModal";
@@ -71,11 +71,9 @@ function SeatDetails({ zone }: { zone: LibrarySeatZone }) {
             key={seat.id}
             title={`${seat.label} (${SEAT_STATUS_LABEL[seat.status]})`}
             className={cn(
-              "inline-flex h-6 min-w-10 items-center justify-center rounded px-1 text-[10px] font-medium",
-              seat.status === "available" &&
-                "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-              seat.status === "occupied" &&
-                "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-400",
+              "inline-flex h-6 min-w-10 items-center justify-center rounded-[6px] px-1 font-mono text-[10px] font-bold",
+              seat.status === "available" && "bg-success-bg text-success",
+              seat.status === "occupied" && "bg-danger-bg text-danger",
               seat.status === "outOfService" &&
                 "bg-muted text-muted-foreground opacity-50",
             )}
@@ -104,15 +102,15 @@ function SeatLegend() {
   return (
     <div className="flex gap-3 text-xs text-muted-foreground" aria-label="좌석 상태 범례">
       <span className="flex items-center gap-1">
-        <span className="inline-block h-2.5 w-2.5 rounded bg-green-200" />
+        <span className="inline-block h-2.5 w-2.5 rounded-[3px] bg-success-bg ring-1 ring-inset ring-success/40" />
         가능
       </span>
       <span className="flex items-center gap-1">
-        <span className="inline-block h-2.5 w-2.5 rounded bg-red-200" />
+        <span className="inline-block h-2.5 w-2.5 rounded-[3px] bg-danger-bg ring-1 ring-inset ring-danger/40" />
         사용중
       </span>
       <span className="flex items-center gap-1">
-        <span className="inline-block h-2.5 w-2.5 rounded bg-muted" />
+        <span className="inline-block h-2.5 w-2.5 rounded-[3px] bg-muted" />
         비활성
       </span>
     </div>
@@ -168,10 +166,15 @@ export function LibrarySeatCard() {
         <div className="mb-4">
           <button
             type="button"
-            className="cursor-pointer text-sm font-medium text-foreground"
+            className="press inline-flex cursor-pointer items-center gap-1 text-[13px] font-bold text-primary"
             onClick={() => setShowRecommendations((prev) => !prev)}
           >
-            {showRecommendations ? "▲ 추천 좌석 예약 닫기" : "▼ 추천 좌석 예약"}
+            {showRecommendations ? (
+              <ChevronUp size={14} aria-hidden />
+            ) : (
+              <ChevronDown size={14} aria-hidden />
+            )}
+            {showRecommendations ? "추천 좌석 예약 닫기" : "추천 좌석 예약"}
           </button>
           {showRecommendations ? (
             <SeatRecommendationPanel
@@ -184,7 +187,7 @@ export function LibrarySeatCard() {
         {isLoading ? <LibrarySeatSkeleton /> : null}
 
         {needsAuth ? (
-          <div className="flex flex-col items-start gap-3 rounded-md border border-border bg-muted/40 p-4">
+          <div className="flex flex-col items-start gap-3 rounded-control border border-dashed border-border bg-muted/40 p-4">
             <p className="text-sm text-muted-foreground">
               실시간 좌석 현황은 도서관 로그인이 필요합니다.
             </p>
@@ -211,13 +214,13 @@ export function LibrarySeatCard() {
             <div>
               <div className="flex items-baseline justify-between gap-3">
                 <p className="text-sm text-muted-foreground">{data.floorLabel}</p>
-                <p className="text-sm tabular-nums text-muted-foreground">
-                  <span className="font-medium text-foreground">{data.availableSeats}</span>
+                <p className="font-mono text-sm tabular-nums text-muted-foreground">
+                  <span className="font-bold text-foreground">{data.availableSeats}</span>
                   <span> / {data.totalSeats}석 이용 가능</span>
                 </p>
               </div>
               <div
-                className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted"
+                className="mt-2 h-2 w-full overflow-hidden rounded-pill bg-muted"
                 role="progressbar"
                 aria-valuenow={usagePercent}
                 aria-valuemin={0}
@@ -226,23 +229,23 @@ export function LibrarySeatCard() {
               >
                 <div
                   className={cn(
-                    "h-full transition-all",
+                    "h-full rounded-pill transition-all",
                     usagePercent >= 90
-                      ? "bg-destructive"
+                      ? "bg-danger"
                       : usagePercent >= 70
-                        ? "bg-amber-500"
-                        : "bg-emerald-500",
+                        ? "bg-warning"
+                        : "bg-success",
                   )}
                   style={{ width: `${usagePercent}%` }}
                 />
               </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                 <Badge variant="secondary">예약 {data.reservedSeats}</Badge>
                 {data.outOfServiceSeats > 0 ? (
                   <Badge variant="outline">사용 불가 {data.outOfServiceSeats}</Badge>
                 ) : null}
                 {isFetching && !isLoading ? (
-                  <span className="text-muted-foreground">갱신 중…</span>
+                  <span className="text-subtle">갱신 중…</span>
                 ) : null}
               </div>
             </div>
@@ -252,12 +255,12 @@ export function LibrarySeatCard() {
                 {data.zones.map((zone) => (
                   <li
                     key={zone.label}
-                    className="rounded-md border border-border bg-card p-3"
+                    className="rounded-control border border-hairline bg-surface p-3 shadow-e1"
                   >
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-sm font-medium text-foreground">{zone.label}</p>
-                      <p className="text-xs tabular-nums text-muted-foreground">
-                        <span className="font-medium text-foreground">{zone.available}</span>
+                      <p className="text-sm font-bold text-foreground">{zone.label}</p>
+                      <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                        <span className="font-bold text-foreground">{zone.available}</span>
                         <span> / {zone.total}석</span>
                       </p>
                     </div>

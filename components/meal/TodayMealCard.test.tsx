@@ -35,7 +35,7 @@ describe("TodayMealCard", () => {
     const { container } = renderWithProviders(<TodayMealCard />);
 
     expect(screen.getByText("오늘의 학식")).toBeInTheDocument();
-    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(3);
+    expect(container.querySelectorAll(".skeleton-shimmer")).toHaveLength(3);
   });
 
   it("renders today's meal when the query succeeds", async () => {
@@ -44,7 +44,7 @@ describe("TodayMealCard", () => {
     renderWithProviders(<TodayMealCard />);
 
     expect(await screen.findByText("Mock 학생식당")).toBeInTheDocument();
-    expect(screen.getAllByText("한식")).toHaveLength(2);
+    expect(screen.getByText("한식")).toBeInTheDocument();
     expect(screen.getByText("김치찌개, 쌀밥")).toBeInTheDocument();
     expect(screen.getByText("점심")).toBeInTheDocument();
   });

@@ -12,6 +12,9 @@ import { useSaintSchedule } from "@/hooks/useSaintSchedule";
 import { useSaintSessionGuard } from "@/hooks/useSaintSessionGuard";
 import { getSsoInitUrl } from "@/lib/api/auth";
 import type { ScheduleEntry } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
+
+import { courseTone } from "./WeeklyTimetable";
 
 const DAY_LABELS = ["", "월", "화", "수", "목", "금", "토"];
 
@@ -50,7 +53,10 @@ export function ScheduleCard() {
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>내 시간표</CardTitle>
+        <div className="flex items-center gap-2">
+          <CalendarDays size={19} className="text-primary" aria-hidden />
+          <CardTitle>내 시간표</CardTitle>
+        </div>
         <CardDescription>
           {data ? `${data.currentYear}년 ${data.currentTerm}학기` : "u-SAINT 시간표"}
         </CardDescription>
@@ -59,7 +65,7 @@ export function ScheduleCard() {
         {authLoading && <ScheduleSkeleton />}
 
         {!authLoading && !isAuthenticated && (
-          <div className="flex flex-col items-start gap-3 rounded-md border border-border bg-muted/40 p-4">
+          <div className="flex flex-col items-start gap-3 rounded-control bg-muted/60 p-4">
             <p className="text-sm text-muted-foreground">
               시간표는 u-SAINT 로그인이 필요합니다.
             </p>
@@ -73,7 +79,7 @@ export function ScheduleCard() {
         {isAuthenticated && isLoading && <ScheduleSkeleton />}
 
         {errorState && errorState.code === "SAINT_SESSION_EXPIRED" ? (
-          <div className="rounded-md border border-border bg-muted/40 p-4">
+          <div className="rounded-control bg-muted/60 p-4">
             <p className="text-sm text-muted-foreground">
               세션이 만료됐어요. 잠시 후 자동으로 로그인 화면으로 이동합니다.
             </p>
@@ -96,26 +102,40 @@ export function ScheduleCard() {
                 if (!entries) return null;
                 return (
                   <li key={day}>
-                    <p className="mb-1 text-xs font-semibold text-muted-foreground">
+                    <p className="mb-1.5 text-xs font-bold text-muted-foreground">
                       {DAY_LABELS[day]}요일
                     </p>
-                    <ul className="space-y-1">
+                    <ul className="space-y-1.5">
                       {entries
                         .sort((a: ScheduleEntry, b: ScheduleEntry) => a.period - b.period)
-                        .map((e: ScheduleEntry) => (
-                          <li
-                            key={`${e.dayOfWeek}-${e.period}`}
-                            className="flex items-baseline justify-between rounded-md border border-border px-3 py-2"
-                          >
-                            <div>
-                              <span className="text-sm font-medium text-foreground">{e.course}</span>
-                              <span className="ml-2 text-xs text-muted-foreground">{e.room}</span>
-                            </div>
-                            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                              {e.timeRange}
-                            </span>
-                          </li>
-                        ))}
+                        .map((e: ScheduleEntry) => {
+                          const tone = courseTone(e.course);
+                          return (
+                            <li
+                              key={`${e.dayOfWeek}-${e.period}`}
+                              className={cn(
+                                "flex items-baseline justify-between gap-3 rounded-[8px] border-l-[3px] px-3 py-2",
+                                tone.border,
+                                tone.bg,
+                              )}
+                            >
+                              <div className="min-w-0">
+                                <span className="text-sm font-semibold text-foreground">
+                                  {e.course}
+                                </span>
+                                <span className="ml-2 text-xs text-subtle">{e.room}</span>
+                              </div>
+                              <span
+                                className={cn(
+                                  "shrink-0 font-mono text-xs font-semibold",
+                                  tone.time,
+                                )}
+                              >
+                                {e.timeRange}
+                              </span>
+                            </li>
+                          );
+                        })}
                     </ul>
                   </li>
                 );

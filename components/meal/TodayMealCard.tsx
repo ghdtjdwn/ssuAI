@@ -7,7 +7,7 @@ import { Utensils } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState, getErrorStateDetails } from "@/components/shared/ErrorState";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTodayMeal } from "@/hooks/useTodayMeal";
 import type { MealItem } from "@/lib/api/types";
@@ -22,12 +22,10 @@ function groupByRestaurant(meals: MealItem[]) {
 
 function TodayMealSkeleton() {
   return (
-    <div className="space-y-4">
-      <Skeleton className="h-5 w-36" />
-      <div className="space-y-3">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-      </div>
+    <div className="space-y-3">
+      <Skeleton className="h-4 w-32" />
+      <Skeleton className="h-24 w-full rounded-[12px]" />
+      <Skeleton className="h-24 w-full rounded-[12px]" />
     </div>
   );
 }
@@ -40,12 +38,15 @@ export function TodayMealCard() {
   const hasClosures = data ? data.closures.length > 0 : false;
 
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle>오늘의 학식</CardTitle>
-        <CardDescription>
+    <Card className="h-full animate-fadeUp">
+      <CardHeader className="flex-row items-center justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <Utensils size={18} className="shrink-0 text-primary" aria-hidden="true" />
+          <CardTitle>오늘의 학식</CardTitle>
+        </div>
+        <span className="shrink-0 font-mono text-[11.5px] text-subtle">
           {data ? formatKoreanDate(data.date) : "학생식당 메뉴"}
-        </CardDescription>
+        </span>
       </CardHeader>
       <CardContent>
         {isLoading ? <TodayMealSkeleton /> : null}
@@ -68,39 +69,34 @@ export function TodayMealCard() {
         ) : null}
 
         {data && (hasMeals || hasClosures) ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {hasClosures ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {data.closures.map((closure) => (
-                  <Badge key={`${closure.restaurant}-${closure.reason}`} variant="outline">
+                  <Badge key={`${closure.restaurant}-${closure.reason}`} variant="warning">
                     휴무: {closure.restaurant} · {closure.reason}
                   </Badge>
                 ))}
               </div>
             ) : null}
 
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               {Object.entries(groupedMeals).map(([restaurant, meals]) => (
-                <section key={restaurant} className="rounded-md border border-border p-4">
-                  <h4 className="text-sm font-semibold text-foreground">{restaurant}</h4>
-                  <div className="mt-3 space-y-3">
+                <section
+                  key={restaurant}
+                  className="rounded-[12px] border border-hairline bg-surface p-3.5"
+                >
+                  <h4 className="text-[13.5px] font-bold text-foreground">{restaurant}</h4>
+                  <div className="mt-2.5 space-y-3">
                     {meals.map((meal) => (
-                      <div
-                        key={`${meal.restaurant}-${meal.type}-${meal.corner}`}
-                        className="grid gap-2 sm:grid-cols-[5rem_1fr]"
-                      >
-                        <div className="flex items-start gap-2">
-                          <Badge variant="secondary">{mealTypeLabel(meal.type)}</Badge>
-                          <span className="text-xs text-muted-foreground sm:hidden">{meal.corner}</span>
+                      <div key={`${meal.restaurant}-${meal.type}-${meal.corner}`}>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge>{mealTypeLabel(meal.type)}</Badge>
+                          {meal.corner ? <Badge variant="mint">{meal.corner}</Badge> : null}
                         </div>
-                        <div className="min-w-0">
-                          <p className="hidden text-xs font-medium text-muted-foreground sm:block">
-                            {meal.corner}
-                          </p>
-                          <p className="mt-1 text-sm leading-6 text-foreground">
-                            {meal.menu.length > 0 ? meal.menu.join(", ") : "메뉴 준비 중"}
-                          </p>
-                        </div>
+                        <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
+                          {meal.menu.length > 0 ? meal.menu.join(", ") : "메뉴 준비 중"}
+                        </p>
                       </div>
                     ))}
                   </div>
