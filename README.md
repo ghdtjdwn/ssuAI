@@ -3,24 +3,31 @@
 [![CI](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml)
 
 숭실대학교 MCP 서버 [ssuMCP](https://github.com/hoeongj/ssuMCP)를 소비하는 Next.js 웹 클라이언트.  
-카드형 대시보드와 자연어 챗봇으로 공개 캠퍼스 정보와 개인 학사 정보를 조회한다.
+5개 화면(홈·챗봇·학사·도서관·캠퍼스)과 자연어 챗봇으로 공개 캠퍼스 정보와 개인 학사 정보를 조회한다.
 
 | | URL |
 |--|-----|
+| 홈 (AI 브리핑 + 커스터마이즈 위젯) | <https://ssuai.vercel.app/> |
 | 챗봇 | <https://ssuai.vercel.app/chat> |
-| 대시보드 | <https://ssuai.vercel.app/> |
+| 학사 | <https://ssuai.vercel.app/academics> |
+| 도서관 | <https://ssuai.vercel.app/library> |
+| 캠퍼스 | <https://ssuai.vercel.app/campus> |
 
 ---
 
-## 미리보기
+## 화면 구성 (2026-07-02 전면 리디자인 — [ADR 0010](docs/adr/0010-ui-redesign.md))
 
-로그인 없이 보이는 대시보드. 학식·시설·도서관·공지부터 u-SAINT/LMS 연동 개인 정보까지 한 화면의 카드로 모았다.
+단일 디자인 시스템(숭실 블루 + 민트 토큰, Pretendard/JetBrains Mono, 시스템 추종 다크모드) 위에서 데스크톱은 사이드바+멀티컬럼, 모바일은 하단 탭바+단일 컬럼으로 레이아웃만 분기한다.
+
+- **홈** — AI 오늘의 브리핑 히어로(연동 데이터 기반 요약) · 우선순위 카드 3 · 위젯 13종 커스터마이즈 그리드(순서/크기/표시/밀도, localStorage 영속)
+- **챗봇** — SSE 스트리밍 + HITL 승인 카드(예약 등 실행 액션은 승인 후 실행)
+- **학사** — 주간 시간표 그리드 · 졸업요건 · 성적 · 채플 · 장학 · LMS 과제 (u-SAINT 로그인)
+- **도서관** — 실시간 좌석 3-뷰(도넛 오버뷰/공간/전체) · 좌석 추천→예약 · 대기 등록 · 대출 · 도서 검색
+- **캠퍼스** — 학식(오늘/주간)·기숙사 식단 · 공지(카테고리 필터) · 시설 검색 · AI 근거 검색 진입
+
+> 아래 미리보기 이미지는 리디자인 이전 UI 캡처로, 교체 예정.
 
 ![대시보드 — 오늘의 학식 · 시설 검색 · 주간 식단](docs/assets/dashboard.png)
-
-자연어 챗봇(`/chat`) — 추천 질문으로 바로 시작하고, 공개/인증 도구 모드를 구분한다.
-
-![챗봇 — 추천 질문과 공개 도구 모드](docs/assets/chat.png)
 
 | 도서관 좌석 실시간 현황 · 도서 검색 | 개인 학사 정보 (로그인 연동) |
 |---|---|
