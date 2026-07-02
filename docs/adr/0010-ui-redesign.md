@@ -33,6 +33,8 @@
 
 리디자인 중 발견: `getLibrarySeatRecommendations`가 응답을 **bare 배열 + 숫자 `externalSeatId`**로 타이핑하고 있었으나, 실제 웹 API(`GET /api/library/reservations/recommend`)는 `LibrarySeatRecommendationResponse` **envelope**(`{floor, floorLabel, …, recommendations: [...]}`)에 **문자열 `externalSeatId` + 구조화 `attributes` 객체**를 담아 반환한다. 그 결과 추천 패널이 `recommendations?.length`를 항상 falsy로 판정해 **조용히 "좌석 없음" 빈 상태만 렌더**하고 있었다(타입은 통과·테스트 mock도 배열이라 그린 — 침묵 회귀의 전형). 프론트 타입을 백엔드 record와 일치시키고, `prepare`에는 `Number(externalSeatId)`를 전달하도록 수정. 상세 기록은 ssuMCP 트러블슈팅 로그 참조.
 
+> **후속 조치 (2026-07-02)**: 같은 유형의 침묵 회귀를 구조적으로 차단하기 위해 네트워크 경계에 런타임 스키마 검증을 추가했다. `fetchJsonParsed`(`lib/api/schema.ts`)가 `fetchJson`의 envelope 해제 결과를 zod 스키마로 검증하고, 불일치 시 요청 경로+필드별 이슈 요약을 담은 `ApiSchemaError`를 던져 React Query가 빈 UI 대신 에러 상태를 표면화한다(fail-loud). 적용 대상은 이미 사고가 났던 고위험 도서관 엔드포인트 3종(좌석 추천·예약 prepare·좌석 현황)이며, 스키마는 loose object로 정의해 백엔드의 additive 필드 추가에는 깨지지 않고, `z.ZodType<Interface>` 주석으로 TS 계약과의 드리프트를 컴파일 타임에 잡는다.
+
 ## 3 Core Interview Questions (예상 면접 질문)
 
 ### Q1. 디자인 토큰을 정적 Tailwind 값과 CSS 변수로 이원화한 이유는?

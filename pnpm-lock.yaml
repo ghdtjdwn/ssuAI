@@ -38,6 +38,9 @@ importers:
       tailwind-merge:
         specifier: 3.6.0
         version: 3.6.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 6.9.1

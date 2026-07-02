@@ -1,5 +1,15 @@
+import { z } from "zod";
+
 import { fetchJson } from "./client";
-import type { LibraryBookSearchResponse, LibraryFloorCode, LibraryLoansResponse, LibrarySeatStatusResponse } from "./types";
+import { fetchJsonParsed } from "./schema";
+import type {
+  LibraryBookSearchResponse,
+  LibraryFloorCode,
+  LibraryLoansResponse,
+  LibrarySeatItem,
+  LibrarySeatStatusResponse,
+  LibrarySeatZone,
+} from "./types";
 
 export interface McpLibraryCallbackRequest {
   state: string;
@@ -14,8 +24,38 @@ export function completeMcpLibraryAuth(req: McpLibraryCallbackRequest) {
   });
 }
 
+// Runtime response schemas (ADR 0010 §5 follow-up): validate the envelope-unwrapped
+// payload of the highest-risk library endpoints at the network boundary. Schemas are
+// loose objects, so ADDITIVE backend fields never break the client; annotating each
+// schema as `z.ZodType<Interface>` keeps it from drifting away from the TS contract.
+
+const librarySeatItemSchema: z.ZodType<LibrarySeatItem> = z.looseObject({
+  id: z.string(),
+  label: z.string(),
+  status: z.enum(["available", "occupied", "outOfService"]),
+});
+
+const librarySeatZoneSchema: z.ZodType<LibrarySeatZone> = z.looseObject({
+  label: z.string(),
+  total: z.number(),
+  available: z.number(),
+  seatIds: z.array(z.string()),
+  seats: z.array(librarySeatItemSchema),
+});
+
+export const librarySeatStatusResponseSchema: z.ZodType<LibrarySeatStatusResponse> = z.looseObject({
+  floor: z.literal([2, 5, 6]),
+  floorLabel: z.string(),
+  totalSeats: z.number(),
+  availableSeats: z.number(),
+  reservedSeats: z.number(),
+  outOfServiceSeats: z.number(),
+  fetchedAt: z.string(),
+  zones: z.array(librarySeatZoneSchema),
+});
+
 export function getLibrarySeatStatus(floor: LibraryFloorCode) {
-  return fetchJson<LibrarySeatStatusResponse>(`/api/library/seats?floor=${floor}`, {
+  return fetchJsonParsed(`/api/library/seats?floor=${floor}`, librarySeatStatusResponseSchema, {
     credentials: "include",
   });
 }
@@ -85,6 +125,44 @@ export interface LibrarySeatRecommendationResponse {
   recommendations: LibrarySeatRecommendation[];
 }
 
+const librarySeatAttributesSchema: z.ZodType<LibrarySeatAttributes> = z.looseObject({
+  window: z.boolean(),
+  outlet: z.boolean(),
+  standing: z.boolean(),
+  edge: z.boolean(),
+  quiet: z.boolean(),
+  nearEntrance: z.boolean(),
+});
+
+const librarySeatRecommendationSchema: z.ZodType<LibrarySeatRecommendation> = z.looseObject({
+  seatId: z.string(),
+  externalSeatId: z.string(),
+  label: z.string(),
+  roomCode: z.string(),
+  roomName: z.string(),
+  zone: z.string().nullable(),
+  seatType: z.string().nullable(),
+  audience: z.string().nullable(),
+  status: z.string().nullable(),
+  score: z.number(),
+  matchedPreferences: z.array(z.string()),
+  missingPreferences: z.array(z.string()),
+  attributes: librarySeatAttributesSchema.nullable(),
+  note: z.string().nullable(),
+});
+
+export const librarySeatRecommendationResponseSchema: z.ZodType<LibrarySeatRecommendationResponse> =
+  z.looseObject({
+    floor: z.number(),
+    floorLabel: z.string(),
+    requestedLimit: z.number(),
+    availabilitySource: z.string(),
+    message: z.string().nullable(),
+    excludedRooms: z.array(z.string()),
+    warnings: z.array(z.string()),
+    recommendations: z.array(librarySeatRecommendationSchema),
+  });
+
 export type ReservationType = "RESERVE" | "CANCEL" | "SWAP";
 
 export interface LibraryReservationPrepareRequest {
@@ -97,8 +175,17 @@ export interface LibraryReservationPrepareResponse {
   actionId: number;
   actionType: string;
   summary: string;
+  /** ISO-8601 string as sent by the backend — validated as string, never coerced. */
   expiresAt: string;
 }
+
+export const libraryReservationPrepareResponseSchema: z.ZodType<LibraryReservationPrepareResponse> =
+  z.looseObject({
+    actionId: z.number(),
+    actionType: z.string(),
+    summary: z.string(),
+    expiresAt: z.string(),
+  });
 
 export interface LibraryReservationConfirmResponse {
   status: "SUCCESS" | "PROCESSING" | "FAILED_RACE" | "TIMEOUT" | "FAILED_AUTH" | "FAILED_UPSTREAM";
@@ -137,8 +224,9 @@ export function getLibrarySeatRecommendations(
   const params = new URLSearchParams({ floor: String(floor) });
   if (roomIds) params.set("roomIds", roomIds);
   if (attributes) params.set("attributes", attributes);
-  return fetchJson<LibrarySeatRecommendationResponse>(
+  return fetchJsonParsed(
     `/api/library/reservations/recommend?${params}`,
+    librarySeatRecommendationResponseSchema,
     {
       credentials: "include",
     },
@@ -146,7 +234,7 @@ export function getLibrarySeatRecommendations(
 }
 
 export function prepareReservation(req: LibraryReservationPrepareRequest) {
-  return fetchJson<LibraryReservationPrepareResponse>("/api/library/reservations/prepare", {
+  return fetchJsonParsed("/api/library/reservations/prepare", libraryReservationPrepareResponseSchema, {
     method: "POST",
     credentials: "include",
     body: JSON.stringify(req),
