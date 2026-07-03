@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml)
 
+> 🇺🇸 English version: [README.en.md](README.en.md)
+
 숭실대학교 MCP 서버 [ssuMCP](https://github.com/hoeongj/ssuMCP)를 소비하는 Next.js 웹 클라이언트.  
 5개 화면(홈·챗봇·학사·도서관·캠퍼스)과 자연어 챗봇으로 공개 캠퍼스 정보와 개인 학사 정보를 조회한다.
 
