@@ -21,10 +21,13 @@ import {
   readAgentStream,
   type InterruptData,
 } from "@/lib/api/agent";
+import {
+  clearAgentThread,
+  getOrCreateAgentThreadId,
+} from "@/lib/agentThread";
 import { cn } from "@/lib/utils";
 
 const MAX_MESSAGE_LENGTH = 1000;
-const THREAD_ID_KEY = "ssuagent_thread_id";
 
 const SAMPLE_PROMPTS = [
   "도서관 5층 빈 자리 있어?",
@@ -50,24 +53,10 @@ function nextId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function getOrCreateThreadId(): string {
-  if (typeof window === "undefined") return nextId();
-  const stored = sessionStorage.getItem(THREAD_ID_KEY);
-  if (stored) return stored;
-  const fresh = nextId();
-  sessionStorage.setItem(THREAD_ID_KEY, fresh);
-  return fresh;
-}
-
-function clearThread() {
-  if (typeof window === "undefined") return;
-  sessionStorage.removeItem(THREAD_ID_KEY);
-}
-
 export function ChatPanel() {
   const { accessToken, isAuthenticated } = useSaintAuth();
 
-  const [threadId, setThreadId] = useState<string>(getOrCreateThreadId);
+  const [threadId, setThreadId] = useState<string>(getOrCreateAgentThreadId);
   const [mcpSessionId, setMcpSessionId] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -111,8 +100,11 @@ export function ChatPanel() {
     if (!wasAuthenticated || isAuthenticated) return;
 
     setMcpSessionId(null);
-    clearThread();
-    setThreadId(getOrCreateThreadId());
+    // useSaintAuth.logout() already clears the stored id (it must work even
+    // when this panel is unmounted); this keeps the mounted panel's state in
+    // sync and covers non-logout auth losses (e.g. refresh expiry).
+    clearAgentThread();
+    setThreadId(getOrCreateAgentThreadId());
     setMessages([]);
     streamingContentRef.current = "";
     setStreamingContent("");

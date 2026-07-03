@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { clearAgentThread } from "@/lib/agentThread";
 import { callLogout, fetchMe, refreshAccessToken, type AuthMe } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/types";
 
@@ -76,6 +77,12 @@ export function SaintAuthProvider({ children }: { children: ReactNode }) {
     queryClient.removeQueries({ queryKey: ["saint"] });
     queryClient.removeQueries({ queryKey: ["lms"] });
     queryClient.removeQueries({ queryKey: ["library"] });
+    // Drop the ssuAgent conversation thread id: the agent binds a thread to
+    // the mcp_session_id that first used it, and that session rotates on
+    // re-login — a surviving thread id would 403 the same user after they
+    // reconnect. Must live here (not only in the chat panel) so logging out
+    // from any tab clears it even when the chat UI is unmounted.
+    clearAgentThread();
   }, [queryClient]);
 
   // Try to hydrate on first mount. If the user has a valid refresh cookie
