@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Sparkles } from "lucide-react";
+import { Lightbulb, RefreshCw, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { useLmsAssignments } from "@/hooks/useLmsAssignments";
@@ -13,8 +13,10 @@ import {
   findMajorRequirement,
   findRequirement,
   greetingForHour,
+  todaySuggestion,
 } from "./home-utils";
 import { useLibraryZones } from "./useLibraryZones";
+import { upcomingDeadlines } from "./widgets/DeadlineWidget";
 
 /** Query-key prefixes the refresh button invalidates (everything home shows). */
 const HOME_QUERY_KEYS: readonly (readonly string[])[] = [
@@ -82,6 +84,16 @@ export function BriefingHero() {
         ? "오늘도 차분하게 시작해봐요. 아래 요약에서 하루를 확인하세요."
         : "u-SAINT·LMS·도서관을 연결하면 나에게 맞는 브리핑을 만들어드려요.";
 
+  // "What to do today" — one concrete, gently-phrased suggestion built from the
+  // same connected data (rule-based; see todaySuggestion). Null for anonymous.
+  const nearest = upcomingDeadlines(lmsQ.data?.items ?? [], 1)[0] ?? null;
+  const suggestion = todaySuggestion({
+    nearestDeadline: nearest ? { title: nearest.title, dday: nearest.dday } : null,
+    chapelRemaining: chapelReq ? chapelReq.remaining : null,
+    bestSeat: bestZone ? { label: bestZone.label, available: bestZone.available } : null,
+    isAuthenticated,
+  });
+
   const greeting = user
     ? `${greetingForHour(new Date().getHours())}, ${user.name}님`
     : "환영해요!";
@@ -127,6 +139,12 @@ export function BriefingHero() {
               {summary}
             </p>
           )}
+          {!refreshing && suggestion ? (
+            <p className="mt-2.5 flex max-w-xl items-start gap-1.5 rounded-[10px] bg-white/10 px-3 py-2 text-[12.5px] leading-relaxed text-primary-50 sm:text-[13px]">
+              <Lightbulb size={14} className="mt-0.5 shrink-0 text-mint-glow-soft" aria-hidden />
+              <span>{suggestion}</span>
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
