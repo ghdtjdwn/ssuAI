@@ -21,7 +21,7 @@ Five screens (Home · Chatbot · Academics · Library · Campus) plus a natural-
 
 On top of a single design system (Soongsil blue + mint tokens, Pretendard/JetBrains Mono, system-following dark mode), only the layout branches: sidebar + multi-column on desktop, bottom tab bar + single column on mobile.
 
-- **Home** — AI daily-briefing hero (a summary built from linked data) · 3 priority cards · customizable grid of 13 widgets (order/size/visibility/density, persisted in localStorage)
+- **Home** — AI daily-briefing hero (a summary built from linked data) · 3 priority cards · customizable grid of 14 widgets (order/size/visibility/density, persisted in localStorage)
 - **Chatbot** — SSE streaming + HITL approval cards (state-changing actions such as reservations run only after approval)
 - **Academics** — weekly timetable grid · graduation requirements · grades · chapel · scholarships · LMS assignments (u-SAINT login)
 - **Library** — real-time seats in 3 views (donut overview / rooms / full map) · seat recommendation → reservation · waitlist registration · loans · book search
