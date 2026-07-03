@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { CalendarWidget } from "./CalendarWidget";
 import { ChapelWidget } from "./ChapelWidget";
 import { DeadlineWidget } from "./DeadlineWidget";
 import { DormMealWidget } from "./DormMealWidget";
@@ -46,9 +47,6 @@ export interface HomeWidgetDef {
 /**
  * Home widget catalog. Order here = default display order.
  * Default ON = the six 오늘-section widgets (design §1 홈).
- *
- * NOTE: the design's 학사일정(academic calendar) widget is intentionally
- * omitted — lib/api exposes no calendar endpoint.
  */
 export const WIDGET_REGISTRY: HomeWidgetDef[] = [
   { id: "schedule", section: "오늘", title: "다음 일정", icon: Calendar, defaultOn: true, defaultSpan: 1, component: NextScheduleWidget },
@@ -64,6 +62,7 @@ export const WIDGET_REGISTRY: HomeWidgetDef[] = [
   { id: "lms", section: "학사", title: "LMS 과제·자료", icon: MonitorPlay, defaultOn: false, defaultSpan: 1, component: LmsWidget },
   { id: "loans", section: "도서관", title: "대출 현황", icon: BookOpen, defaultOn: false, defaultSpan: 1, component: LoansWidget },
   { id: "dorm", section: "캠퍼스", title: "기숙사 식단", icon: UtensilsCrossed, defaultOn: false, defaultSpan: 1, component: DormMealWidget },
+  { id: "calendar", section: "캠퍼스", title: "학사일정", icon: CalendarDays, defaultOn: false, defaultSpan: 1, component: CalendarWidget },
 ];
 
 export const WIDGET_MAP: ReadonlyMap<string, HomeWidgetDef> = new Map(

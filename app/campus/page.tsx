@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Sparkles, Utensils } from "lucide-react";
 import Link from "next/link";
 
+import { AcademicCalendarCard } from "@/components/campus/AcademicCalendarCard";
 import { DormWeeklyCard } from "@/components/dorm/DormWeeklyCard";
 import { FacilitySearchCard } from "@/components/facility/FacilitySearchCard";
 import { TodayMealCard } from "@/components/meal/TodayMealCard";
@@ -86,6 +87,7 @@ export default function CampusPage() {
         </section>
 
         <DormWeeklyCard />
+        <AcademicCalendarCard />
       </div>
 
       {/* Right column: notices, evidence search, facilities */}
