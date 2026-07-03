@@ -6,23 +6,20 @@ import { Fragment } from "react";
 import { getErrorStateDetails } from "@/components/shared/ErrorState";
 import { useAcademicCalendar } from "@/hooks/useAcademicCalendar";
 import type { AcademicCalendarEvent } from "@/lib/api/calendar";
+import { isOngoing, pickRelevantEvents } from "@/lib/calendarEvents";
 import { getSeoulDateString } from "@/lib/utils";
 
 import { WidgetEmpty, WidgetError, WidgetFrame, WidgetSkeleton } from "./WidgetFrame";
 
-/** Events from today onward, soonest first; falls back to the latest past events. */
-function upcoming(events: AcademicCalendarEvent[], limit: number): AcademicCalendarEvent[] {
+/** "진행중" while inside a multi-day range, otherwise D-day countdown to the start. */
+function ddayLabel(item: AcademicCalendarEvent): string {
   const today = getSeoulDateString();
-  const sorted = [...events].sort((a, b) => a.date.localeCompare(b.date));
-  const ahead = sorted.filter((e) => e.date >= today);
-  return (ahead.length > 0 ? ahead : sorted.slice(-limit)).slice(0, limit);
-}
-
-function ddayLabel(dateIso: string): string {
-  const today = getSeoulDateString();
-  if (dateIso === today) return "D-day";
+  if (isOngoing(item, today)) {
+    return item.date === today && !item.endDate ? "D-day" : "진행중";
+  }
   const diff = Math.round(
-    (Date.parse(`${dateIso}T00:00:00+09:00`) - Date.parse(`${today}T00:00:00+09:00`)) / 86_400_000,
+    (Date.parse(`${item.date}T00:00:00+09:00`) - Date.parse(`${today}T00:00:00+09:00`)) /
+      86_400_000,
   );
   return diff > 0 ? `D-${diff}` : `D+${-diff}`;
 }
@@ -37,7 +34,7 @@ export function CalendarWidget() {
   } else if (errorState) {
     body = <WidgetError onRetry={() => void refetch()} />;
   } else if (data) {
-    const items = upcoming(data.events, 3);
+    const items = pickRelevantEvents(data.events, 3, getSeoulDateString());
     body =
       items.length === 0 ? (
         <WidgetEmpty title="학사일정 정보가 없어요" />
@@ -51,7 +48,7 @@ export function CalendarWidget() {
                   {item.event}
                 </span>
                 <span className="shrink-0 font-mono text-[11px] font-bold text-primary">
-                  {ddayLabel(item.date)}
+                  {ddayLabel(item)}
                 </span>
               </div>
             </Fragment>

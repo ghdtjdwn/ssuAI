@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAcademicCalendar } from "@/hooks/useAcademicCalendar";
 import type { AcademicCalendarEvent } from "@/lib/api/calendar";
+import { isOngoing, pickRelevantEvents } from "@/lib/calendarEvents";
 import { getSeoulDateString } from "@/lib/utils";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -19,12 +20,13 @@ function formatDate(iso: string): string {
   return `${month}.${day} (${weekday})`;
 }
 
-/** Upcoming events (today onward) first; falls back to the latest past events. */
-function pickEvents(events: AcademicCalendarEvent[], limit: number): AcademicCalendarEvent[] {
-  const today = getSeoulDateString();
-  const sorted = [...events].sort((a, b) => a.date.localeCompare(b.date));
-  const ahead = sorted.filter((e) => e.date >= today);
-  return (ahead.length > 0 ? ahead : sorted.slice(-limit)).slice(0, limit);
+/** Single day → "MM.DD (요일)"; range → "MM.DD (요일) ~ MM.DD". */
+function formatPeriod(item: AcademicCalendarEvent): string {
+  const start = formatDate(item.date);
+  if (!item.endDate) return start;
+  const endParts = item.endDate.split("-");
+  if (endParts.length !== 3) return start;
+  return `${start} ~ ${endParts[1]}.${endParts[2]}`;
 }
 
 export function AcademicCalendarCard() {
@@ -63,7 +65,7 @@ export function AcademicCalendarCard() {
           </div>
         ) : (
           (() => {
-            const items = pickEvents(data?.events ?? [], 8);
+            const items = pickRelevantEvents(data?.events ?? [], 8, today);
             if (items.length === 0) {
               return (
                 <p className="py-3 text-center text-[13px] text-muted-foreground">
@@ -74,7 +76,8 @@ export function AcademicCalendarCard() {
             return (
               <ul className="flex flex-col">
                 {items.map((item, i) => {
-                  const isToday = item.date === today;
+                  // Highlight today's single-day events and ranges that contain today.
+                  const isToday = isOngoing(item, today);
                   return (
                     <li
                       key={`${item.date}-${i}`}
@@ -87,7 +90,7 @@ export function AcademicCalendarCard() {
                           isToday ? "text-primary" : "text-subtle"
                         }`}
                       >
-                        {formatDate(item.date)}
+                        {formatPeriod(item)}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
                         {item.event}
