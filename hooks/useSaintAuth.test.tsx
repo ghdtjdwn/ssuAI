@@ -105,6 +105,9 @@ describe("SaintAuthProvider", () => {
       enrollmentStatus: null,
     });
     vi.mocked(callLogout).mockResolvedValue();
+    // The agent thread is bound to the mcp session, which rotates on
+    // re-login — logout must drop it even with the chat UI unmounted.
+    sessionStorage.setItem("ssuagent_thread_id", "thread-before-logout");
 
     renderWithClient(
       <SaintAuthProvider>
@@ -123,6 +126,7 @@ describe("SaintAuthProvider", () => {
     expect(callLogout).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("auth").textContent).toBe("false");
     expect(screen.getByTestId("name").textContent).toBe("");
+    expect(sessionStorage.getItem("ssuagent_thread_id")).toBeNull();
   });
 
   it("logout still clears state when the server call fails", async () => {
@@ -140,6 +144,7 @@ describe("SaintAuthProvider", () => {
       new ApiError("HTTP_500", "boom", "trace-1", 500),
     );
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    sessionStorage.setItem("ssuagent_thread_id", "thread-before-logout");
 
     renderWithClient(
       <SaintAuthProvider>
@@ -159,6 +164,7 @@ describe("SaintAuthProvider", () => {
     expect(warn).toHaveBeenCalled();
     expect(screen.getByTestId("auth").textContent).toBe("false");
     expect(screen.getByTestId("name").textContent).toBe("");
+    expect(sessionStorage.getItem("ssuagent_thread_id")).toBeNull();
   });
 
   it("refresh() returns false when the refresh call throws", async () => {
