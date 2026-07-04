@@ -41,6 +41,10 @@ export function SaintAuthProvider({ children }: { children: ReactNode }) {
   // Stores the access token TTL returned by the backend so the auto-refresh
   // timer can fire ~2 min before actual expiry instead of using a hardcoded value.
   const accessTtlRef = useRef<number>(900);
+  // Coalesces concurrent logout() calls. Every SAINT/LMS/library card mounts a
+  // session guard that logs out on SAINT_SESSION_EXPIRED, so a single expiry
+  // would otherwise fire ~5 simultaneous /api/auth/logout POSTs + cache clears.
+  const logoutInFlight = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(async (): Promise<boolean> => {
     setIsLoading(true);
@@ -64,25 +68,37 @@ export function SaintAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const logout = useCallback(async () => {
-    try {
-      await callLogout();
-    } catch (error) {
-      console.warn("ssuAI logout cookie clear failed", error);
+  const logout = useCallback(async (): Promise<void> => {
+    // If a logout is already running, join it instead of firing another.
+    if (logoutInFlight.current) {
+      return logoutInFlight.current;
     }
-    setAccessToken(null);
-    setUser(null);
-    // Drop cached private data so a different account on the same browser
-    // never sees the previous user's grades/assignments/loans.
-    queryClient.removeQueries({ queryKey: ["saint"] });
-    queryClient.removeQueries({ queryKey: ["lms"] });
-    queryClient.removeQueries({ queryKey: ["library"] });
-    // Drop the ssuAgent conversation thread id: the agent binds a thread to
-    // the mcp_session_id that first used it, and that session rotates on
-    // re-login — a surviving thread id would 403 the same user after they
-    // reconnect. Must live here (not only in the chat panel) so logging out
-    // from any tab clears it even when the chat UI is unmounted.
-    clearAgentThread();
+    const run = (async () => {
+      try {
+        await callLogout();
+      } catch (error) {
+        console.warn("ssuAI logout cookie clear failed", error);
+      }
+      setAccessToken(null);
+      setUser(null);
+      // Drop cached private data so a different account on the same browser
+      // never sees the previous user's grades/assignments/loans.
+      queryClient.removeQueries({ queryKey: ["saint"] });
+      queryClient.removeQueries({ queryKey: ["lms"] });
+      queryClient.removeQueries({ queryKey: ["library"] });
+      // Drop the ssuAgent conversation thread id: the agent binds a thread to
+      // the mcp_session_id that first used it, and that session rotates on
+      // re-login — a surviving thread id would 403 the same user after they
+      // reconnect. Must live here (not only in the chat panel) so logging out
+      // from any tab clears it even when the chat UI is unmounted.
+      clearAgentThread();
+    })();
+    logoutInFlight.current = run;
+    try {
+      await run;
+    } finally {
+      logoutInFlight.current = null;
+    }
   }, [queryClient]);
 
   // Try to hydrate on first mount. If the user has a valid refresh cookie
