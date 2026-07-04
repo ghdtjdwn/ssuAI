@@ -8,6 +8,7 @@ import { useSaintAuth } from "@/hooks/useSaintAuth";
 import { useSaintScholarships } from "@/hooks/useSaintScholarships";
 import { useSaintSessionGuard } from "@/hooks/useSaintSessionGuard";
 import type { ScholarshipEntry } from "@/lib/api/types";
+import { formatCount } from "@/lib/utils";
 
 import { WidgetConnect, WidgetEmpty, WidgetError, WidgetFrame, WidgetSkeleton } from "./WidgetFrame";
 
@@ -48,7 +49,7 @@ export function ScholarshipWidget() {
                   </p>
                 </div>
                 <span className="shrink-0 font-mono text-[12.5px] font-bold text-success">
-                  {entry.receivedAmount.toLocaleString("ko-KR")}
+                  {formatCount(entry.receivedAmount)}
                 </span>
               </div>
             </Fragment>
