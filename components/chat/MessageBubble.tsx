@@ -1,4 +1,5 @@
 import { Loader2 } from "lucide-react";
+import { memo } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -11,7 +12,15 @@ interface MessageBubbleProps {
   model?: string | null;
 }
 
-export function MessageBubble({ role, content, isLoading = false, model }: MessageBubbleProps) {
+// Memoized: during streaming the whole thread re-renders on every token, but
+// the already-settled bubbles have unchanged (primitive) props, so memo keeps
+// them from re-rendering — only the streaming bubble updates.
+export const MessageBubble = memo(function MessageBubble({
+  role,
+  content,
+  isLoading = false,
+  model,
+}: MessageBubbleProps) {
   const isUser = role === "user";
 
   return (
@@ -40,4 +49,4 @@ export function MessageBubble({ role, content, isLoading = false, model }: Messa
       </div>
     </div>
   );
-}
+});
