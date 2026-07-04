@@ -6,9 +6,7 @@ import {
   cancelWait,
   confirmReservation,
   getCurrentWait,
-  prepareReservation,
   registerWait,
-  type LibraryReservationPrepareRequest,
   type LibraryWaitRequest,
 } from "@/lib/api/library";
 import { ApiError } from "@/lib/api/types";
@@ -29,12 +27,6 @@ export function isLibraryAuthError(error: unknown): boolean {
       error.httpStatus === 401 ||
       error.code === "LIBRARY_SESSION_REQUIRED")
   );
-}
-
-export function usePrepareReservation() {
-  return useMutation({
-    mutationFn: (req: LibraryReservationPrepareRequest) => prepareReservation(req),
-  });
 }
 
 export function useConfirmReservation() {

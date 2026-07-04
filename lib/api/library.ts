@@ -269,8 +269,3 @@ export function cancelWait() {
   });
 }
 
-export function getMyLibrarySeat() {
-  return fetchJson<unknown>("/api/library/reservations/my-seat", {
-    credentials: "include",
-  });
-}
