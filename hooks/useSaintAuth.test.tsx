@@ -204,4 +204,58 @@ describe("SaintAuthProvider", () => {
 
     expect(returned).toBe(false);
   });
+
+  it("coalesces concurrent refresh() calls into one request", async () => {
+    // On the /auth/return full page load the provider hydration effect and the
+    // return page effect both call refresh() at once. Without single-flighting,
+    // the second POST /api/auth/refresh presents an already-rotated token and
+    // 401s (backend denylist), which surfaced as a first-attempt login failure.
+    let resolveRefresh: (v: { accessToken: string; accessTtlSeconds: number }) => void = () => {};
+    vi.mocked(refreshAccessToken).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    vi.mocked(fetchMe).mockResolvedValue({
+      studentId: "20231234",
+      name: "홍길동",
+      major: "컴퓨터학부",
+      enrollmentStatus: "재학",
+    });
+
+    function Caller() {
+      const { refresh } = useSaintAuth();
+      return (
+        <button type="button" onClick={() => void refresh()}>
+          go
+        </button>
+      );
+    }
+
+    renderWithClient(
+      <SaintAuthProvider>
+        <Caller />
+      </SaintAuthProvider>,
+    );
+
+    // The mount hydration refresh is already in flight (pending). Fire a second
+    // refresh() concurrently — it must join the in-flight call, not start a new one.
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+    });
+
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRefresh({ accessToken: "access.jwt", accessTtlSeconds: 900 });
+    });
+
+    // The single coalesced refresh completed (fetchMe ran once), and there was
+    // still exactly one upstream refresh call for both concurrent callers.
+    await waitFor(() => {
+      expect(fetchMe).toHaveBeenCalledTimes(1);
+    });
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+  });
 });
