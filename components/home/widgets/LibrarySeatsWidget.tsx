@@ -22,7 +22,6 @@ export function LibrarySeatsWidget() {
   } else if (zones.length === 0) {
     body = <WidgetEmpty title="좌석 정보가 없어요" />;
   } else {
-    const tones = { success: "success", warning: "warning", danger: "danger" } as const;
     body = (
       <div>
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -43,7 +42,7 @@ export function LibrarySeatsWidget() {
                 <ProgressBar
                   value={zone.available}
                   max={zone.total}
-                  tone={tones[tone]}
+                  tone={tone}
                   className="h-[7px]"
                 />
               </div>
