@@ -1,20 +1,32 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useSaintAuth, type SaintAuthState } from "@/hooks/useSaintAuth";
-import { createMcpWebSession } from "@/lib/api/agent";
+import { AgentStreamError, createMcpWebSession, startAgentStream } from "@/lib/api/agent";
 
 vi.mock("@/hooks/useSaintAuth", () => ({
   useSaintAuth: vi.fn(),
 }));
 
-vi.mock("@/lib/api/agent", () => ({
-  createMcpWebSession: vi.fn(),
-  readAgentStream: vi.fn(),
-  resumeAgentStream: vi.fn(),
-  startAgentStream: vi.fn(),
-}));
+vi.mock("@/lib/api/agent", () => {
+  // Keep a real AgentStreamError so `instanceof` in the 403 self-heal works.
+  class AgentStreamError extends Error {
+    status: number;
+    constructor(endpoint: string, status: number) {
+      super(`ssuAgent ${endpoint} returned ${status}`);
+      this.name = "AgentStreamError";
+      this.status = status;
+    }
+  }
+  return {
+    AgentStreamError,
+    createMcpWebSession: vi.fn(),
+    readAgentStream: vi.fn(),
+    resumeAgentStream: vi.fn(),
+    startAgentStream: vi.fn(),
+  };
+});
 
 const THREAD_ID_KEY = "ssuagent_thread_id";
 
@@ -77,6 +89,53 @@ describe("ChatPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("공개 도구 모드")).toBeInTheDocument();
     });
+  });
+
+  it("self-heals a 403 by abandoning the orphaned thread and retrying once", async () => {
+    // A stale thread from a prior mcp_session is now owned by someone else.
+    sessionStorage.setItem(THREAD_ID_KEY, "stale-thread");
+    setAuthState({
+      accessToken: "access-token",
+      isAuthenticated: true,
+      user: {
+        enrollmentStatus: "재학",
+        major: "컴퓨터학부",
+        name: "홍길동",
+        studentId: "20231234",
+      },
+    });
+    vi.mocked(createMcpWebSession).mockResolvedValue({
+      expiresAt: "2026-06-30T01:00:00Z",
+      mcpSessionId: "mcp-session-new",
+    });
+    const { readAgentStream } = await import("@/lib/api/agent");
+    vi.mocked(readAgentStream).mockImplementation(async function* () {
+      yield { type: "done" } as never;
+    });
+    // First call 403s (owner mismatch); the retry with a fresh thread succeeds.
+    vi.mocked(startAgentStream)
+      .mockRejectedValueOnce(new AgentStreamError("/agent/stream", 403))
+      .mockResolvedValueOnce({} as Response);
+
+    render(<ChatPanel />);
+    await screen.findByText("MCP 연결됨");
+
+    fireEvent.change(screen.getByPlaceholderText("메시지를 입력하세요"), {
+      target: { value: "졸업까지 어떤 조건들이 남았어?" },
+    });
+    fireEvent.submit(screen.getByPlaceholderText("메시지를 입력하세요").closest("form")!);
+
+    await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(2));
+
+    const firstThread = vi.mocked(startAgentStream).mock.calls[0][1];
+    const retryThread = vi.mocked(startAgentStream).mock.calls[1][1];
+    expect(firstThread).toBe("stale-thread");
+    expect(retryThread).not.toBe("stale-thread");
+    expect(sessionStorage.getItem(THREAD_ID_KEY)).toBe(retryThread);
+    // The 403 was healed, so no error surfaces to the user.
+    expect(
+      screen.queryByText(/returned 403/),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps an existing anonymous thread on first mount", () => {

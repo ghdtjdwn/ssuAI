@@ -12,6 +12,7 @@ import { useSaintAuth } from "@/hooks/useSaintAuth";
 import { useSaintScholarships } from "@/hooks/useSaintScholarships";
 import { useSaintSessionGuard } from "@/hooks/useSaintSessionGuard";
 import { getSsoInitUrl } from "@/lib/api/auth";
+import { formatCount } from "@/lib/utils";
 
 function ScholarshipsSkeleton() {
   return (
@@ -96,7 +97,7 @@ export function ScholarshipsCard() {
                     </div>
                   </div>
                   <span className="shrink-0 font-mono text-[13px] font-bold text-success">
-                    {scholarship.receivedAmount.toLocaleString()}원
+                    {formatCount(scholarship.receivedAmount)}원
                   </span>
                 </li>
               ))}

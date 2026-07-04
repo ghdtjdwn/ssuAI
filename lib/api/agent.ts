@@ -67,6 +67,16 @@ export async function* readAgentStream(response: Response): AsyncGenerator<Agent
   }
 }
 
+/** Carries the HTTP status so callers can react (e.g. a 403 owner mismatch). */
+export class AgentStreamError extends Error {
+  readonly status: number;
+  constructor(endpoint: string, status: number) {
+    super(`ssuAgent ${endpoint} returned ${status}`);
+    this.name = "AgentStreamError";
+    this.status = status;
+  }
+}
+
 /** Start or continue a conversation. Returns the fetch Response for SSE reading. */
 export async function startAgentStream(
   message: string,
@@ -79,7 +89,7 @@ export async function startAgentStream(
     body: JSON.stringify({ message, thread_id: threadId, mcp_session_id: mcpSessionId }),
   });
   if (!response.ok) {
-    throw new Error(`ssuAgent /agent/stream returned ${response.status}`);
+    throw new AgentStreamError("/agent/stream", response.status);
   }
   return response;
 }
@@ -102,7 +112,7 @@ export async function resumeAgentStream(
     }),
   });
   if (!response.ok) {
-    throw new Error(`ssuAgent /agent/resume returned ${response.status}`);
+    throw new AgentStreamError("/agent/resume", response.status);
   }
   return response;
 }

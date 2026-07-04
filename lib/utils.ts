@@ -52,6 +52,23 @@ export function normalizeSearchQuery(query: string) {
   return query.trim().toLowerCase();
 }
 
+/**
+ * Format a numeric field defensively. The saint/scholarship wire types declare
+ * these fields non-null, but u-SAINT occasionally omits one (e.g. a P/F-only
+ * term with no GPA, an awarded-but-undisbursed scholarship). A raw
+ * `value.toFixed()` / `value.toLocaleString()` on the resulting null throws and,
+ * without a boundary, blanks the whole page — so render a dash instead.
+ */
+export function formatFixed(value: number | null | undefined, digits = 2, fallback = "—") {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : fallback;
+}
+
+export function formatCount(value: number | null | undefined, fallback = "—") {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toLocaleString()
+    : fallback;
+}
+
 export function mealTypeLabel(type: string) {
   switch (type) {
     case "ALL_DAY":

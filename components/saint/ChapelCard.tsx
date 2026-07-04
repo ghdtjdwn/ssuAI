@@ -66,13 +66,16 @@ export function ChapelCard() {
   const { data, error, isLoading, refetch } = useSaintChapel(accessToken);
   const errorState = getErrorStateDetails(error);
   useSaintSessionGuard(errorState?.code);
-  const recentAttendances = data
-    ? [...data.attendances].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
-    : [];
-  const attendedCount = data
-    ? data.attendances.filter((attendance) => attendance.status.includes("출석")).length
-    : 0;
-  const totalSessions = data ? data.attendances.length : 0;
+  // attendances is typed non-null, but guard anyway: a null from the wire would
+  // otherwise throw on spread/filter and blank the whole academics page.
+  const attendances = data?.attendances ?? [];
+  const recentAttendances = [...attendances]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5);
+  const attendedCount = attendances.filter((attendance) =>
+    attendance.status.includes("출석"),
+  ).length;
+  const totalSessions = attendances.length;
 
   return (
     <Card className="h-full">
@@ -195,11 +198,11 @@ export function ChapelCard() {
               </div>
             )}
 
-            {data.absenceApplications.length > 0 ? (
+            {(data.absenceApplications?.length ?? 0) > 0 ? (
               <div>
                 <p className="mb-2 text-xs font-bold text-muted-foreground">결석 신청 이력</p>
                 <ul className="divide-y divide-hairline border-t border-hairline">
-                  {data.absenceApplications.map((application, index) => (
+                  {(data.absenceApplications ?? []).map((application, index) => (
                     <li
                       key={`${application.startDate}-${application.reason}-${index}`}
                       className="flex items-start justify-between gap-2 py-2.5"
