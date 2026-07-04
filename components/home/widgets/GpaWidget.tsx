@@ -6,6 +6,7 @@ import { getErrorStateDetails } from "@/components/shared/ErrorState";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import { useSaintGrades } from "@/hooks/useSaintGrades";
 import { useSaintSessionGuard } from "@/hooks/useSaintSessionGuard";
+import { formatFixed } from "@/lib/utils";
 
 import { WidgetConnect, WidgetEmpty, WidgetError, WidgetFrame, WidgetSkeleton } from "./WidgetFrame";
 
@@ -30,7 +31,7 @@ export function GpaWidget() {
       body = (
         <div>
           <div className="font-mono text-[30px] font-bold leading-none text-primary">
-            {record.gpa.toFixed(2)}
+            {formatFixed(record.gpa)}
             <span className="text-[14px] text-subtle">/4.5</span>
           </div>
           <p className="mt-1.5 text-[12px] text-subtle">취득 {record.earnedCredits}학점</p>
