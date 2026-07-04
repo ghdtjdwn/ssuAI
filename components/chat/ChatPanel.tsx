@@ -15,6 +15,7 @@ import { MessageBubble, type ChatMessageRole } from "@/components/chat/MessageBu
 import { Button } from "@/components/ui/button";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import {
+  AgentStreamError,
   startAgentStream,
   resumeAgentStream,
   createMcpWebSession,
@@ -188,7 +189,24 @@ export function ChatPanel() {
     setStreamingContent("");
 
     try {
-      const response = await startAgentStream(trimmed, threadId, mcpSessionId);
+      let activeThread = threadId;
+      let response: Response;
+      try {
+        response = await startAgentStream(trimmed, activeThread, mcpSessionId);
+      } catch (err) {
+        // 403 = this thread is owned by a prior mcp_session (the session rotates
+        // on every SSO re-login, and the thread id survives in sessionStorage).
+        // Abandon the orphaned thread, mint a fresh one, and retry once so the
+        // same user is not locked out of chat after reconnecting.
+        if (err instanceof AgentStreamError && err.status === 403) {
+          clearAgentThread();
+          activeThread = getOrCreateAgentThreadId();
+          setThreadId(activeThread);
+          response = await startAgentStream(trimmed, activeThread, mcpSessionId);
+        } else {
+          throw err;
+        }
+      }
       await consumeStream(response);
     } catch (err) {
       finalizeAssistantMessage();

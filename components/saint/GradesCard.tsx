@@ -11,6 +11,7 @@ import { useSaintAuth } from "@/hooks/useSaintAuth";
 import { useSaintGrades } from "@/hooks/useSaintGrades";
 import { useSaintSessionGuard } from "@/hooks/useSaintSessionGuard";
 import { getSsoInitUrl } from "@/lib/api/auth";
+import { formatFixed } from "@/lib/utils";
 
 function GradesSkeleton() {
   return (
@@ -66,7 +67,7 @@ export function GradesCard() {
           <>
             <div className="mb-4">
               <p className="font-mono text-[30px] font-bold leading-none text-primary">
-                {data.academicRecord.gpa.toFixed(2)}
+                {formatFixed(data.academicRecord.gpa)}
                 <span className="ml-1 text-sm font-semibold text-subtle">/ 4.5</span>
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
@@ -103,7 +104,7 @@ export function GradesCard() {
                         {row.earnedCredits}학점
                       </span>
                       <span className="font-mono text-[13px] font-bold text-foreground">
-                        {row.gpa.toFixed(2)}
+                        {formatFixed(row.gpa)}
                       </span>
                     </div>
                   </li>
