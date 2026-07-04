@@ -45,27 +45,46 @@ export function SaintAuthProvider({ children }: { children: ReactNode }) {
   // session guard that logs out on SAINT_SESSION_EXPIRED, so a single expiry
   // would otherwise fire ~5 simultaneous /api/auth/logout POSTs + cache clears.
   const logoutInFlight = useRef<Promise<void> | null>(null);
+  // Coalesces concurrent refresh() calls. On the /auth/return full page load
+  // after SSO, the provider's hydration effect AND the return page's own effect
+  // both call refresh() at once. The backend rotates the refresh token and
+  // denylists the old jti, so the second of two concurrent calls presents an
+  // already-rotated token and gets 401 — surfacing as "세션을 만들지 못했어요" on
+  // the *first* login attempt, which then works on retry. Single-flighting the
+  // request makes both callers share one rotation. (Root cause of the residual
+  // first-attempt login failure — a frontend race, not the backend FFI warmup.)
+  const refreshInFlight = useRef<Promise<boolean> | null>(null);
 
-  const refresh = useCallback(async (): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      const { accessToken: newAccess, accessTtlSeconds } = await refreshAccessToken();
-      const me = await fetchMe(newAccess);
-      accessTtlRef.current = accessTtlSeconds;
-      setAccessToken(newAccess);
-      setUser(me);
-      return true;
-    } catch (error) {
-      // 401 = anonymous visitor with no refresh cookie. Silent.
-      if (!(error instanceof ApiError && error.httpStatus === 401)) {
-        console.warn("ssuAI auth refresh failed", error);
-      }
-      setAccessToken(null);
-      setUser(null);
-      return false;
-    } finally {
-      setIsLoading(false);
+  const refresh = useCallback((): Promise<boolean> => {
+    if (refreshInFlight.current) {
+      return refreshInFlight.current;
     }
+    const run = (async (): Promise<boolean> => {
+      setIsLoading(true);
+      try {
+        const { accessToken: newAccess, accessTtlSeconds } = await refreshAccessToken();
+        const me = await fetchMe(newAccess);
+        accessTtlRef.current = accessTtlSeconds;
+        setAccessToken(newAccess);
+        setUser(me);
+        return true;
+      } catch (error) {
+        // 401 = anonymous visitor with no refresh cookie. Silent.
+        if (!(error instanceof ApiError && error.httpStatus === 401)) {
+          console.warn("ssuAI auth refresh failed", error);
+        }
+        setAccessToken(null);
+        setUser(null);
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    refreshInFlight.current = run;
+    void run.finally(() => {
+      refreshInFlight.current = null;
+    });
+    return run;
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
