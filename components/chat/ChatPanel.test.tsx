@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatPanel } from "@/components/chat/ChatPanel";
+import { ToastProvider } from "@/components/ui/toast";
 import { useSaintAuth, type SaintAuthState } from "@/hooks/useSaintAuth";
 import { AgentStreamError, createMcpWebSession, startAgentStream } from "@/lib/api/agent";
 
@@ -150,5 +151,124 @@ describe("ChatPanel", () => {
 
     expect(sessionStorage.getItem(THREAD_ID_KEY)).toBe("anonymous-thread");
     expect(createMcpWebSession).not.toHaveBeenCalled();
+  });
+
+  describe("streaming render", () => {
+    function setAuthedUser() {
+      setAuthState({
+        accessToken: "access-token",
+        isAuthenticated: true,
+        user: {
+          enrollmentStatus: "재학",
+          major: "컴퓨터학부",
+          name: "홍길동",
+          studentId: "20231234",
+        },
+      });
+      vi.mocked(createMcpWebSession).mockResolvedValue({
+        expiresAt: "2026-06-30T01:00:00Z",
+        mcpSessionId: "mcp-session",
+      });
+      vi.mocked(startAgentStream).mockResolvedValue({} as Response);
+    }
+
+    async function mockStream(
+      events: Array<Record<string, unknown>>,
+    ) {
+      const { readAgentStream } = await import("@/lib/api/agent");
+      vi.mocked(readAgentStream).mockImplementation(async function* () {
+        for (const event of events) {
+          yield event as never;
+        }
+      });
+    }
+
+    function submit(text: string) {
+      const input = screen.getByPlaceholderText("메시지를 입력하세요");
+      fireEvent.change(input, { target: { value: text } });
+      fireEvent.submit(input.closest("form")!);
+    }
+
+    it("streams assistant text and settles the bubble when the stream is done", async () => {
+      setAuthedUser();
+      await mockStream([
+        { type: "text", content: "졸업까지 " },
+        { type: "text", content: "3학점 남았어요." },
+        { type: "done" },
+      ]);
+
+      render(<ChatPanel />);
+      await screen.findByText("MCP 연결됨");
+      submit("내 졸업 요건 알려줘");
+
+      // Chunks concatenate into a single settled assistant bubble.
+      expect(await screen.findByText("졸업까지 3학점 남았어요.")).toBeInTheDocument();
+      // Composer re-enables once the stream reports done.
+      await waitFor(() =>
+        expect(screen.getByPlaceholderText("메시지를 입력하세요")).not.toBeDisabled(),
+      );
+    });
+
+    it("renders handoff and tool steps as status lines while streaming", async () => {
+      setAuthedUser();
+      await mockStream([
+        { type: "handoff", agent: "library_agent", message: "좌석을 찾고 있어요" },
+        { type: "tool", name: "get_seats", label: "좌석 조회" },
+        { type: "text", content: "빈 자리를 찾았어요." },
+        { type: "done" },
+      ]);
+
+      render(<ChatPanel />);
+      await screen.findByText("MCP 연결됨");
+      submit("도서관 자리 있어?");
+
+      expect(
+        await screen.findByText("[library_agent] 좌석을 찾고 있어요"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("좌석 조회")).toBeInTheDocument();
+      expect(await screen.findByText("빈 자리를 찾았어요.")).toBeInTheDocument();
+    });
+
+    it("shows a HITL approval card when the stream interrupts", async () => {
+      setAuthedUser();
+      await mockStream([
+        {
+          type: "interrupt",
+          data: {
+            type: "approval",
+            action_id: 7,
+            details: { message: "도서관 3층 12번 좌석 예약" },
+          },
+        },
+      ]);
+
+      render(<ChatPanel />, { wrapper: ToastProvider });
+      await screen.findByText("MCP 연결됨");
+      submit("자리 예약해줘");
+
+      expect(await screen.findByText("승인이 필요한 작업이에요")).toBeInTheDocument();
+      expect(screen.getByText("도서관 3층 12번 좌석 예약")).toBeInTheDocument();
+      // Composer switches to the approval-pending placeholder.
+      expect(
+        screen.getByPlaceholderText("위 요청을 승인하거나 취소해주세요"),
+      ).toBeInTheDocument();
+    });
+
+    it("surfaces a stream error event as an alert", async () => {
+      setAuthedUser();
+      await mockStream([
+        { type: "text", content: "부분 응답" },
+        { type: "error", message: "에이전트 내부 오류가 발생했어요." },
+      ]);
+
+      render(<ChatPanel />);
+      await screen.findByText("MCP 연결됨");
+      submit("뭔가 물어봄");
+
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("에이전트 내부 오류가 발생했어요.");
+      // Text streamed before the error is preserved as a settled bubble.
+      expect(screen.getByText("부분 응답")).toBeInTheDocument();
+    });
   });
 });
