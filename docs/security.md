@@ -4,6 +4,5 @@
 
 - Canonical document:
   [ssuMCP/docs/security.md](https://github.com/hoeongj/ssuMCP/blob/main/docs/security.md)
-- Local workspace path: `../../ssuMCP/docs/security.md`
 
 이 파일은 ADR의 상대 링크 호환을 위해 유지합니다.
