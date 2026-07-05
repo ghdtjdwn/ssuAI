@@ -26,7 +26,7 @@ import {
   clearAgentThread,
   getOrCreateAgentThreadId,
 } from "@/lib/agentThread";
-import { cn } from "@/lib/utils";
+import { cn, safeRandomId } from "@/lib/utils";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -45,13 +45,6 @@ interface ChatMessage {
   content: string;
   isStatus?: boolean; // handoff / tool events shown as non-bubble lines
   hitl?: "approved"; // approved HITL request kept in the thread as a done card
-}
-
-function nextId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export function ChatPanel() {
@@ -123,7 +116,7 @@ export function ChatPanel() {
   function appendStatus(text: string) {
     setMessages((prev) => [
       ...prev,
-      { id: nextId(), role: "assistant", content: text, isStatus: true },
+      { id: safeRandomId(), role: "assistant", content: text, isStatus: true },
     ]);
   }
 
@@ -132,7 +125,7 @@ export function ChatPanel() {
     if (content) {
       setMessages((prev) => [
         ...prev,
-        { id: nextId(), role: "assistant", content },
+        { id: safeRandomId(), role: "assistant", content },
       ]);
     }
     streamingContentRef.current = "";
@@ -181,7 +174,7 @@ export function ChatPanel() {
     if (appendUserMsg) {
       setMessages((prev) => [
         ...prev,
-        { id: nextId(), role: "user", content: trimmed },
+        { id: safeRandomId(), role: "user", content: trimmed },
       ]);
     }
     setIsStreaming(true);
@@ -222,7 +215,7 @@ export function ChatPanel() {
       const summary = formatHitlSummary(pendingInterrupt.details);
       setMessages((prev) => [
         ...prev,
-        { id: nextId(), role: "assistant", content: summary, hitl: "approved" },
+        { id: safeRandomId(), role: "assistant", content: summary, hitl: "approved" },
       ]);
     }
     setIsResumingHitl(true);

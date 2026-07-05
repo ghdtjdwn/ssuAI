@@ -165,8 +165,8 @@ app/
   chat/         # 챗봇 UI
   mcp/auth/     # 도서관 세션 UI
 components/     # 기능별·공통 UI 컴포넌트
-contexts/       # AuthContext (클라이언트 인증 상태)
-hooks/          # TanStack Query 훅
+contexts/       # 도서관 인증 컨텍스트 (LibraryAuthContext)
+hooks/          # TanStack Query 훅 + u-SAINT 인증(useSaintAuth·프로바이더) · 세션 가드
 lib/
   api/          # 타입 안전 API 클라이언트
   api/client.ts # fetch 래퍼 — envelope 파싱, ApiError

@@ -1,3 +1,5 @@
+import { safeRandomId } from "@/lib/utils";
+
 /**
  * The LangGraph conversation thread id the chat UI sends to ssuAgent.
  *
@@ -11,18 +13,11 @@
  */
 export const AGENT_THREAD_ID_KEY = "ssuagent_thread_id";
 
-function newThreadId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 export function getOrCreateAgentThreadId(): string {
-  if (typeof window === "undefined") return newThreadId();
+  if (typeof window === "undefined") return safeRandomId();
   const stored = sessionStorage.getItem(AGENT_THREAD_ID_KEY);
   if (stored) return stored;
-  const fresh = newThreadId();
+  const fresh = safeRandomId();
   sessionStorage.setItem(AGENT_THREAD_ID_KEY, fresh);
   return fresh;
 }
