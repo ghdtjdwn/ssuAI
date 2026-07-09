@@ -31,6 +31,15 @@ function resultVariant(result: string): BadgeProps["variant"] {
   return "default";
 }
 
+/** Wire migration shim: the backend is renaming absence*Minutes → absence*Count
+ * (the values are counts). Prefer the new names, fall back to the old ones. */
+function absenceCounts(chapel: ChapelInfo): { allowed: number | null; used: number } {
+  return {
+    allowed: chapel.absenceAllowedCount ?? chapel.absenceAllowedMinutes ?? null,
+    used: chapel.absenceUsedCount ?? chapel.absenceUsedMinutes ?? 0,
+  };
+}
+
 function AbsenceStatus({ chapel }: { chapel: ChapelInfo }) {
   if (chapel.result === "이수") {
     return (
@@ -41,11 +50,12 @@ function AbsenceStatus({ chapel }: { chapel: ChapelInfo }) {
     );
   }
 
-  if (chapel.absenceAllowedMinutes === null) {
+  const { allowed, used } = absenceCounts(chapel);
+  if (allowed === null) {
     return null;
   }
 
-  const remaining = chapel.absenceAllowedMinutes - chapel.absenceUsedMinutes;
+  const remaining = allowed - used;
   if (remaining <= 0) {
     return (
       <div className="rounded-control bg-danger-bg px-3 py-2 text-sm font-semibold text-danger">
@@ -153,10 +163,10 @@ export function ChapelCard() {
                 <div className="flex justify-between gap-3">
                   <dt className="text-muted-foreground">결석</dt>
                   <dd className="text-right font-mono font-medium text-foreground">
-                    {data.absenceUsedMinutes}회
-                    {data.absenceAllowedMinutes === null
+                    {absenceCounts(data).used}회
+                    {absenceCounts(data).allowed === null
                       ? ""
-                      : ` / 최대 ${data.absenceAllowedMinutes}회`}
+                      : ` / 최대 ${absenceCounts(data).allowed}회`}
                   </dd>
                 </div>
               </dl>

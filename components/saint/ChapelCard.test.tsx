@@ -75,6 +75,26 @@ describe("ChapelCard", () => {
     expect(screen.getByText("결석 1번 더 가능")).toBeInTheDocument();
   });
 
+  it("prefers the renamed absence*Count fields when the backend sends them", () => {
+    vi.mocked(useSaintChapel).mockReturnValue({
+      data: {
+        ...chapel,
+        absenceAllowedMinutes: undefined,
+        absenceUsedMinutes: undefined,
+        absenceAllowedCount: 3,
+        absenceUsedCount: 2,
+      },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useSaintChapel>);
+
+    render(<ChapelCard />);
+
+    expect(screen.getByText("2회 / 최대 3회")).toBeInTheDocument();
+    expect(screen.getByText("결석 1번 더 가능")).toBeInTheDocument();
+  });
+
   it("renders approved absence applications returned by rusaint", () => {
     render(<ChapelCard />);
 

@@ -243,8 +243,14 @@ export interface ChapelInfo {
   chapelTime: string;
   chapelRoom: string;
   seatNumber: string | null;
-  absenceAllowedMinutes: number | null;
-  absenceUsedMinutes: number;
+  // Wire rename in flight: the values are absence COUNTS, not minutes (confirmed
+  // against live u-SAINT), so the backend is renaming *Minutes → *Count. Both
+  // spellings stay optional until the backend rename lands; read via
+  // ChapelCard's absenceCounts() helper.
+  absenceAllowedCount?: number | null;
+  absenceUsedCount?: number;
+  absenceAllowedMinutes?: number | null;
+  absenceUsedMinutes?: number;
   result: string;
   attendances: ChapelAttendanceEntry[];
   absenceApplications: ChapelAbsenceApplication[];
