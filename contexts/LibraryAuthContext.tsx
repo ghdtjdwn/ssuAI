@@ -60,18 +60,23 @@ export function LibraryAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return queryClient.getQueryCache().subscribe((event) => {
       const queryKey = event.query.queryKey as unknown[];
-      if (queryKey[0] !== "library") return;
-      if (queryKey[1] !== "seats" && queryKey[1] !== "loans") return;
+      // Only the loans endpoint requires a library session, so it is the sole
+      // signal for connected state. Seat availability is public: its success
+      // says nothing about whether this visitor is authenticated, so it must
+      // never set or refresh the connected flag.
+      if (queryKey[0] !== "library" || queryKey[1] !== "loans") return;
 
       const { status, error, data } = event.query.state;
       if (status === "success" && data) {
         setConnected(true);
-      } else if (
-        status === "error" &&
-        error instanceof ApiError &&
-        error.code === "LIBRARY_SESSION_REQUIRED"
-      ) {
-        setConnected(false);
+      } else if (status === "error" && error instanceof ApiError) {
+        const sessionLost =
+          error.code === "LIBRARY_SESSION_REQUIRED" ||
+          error.httpStatus === 401 ||
+          error.httpStatus === 403;
+        if (sessionLost) {
+          setConnected(false);
+        }
       }
     });
   }, [queryClient, setConnected]);
