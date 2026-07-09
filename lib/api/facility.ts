@@ -1,4 +1,4 @@
-import { fetchJson } from "./client";
+import { fetchPublicJson } from "./client";
 import type { CampusFacilityListResponse } from "./types";
 
 export function searchFacilities(query: string) {
@@ -10,7 +10,7 @@ export function searchFacilities(query: string) {
   }
 
   const search = params.toString();
-  return fetchJson<CampusFacilityListResponse>(
+  return fetchPublicJson<CampusFacilityListResponse>(
     `/api/campus/facilities${search ? `?${search}` : ""}`,
   );
 }

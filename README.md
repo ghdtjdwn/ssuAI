@@ -49,20 +49,23 @@
 
 ```
 브라우저
-   │  fetch /api/*  ·  /api/agent/*   (same-origin)
-   ▼
-Next.js 서버 (Vercel)
-   ├─ /api/*        → rewrites ──────────────────────────┐
-   └─ /api/agent/*  → proxy (X-Agent-Key 주입) → ssuAgent  │
-                                                  │ MCP    │ REST
-                                                  ▼        ▼
-                              ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
-                                                  │  REST API
-                                                  ▼
-                              학교 시스템 (학식 · 도서관 · LMS · u-SAINT)
+   ├─ 공개 GET/SSE ────────────────┐
+   │                                ▼
+   │             ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
+   │                                │ REST API
+   │                                ▼
+   │             학교 시스템 (학식 · 도서관 · LMS · u-SAINT)
+   │                                ▲
+   └─ 인증/세션 /api/* · /api/agent/* (same-origin)
+       ▼
+      Next.js 서버 (Vercel)
+       ├─ /api/*        → rewrites ───────────────┘
+       └─ /api/agent/*  → proxy (X-Agent-Key 주입) → ssuAgent
+                                                     │ MCP
+                                                     └──────────→ ssuMCP
 ```
 
-브라우저는 항상 같은 origin의 `/api/*`·`/api/agent/*`만 호출한다. 대시보드·조회 요청은 Next.js `rewrites`가 ssuMCP로 투명하게 전달하고, 챗봇 요청은 서버 전용 proxy가 `/api/agent/*`를 LangGraph 에이전트(ssuAgent)로 전달하며 `X-Agent-Key`를 주입한다(ssuAgent는 다시 MCP로 ssuMCP를 호출). CORS가 없고, API 키·에이전트 키·세션이 브라우저에 노출되지 않는다.
+브라우저는 로그인 없는 공개 조회(학식·기숙사 식단, 공지, 시설, 학사일정, 도서관 좌석 상태/도서 검색)와 공개 좌석 SSE만 backend origin으로 직접 호출한다(ADR 0087). SmartID/LMS Bearer, refresh cookie, library session, 예약/대출, MCP web session, `/api/agent/*` 챗봇 stream은 계속 same-origin 프록시를 탄다. Backend CORS는 공개 GET/SSE에만 열리고 credentials는 꺼져 있어, API 키·에이전트 키·세션이 브라우저 cross-origin 호출로 확장되지 않는다.
 
 ---
 
@@ -201,7 +204,8 @@ pnpm build
 
 | 변수 | 설명 |
 |------|------|
-| `NEXT_PUBLIC_SSUAI_API_BASE` | ssuMCP 서버 URL |
+| `NEXT_PUBLIC_BACKEND_ORIGIN` | 공개 REST 조회와 도서관 좌석 SSE의 직접 호출 대상. 미설정 시 `NEXT_PUBLIC_SSUAI_API_BASE` → same-origin 순으로 폴백 |
+| `NEXT_PUBLIC_SSUAI_API_BASE` | ssuMCP 서버 URL. `/api/*` rewrite 대상의 legacy public env이며, `NEXT_PUBLIC_BACKEND_ORIGIN` 미설정 시 공개 직접 호출 fallback |
 | `SSUAI_API_PROXY_TARGET` | (서버 전용) `/api/*` 프록시 대상 오버라이드. 설정 시 `NEXT_PUBLIC_SSUAI_API_BASE`보다 우선 |
 | `SSUAGENT_BASE_URL` | (서버 전용) `/api/agent` 프록시가 전달하는 ssuAgent 서버 URL. 미설정 시 `NEXT_PUBLIC_SSUAGENT_BASE_URL` → `https://ssuagent.duckdns.org` 순으로 폴백 |
 | `NEXT_PUBLIC_SSUAGENT_BASE_URL` | (공개·레거시) ssuAgent 서버 URL 폴백값. 주로 로컬 개발용 |

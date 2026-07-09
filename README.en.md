@@ -49,20 +49,23 @@ On top of a single design system (Soongsil blue + mint tokens, Pretendard/JetBra
 
 ```
 Browser
-   │  fetch /api/*  ·  /api/agent/*   (same-origin)
-   ▼
-Next.js server (Vercel)
-   ├─ /api/*        → rewrites ─────────────────────────────────┐
-   └─ /api/agent/*  → proxy (injects X-Agent-Key) → ssuAgent     │
-                                                       │ MCP     │ REST
-                                                       ▼         ▼
-                              ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
-                                                       │  REST API
-                                                       ▼
-                              University systems (cafeteria · library · LMS · u-SAINT)
+   ├─ public GET/SSE ────────────────┐
+   │                                  ▼
+   │               ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
+   │                                  │ REST API
+   │                                  ▼
+   │               University systems (cafeteria · library · LMS · u-SAINT)
+   │                                  ▲
+   └─ auth/session /api/* · /api/agent/* (same-origin)
+       ▼
+      Next.js server (Vercel)
+       ├─ /api/*        → rewrites ─────────────────┘
+       └─ /api/agent/*  → proxy (injects X-Agent-Key) → ssuAgent
+                                                       │ MCP
+                                                       └──────────→ ssuMCP
 ```
 
-The browser only ever calls same-origin `/api/*` and `/api/agent/*`. Dashboard/read requests are transparently forwarded to ssuMCP by Next.js `rewrites`, while chatbot requests go through a server-only proxy that forwards `/api/agent/*` to the LangGraph agent (ssuAgent) and injects `X-Agent-Key` (ssuAgent in turn calls ssuMCP over MCP). There is no CORS, and no API keys, agent keys, or sessions are ever exposed to the browser.
+The browser calls the backend origin directly only for anonymous public reads (meals, dorm meals, notices, facilities, academic calendar, library seat status/book search) and public seat SSE (ADR 0087). SmartID/LMS Bearer, refresh cookies, library session, reservations/loans, MCP web session, and `/api/agent/*` chatbot streams stay on the same-origin proxy path. Backend CORS is open only on public GET/SSE endpoints with credentials disabled, so API keys, agent keys, and sessions do not move to cross-origin browser calls.
 
 ---
 
@@ -201,7 +204,8 @@ pnpm build
 
 | Variable | Description |
 |------|------|
-| `NEXT_PUBLIC_SSUAI_API_BASE` | ssuMCP server URL |
+| `NEXT_PUBLIC_BACKEND_ORIGIN` | Direct target for public REST reads and library seat SSE. Falls back to `NEXT_PUBLIC_SSUAI_API_BASE`, then same-origin when unset |
+| `NEXT_PUBLIC_SSUAI_API_BASE` | ssuMCP server URL. Legacy public env for the `/api/*` rewrite target and public direct-origin fallback when `NEXT_PUBLIC_BACKEND_ORIGIN` is unset |
 | `SSUAI_API_PROXY_TARGET` | (server-only) override for the `/api/*` proxy target. Takes precedence over `NEXT_PUBLIC_SSUAI_API_BASE` when set |
 | `SSUAGENT_BASE_URL` | (server-only) ssuAgent server URL the `/api/agent` proxy forwards to. If unset, falls back to `NEXT_PUBLIC_SSUAGENT_BASE_URL`, then `https://ssuagent.duckdns.org` |
 | `NEXT_PUBLIC_SSUAGENT_BASE_URL` | (public, legacy) fallback ssuAgent server URL, mainly for local development |

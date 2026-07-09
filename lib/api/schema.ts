@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-import { fetchJson } from "./client";
+import { fetchJson, fetchPublicJson } from "./client";
+
+type JsonFetcher = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 function summarizeIssues(issues: z.ZodError["issues"]): string {
   return issues
@@ -29,15 +31,32 @@ export class ApiSchemaError extends Error {
  * naming the request path and the offending fields, so React Query surfaces an
  * error state instead of an empty UI.
  */
-export async function fetchJsonParsed<S extends z.ZodType>(
+async function fetchJsonParsedWith<S extends z.ZodType>(
+  fetcher: JsonFetcher,
   path: string,
   schema: S,
   init?: RequestInit,
 ): Promise<z.output<S>> {
-  const payload = await fetchJson<unknown>(path, init);
+  const payload = await fetcher<unknown>(path, init);
   const result = schema.safeParse(payload);
   if (!result.success) {
     throw new ApiSchemaError(path, result.error.issues);
   }
   return result.data;
+}
+
+export async function fetchJsonParsed<S extends z.ZodType>(
+  path: string,
+  schema: S,
+  init?: RequestInit,
+): Promise<z.output<S>> {
+  return fetchJsonParsedWith(fetchJson, path, schema, init);
+}
+
+export async function fetchPublicJsonParsed<S extends z.ZodType>(
+  path: string,
+  schema: S,
+  init?: RequestInit,
+): Promise<z.output<S>> {
+  return fetchJsonParsedWith(fetchPublicJson, path, schema, init);
 }

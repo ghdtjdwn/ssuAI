@@ -8,6 +8,7 @@ async function importClient(baseUrl: string | null = "http://localhost:8080") {
   } else {
     process.env.NEXT_PUBLIC_SSUAI_API_BASE = baseUrl;
   }
+  delete process.env.NEXT_PUBLIC_BACKEND_ORIGIN;
 
   return import("./client");
 }
@@ -15,6 +16,7 @@ async function importClient(baseUrl: string | null = "http://localhost:8080") {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.resetModules();
+  delete process.env.NEXT_PUBLIC_BACKEND_ORIGIN;
   delete process.env.NEXT_PUBLIC_SSUAI_API_BASE;
 });
 
@@ -146,6 +148,70 @@ describe("fetchJson", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/meals/today",
       expect.objectContaining({
+        headers: expect.any(Headers),
+      }),
+    );
+  });
+
+  it("uses NEXT_PUBLIC_BACKEND_ORIGIN for explicit public-origin calls", async () => {
+    const { fetchPublicJson } = await importClient(null);
+    process.env.NEXT_PUBLIC_BACKEND_ORIGIN = "https://backend.example.com/";
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        data: { ok: true },
+        error: null,
+        traceId: "trace-1",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchPublicJson<{ ok: boolean }>("/api/meals/today")).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.example.com/api/meals/today",
+      expect.objectContaining({
+        credentials: "omit",
+        headers: expect.any(Headers),
+      }),
+    );
+  });
+
+  it("uses NEXT_PUBLIC_SSUAI_API_BASE as the legacy public backend origin fallback", async () => {
+    const { fetchPublicJson } = await importClient("https://legacy-backend.example.com/");
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        data: { ok: true },
+        error: null,
+        traceId: "trace-1",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchPublicJson<{ ok: boolean }>("/api/meals/today")).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://legacy-backend.example.com/api/meals/today",
+      expect.objectContaining({
+        credentials: "omit",
+        headers: expect.any(Headers),
+      }),
+    );
+  });
+
+  it("falls back to same-origin public calls when no backend origin env is set", async () => {
+    const { fetchPublicJson } = await importClient(null);
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        data: { ok: true },
+        error: null,
+        traceId: "trace-1",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchPublicJson<{ ok: boolean }>("/api/meals/today")).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/meals/today",
+      expect.objectContaining({
+        credentials: "omit",
         headers: expect.any(Headers),
       }),
     );

@@ -1,15 +1,25 @@
 import { ApiError, type ApiErrorBody, type ApiResponse } from "./types";
 
+function normalizeBaseUrl(rawBaseUrl: string | undefined) {
+  if (!rawBaseUrl) {
+    return "";
+  }
+  return rawBaseUrl.trim().replace(/\/$/, "");
+}
+
 export function getApiBaseUrl() {
   if (typeof window !== "undefined") {
     return "";
   }
 
-  const rawBaseUrl = process.env.NEXT_PUBLIC_SSUAI_API_BASE?.trim();
-  if (!rawBaseUrl) {
-    return "";
-  }
-  return rawBaseUrl.replace(/\/$/, "");
+  return normalizeBaseUrl(process.env.NEXT_PUBLIC_SSUAI_API_BASE);
+}
+
+export function getPublicApiBaseUrl() {
+  return normalizeBaseUrl(
+    process.env.NEXT_PUBLIC_BACKEND_ORIGIN?.trim() ||
+      process.env.NEXT_PUBLIC_SSUAI_API_BASE?.trim(),
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,7 +56,7 @@ async function parseEnvelope(response: Response) {
   }
 }
 
-export async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function fetchJsonFromBase<T>(path: string, baseUrl: string, init: RequestInit = {}): Promise<T> {
   if (!path.startsWith("/api/")) {
     throw new Error(`API path must start with /api/: ${path}`);
   }
@@ -57,7 +67,7 @@ export async function fetchJson<T>(path: string, init: RequestInit = {}): Promis
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+  const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers,
   });
@@ -95,4 +105,15 @@ export async function fetchJson<T>(path: string, init: RequestInit = {}): Promis
   }
 
   return envelope.data as T;
+}
+
+export async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return fetchJsonFromBase(path, getApiBaseUrl(), init);
+}
+
+export async function fetchPublicJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return fetchJsonFromBase(path, getPublicApiBaseUrl(), {
+    ...init,
+    credentials: "omit",
+  });
 }

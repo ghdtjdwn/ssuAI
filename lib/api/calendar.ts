@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { fetchJsonParsed } from "./schema";
+import { fetchPublicJsonParsed } from "./schema";
 
 export interface AcademicCalendarEvent {
   /** ISO yyyy-MM-dd (range start for multi-day entries). */
@@ -35,5 +35,5 @@ const academicCalendarResponseSchema: z.ZodType<AcademicCalendarResponse> = z.lo
 
 export function getAcademicCalendar(year?: number) {
   const query = year ? `?year=${year}` : "";
-  return fetchJsonParsed(`/api/academic-calendar${query}`, academicCalendarResponseSchema);
+  return fetchPublicJsonParsed(`/api/academic-calendar${query}`, academicCalendarResponseSchema);
 }
