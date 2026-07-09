@@ -51,9 +51,20 @@ interface ServiceRowProps {
   connected: boolean;
   onConnect: () => void;
   onDisconnect?: () => void;
+  /** Shown in place of a disconnect button when the service has no standalone
+   * session to release (e.g. LMS rides on the u-SAINT login). */
+  connectedNote?: string;
 }
 
-function ServiceCard({ icon, name, desc, connected, onConnect, onDisconnect }: ServiceRowProps) {
+function ServiceCard({
+  icon,
+  name,
+  desc,
+  connected,
+  onConnect,
+  onDisconnect,
+  connectedNote,
+}: ServiceRowProps) {
   return (
     <div
       className={`rounded-card border p-4 transition-colors ${
@@ -88,7 +99,9 @@ function ServiceCard({ icon, name, desc, connected, onConnect, onDisconnect }: S
             연결 해제
           </button>
         ) : (
-          <p className="mt-2.5 text-center text-[12px] font-semibold text-success">연결됨 · 최대 7일 유지</p>
+          <p className="mt-2.5 text-center text-[12px] font-semibold text-success">
+            {connectedNote ?? "연결됨 · 최대 7일 유지"}
+          </p>
         )
       ) : (
         <button
@@ -139,6 +152,10 @@ export function ConnectionsPanel({ open, onClose }: { open: boolean; onClose: ()
             onConnect={() => {
               window.location.href = getLmsSsoInitUrl();
             }}
+            // LMS shares the u-SAINT SSO session — one login connects both, and
+            // it is released together from the u-SAINT card. Say so instead of
+            // showing a lone "연결됨" that reads as an inconsistency.
+            connectedNote="u-SAINT 로그인에 포함 · 최대 7일"
           />
           <ServiceCard
             icon={<BookOpen size={18} aria-hidden />}
