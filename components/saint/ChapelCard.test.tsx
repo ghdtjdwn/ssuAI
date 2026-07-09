@@ -21,8 +21,8 @@ const chapel: ChapelInfo = {
   chapelTime: "목 10:30-11:20",
   chapelRoom: "한경직기념관 대예배실",
   seatNumber: "J-5-5",
-  absenceAllowedMinutes: null,
-  absenceUsedMinutes: 1,
+  absenceAllowedCount: null,
+  absenceUsedCount: 1,
   result: "진행중",
   attendances: [],
   absenceApplications: [
@@ -63,7 +63,7 @@ describe("ChapelCard", () => {
 
   it("shows remaining absences only when an allowed count is provided", () => {
     vi.mocked(useSaintChapel).mockReturnValue({
-      data: { ...chapel, absenceAllowedMinutes: 2 },
+      data: { ...chapel, absenceAllowedCount: 2 },
       error: null,
       isLoading: false,
       refetch: vi.fn(),
@@ -72,26 +72,6 @@ describe("ChapelCard", () => {
     render(<ChapelCard />);
 
     expect(screen.getByText("1회 / 최대 2회")).toBeInTheDocument();
-    expect(screen.getByText("결석 1번 더 가능")).toBeInTheDocument();
-  });
-
-  it("prefers the renamed absence*Count fields when the backend sends them", () => {
-    vi.mocked(useSaintChapel).mockReturnValue({
-      data: {
-        ...chapel,
-        absenceAllowedMinutes: undefined,
-        absenceUsedMinutes: undefined,
-        absenceAllowedCount: 3,
-        absenceUsedCount: 2,
-      },
-      error: null,
-      isLoading: false,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useSaintChapel>);
-
-    render(<ChapelCard />);
-
-    expect(screen.getByText("2회 / 최대 3회")).toBeInTheDocument();
     expect(screen.getByText("결석 1번 더 가능")).toBeInTheDocument();
   });
 
