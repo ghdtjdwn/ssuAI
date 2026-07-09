@@ -1,6 +1,6 @@
-import { fetchJson } from "./client";
+import { fetchPublicJson } from "./client";
 import type { WeeklyMealResponse } from "./types";
 
 export function getDormThisWeekMeal() {
-  return fetchJson<WeeklyMealResponse>("/api/dorm/meals/this-week");
+  return fetchPublicJson<WeeklyMealResponse>("/api/dorm/meals/this-week");
 }

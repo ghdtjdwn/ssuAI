@@ -1,8 +1,8 @@
-import { fetchJson } from "./client";
+import { fetchPublicJson } from "./client";
 import type { MealResponse, WeeklyMealResponse } from "./types";
 
 export function getTodayMeal() {
-  return fetchJson<MealResponse>("/api/meals/today");
+  return fetchPublicJson<MealResponse>("/api/meals/today");
 }
 
 export function getWeeklyMeals(startDate?: string) {
@@ -13,5 +13,5 @@ export function getWeeklyMeals(startDate?: string) {
   }
 
   const query = params.toString();
-  return fetchJson<WeeklyMealResponse>(`/api/meals/weekly${query ? `?${query}` : ""}`);
+  return fetchPublicJson<WeeklyMealResponse>(`/api/meals/weekly${query ? `?${query}` : ""}`);
 }

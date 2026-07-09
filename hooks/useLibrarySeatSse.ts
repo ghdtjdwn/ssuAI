@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 
+import { getPublicApiBaseUrl } from "@/lib/api/client";
+
 /**
  * Subscribe to real-time seat updates for one floor.
  *
@@ -22,11 +24,16 @@ interface FloorChannel {
 
 const channels = new Map<number, FloorChannel>();
 
+export function getLibrarySeatEventsUrl(floor: number) {
+  const params = new URLSearchParams({ floor: String(floor) });
+  return `${getPublicApiBaseUrl()}/api/library/seats/events?${params}`;
+}
+
 function subscribe(floor: number, listener: Listener): () => void {
   let channel = channels.get(floor);
   if (!channel) {
-    const source = new EventSource(`/api/library/seats/events?floor=${floor}`, {
-      withCredentials: true,
+    const source = new EventSource(getLibrarySeatEventsUrl(floor), {
+      withCredentials: false,
     });
     const created: FloorChannel = { source, listeners: new Set() };
     source.addEventListener("seat-update", (event) => {

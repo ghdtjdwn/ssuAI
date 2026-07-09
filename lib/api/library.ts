@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { fetchJson } from "./client";
-import { fetchJsonParsed } from "./schema";
+import { fetchJson, fetchPublicJson } from "./client";
+import { fetchJsonParsed, fetchPublicJsonParsed } from "./schema";
 import type {
   LibraryBookSearchResponse,
   LibraryFloorCode,
@@ -55,9 +55,7 @@ export const librarySeatStatusResponseSchema: z.ZodType<LibrarySeatStatusRespons
 });
 
 export function getLibrarySeatStatus(floor: LibraryFloorCode) {
-  return fetchJsonParsed(`/api/library/seats?floor=${floor}`, librarySeatStatusResponseSchema, {
-    credentials: "include",
-  });
+  return fetchPublicJsonParsed(`/api/library/seats?floor=${floor}`, librarySeatStatusResponseSchema);
 }
 
 export function loginLibrary(loginId: string, password: string) {
@@ -71,7 +69,7 @@ export function loginLibrary(loginId: string, password: string) {
 
 export function searchLibraryBooks(query: string, page = 0, size = 10) {
   const params = new URLSearchParams({ query, page: String(page), size: String(size) });
-  return fetchJson<LibraryBookSearchResponse>(`/api/library/books?${params.toString()}`);
+  return fetchPublicJson<LibraryBookSearchResponse>(`/api/library/books?${params.toString()}`);
 }
 
 export function getLibraryLoans() {
@@ -268,4 +266,3 @@ export function cancelWait() {
     credentials: "include",
   });
 }
-
