@@ -27,13 +27,13 @@ On top of a single design system (Soongsil blue + mint tokens, Pretendard/JetBra
 - **Library** — real-time seats in 3 views (donut overview / rooms / full map) · seat recommendation → reservation · waitlist registration · loans · book search
 - **Campus** — cafeteria menu (today/weekly) · dormitory menu · notices (category filter) · facility search · entry point to AI evidence search
 
-> The preview images below were captured before the redesign and will be replaced.
+> Home, Academics, and Library previews below are post-redesign captures. Chatbot and Campus captures are still pending.
 
-![Dashboard — today's cafeteria menu · facility search · weekly menu](docs/assets/dashboard.png)
+![Home — AI daily-briefing hero and customizable widget grid](docs/assets/dashboard.png)
 
-| Real-time library seat status · book search | Personal academic info (login-linked) |
+| Real-time library seat status (donut grid) | Academics — graduation requirements · cumulative grades · chapel |
 |---|---|
-| ![Real-time library seat availability and book search](docs/assets/dashboard-library.png) | ![Chapel · graduation requirements · scholarships · grades · LMS · loan cards](docs/assets/dashboard-academic.png) |
+| ![Real-time library seat availability and book search](docs/assets/dashboard-library.png) | ![Graduation requirement progress · cumulative grades · chapel status](docs/assets/dashboard-academic.png) |
 
 > In the chatbot, actions that change university state — e.g. *"Reserve a library seat for me"* — require login and one more confirmation through an HITL approval card before they run.
 
