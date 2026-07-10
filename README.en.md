@@ -4,6 +4,8 @@
 
 **한국어** [README.md](README.md) · **English** (this document)
 
+> 🧩 **Soongsil Campus AI Platform** (1 of 4 services) · [ssuMCP](https://github.com/hoeongj/ssuMCP) · **ssuAI** · [ssuAgent](https://github.com/hoeongj/ssuAgent) · [ssu-ai-service](https://github.com/hoeongj/ssu-ai-service) · 🟢 [Live](https://ssuai.vercel.app)
+
 A Next.js web client for [ssuMCP](https://github.com/hoeongj/ssuMCP), the Soongsil University MCP server.
 Five screens (Home · Chatbot · Academics · Library · Campus) plus a natural-language chatbot for browsing public campus information and personal academic records.
 

@@ -4,6 +4,8 @@
 
 > 🇺🇸 English version: [README.en.md](README.en.md)
 
+> 🧩 **숭실대 캠퍼스 AI 플랫폼** (4-서비스 중 하나) · [ssuMCP](https://github.com/hoeongj/ssuMCP) · **ssuAI** · [ssuAgent](https://github.com/hoeongj/ssuAgent) · [ssu-ai-service](https://github.com/hoeongj/ssu-ai-service) · 🟢 [Live](https://ssuai.vercel.app)
+
 숭실대학교 MCP 서버 [ssuMCP](https://github.com/hoeongj/ssuMCP)를 소비하는 Next.js 웹 클라이언트.  
 5개 화면(홈·챗봇·학사·도서관·캠퍼스)과 자연어 챗봇으로 공개 캠퍼스 정보와 개인 학사 정보를 조회한다.
 
