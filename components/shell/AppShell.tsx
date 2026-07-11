@@ -195,12 +195,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-[10.5px]",
+                    "flex min-h-[67px] flex-col items-center justify-center gap-1 text-[12.5px]",
                     active ? "font-bold text-primary" : "font-medium text-subtle",
                   )}
                 >
                   <Icon
-                    size={22}
+                    size={26}
                     aria-hidden
                     strokeWidth={active ? 2.5 : 2}
                     fill={active ? "currentColor" : "none"}
