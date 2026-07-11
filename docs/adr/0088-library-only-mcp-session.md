@@ -90,6 +90,11 @@ MCP 세션을 다시 만든다.
   그대로 유지된다.
 - SAINT 로그아웃은 기존처럼 thread/messages/session state를 정리한다. 도서관 쿠키 세션이
   남아 있으면 다음 렌더에서 library-only MCP 세션을 다시 발급한다.
+- 재발급된 세션이 진행 중 thread와 만나면 ssuAgent thread 소유권 검사(ADR 0010/0011,
+  server principal 부재 시 세션-소유)에 걸려 403이 날 수 있다. 이는 `ChatPanel`의 기존
+  403 처리(thread 재발급 + 1회 재시도)가 흡수한다 — 사용자는 잠기지 않고, 화면의 대화
+  표시는 유지되며, 서버측 checkpoint 연속성만 끊긴다. 세션 회전과 thread 수명은 독립
+  관심사로 남긴다.
 
 ## 검증
 
