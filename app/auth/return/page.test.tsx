@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AuthReturnPage from "./page";
@@ -64,16 +65,52 @@ describe("AuthReturnPage", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the failure UI when the code exchange fails", async () => {
+  it("recovers via the refresh fallback when the exchange fails but the cookie is already set", async () => {
+    // Reloading /auth/return?code=<already-consumed> 401s on the exchange,
+    // but the first exchange already set the refresh cookie — the user must
+    // still land signed-in on "/".
+    mockUseSearchParams.mockReturnValue(makeParams({ code: "consumed-code" }));
+    mockExchange.mockRejectedValue(new Error("exchange failed"));
+    refresh.mockResolvedValue(true);
+
+    render(<AuthReturnPage />);
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith("/");
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("세션을 만들지 못했어요")).not.toBeInTheDocument();
+  });
+
+  it("shows the failure UI when both the exchange and the fallback refresh fail", async () => {
     mockUseSearchParams.mockReturnValue(makeParams({ code: "bad-code" }));
     mockExchange.mockRejectedValue(new Error("exchange failed"));
+    refresh.mockResolvedValue(false);
 
     render(<AuthReturnPage />);
 
     await waitFor(() => {
       expect(screen.getByText("세션을 만들지 못했어요")).toBeInTheDocument();
     });
-    expect(refresh).not.toHaveBeenCalled();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("exchanges the code exactly once under React StrictMode's duplicated effects", async () => {
+    mockUseSearchParams.mockReturnValue(makeParams({ code: "one-time-code" }));
+    mockExchange.mockResolvedValue({ accessToken: "a", accessTtlSeconds: 900 });
+    refresh.mockResolvedValue(true);
+
+    render(
+      <StrictMode>
+        <AuthReturnPage />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith("/");
+    });
+    expect(mockExchange).toHaveBeenCalledTimes(1);
   });
 
   it("shows the failure UI when the exchange succeeds but refresh fails", async () => {
