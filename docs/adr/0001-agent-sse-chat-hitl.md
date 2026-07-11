@@ -119,3 +119,11 @@ ssuAgent는 이 힌트를 사전 안내용 short-circuit에만 사용합니다. 
 
 ### Q3. 학생 인증 정보(JWT)가 어떻게 MCP 세션 ID(`mcp_session_id`)로 교환되고, 이를 통해 프론트엔드에서 보안 위협 없이 도구를 실행할 수 있나요?
 > **Answer**: 프론트엔드가 백엔드 에이전트와 직접 통신할 때 JWT 액세스 토큰을 백엔드에 그대로 노출하거나 세션에 장기 보관하면 탈취 시 권한 남용 위험이 있습니다. 대신 컴포넌트 마운트 시점에 기존에 이미 인증된 ssuMCP 서버의 `/api/mcp/auth/web-session`으로 JWT를 전송하여 해당 토큰의 소유주 정보와 바인딩된, 단기 만료일시를 갖는 고유 `mcp_session_id`를 발급받습니다. 이후 클라이언트는 오직 이 `mcp_session_id`만을 에이전트 요청에 실어 보냅니다. 백엔드 에이전트 측은 예약 도구 등을 실행할 때 이 세션 ID를 통해 MCP 서버와 안전하게 통신하므로, 클라이언트 측은 개인정보나 인증 토큰의 유출 걱정 없이 보안성이 담보된 도구 실행 세션을 유지할 수 있습니다.
+
+## 2026-07-11 갱신 — mcp_session_id 발급 조건 변경 (ADR 0088)
+
+본문 "2. mcp_session_id 브릿징 연동"의 JWT-전용 발급 서술은 2026-07-11부로 구식이다.
+
+현재는 identity-tier 발급: SAINT JWT 또는 도서관 연결(`libraryConnected`) 중 가능한 신원으로 발급하고, 더 강한 신원이 생기면 재발급한다. JWT 없는 호출은 `Authorization` 생략 + `credentials:"include"`.
+
+상세와 대안 검토는 [ADR 0088](0088-library-only-mcp-session.md).
