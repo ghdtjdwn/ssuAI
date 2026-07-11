@@ -101,6 +101,14 @@ ssuAgent는 `thread_id`를 생성 당시의 `mcp_session_id`에 바인딩하고,
 
 ---
 
+## 2026-07-11 보강 — 도서관 연결 상태 힌트 전달
+
+도서관 좌석 예약 요청의 UX를 안정화하기 위해 `ChatPanel`은 `useLibraryAuth().isConnected` 값을 ssuAgent의 `/agent/stream`, `/agent/resume` 요청 바디에 `library_connected`로 함께 보냅니다. 이 값은 브라우저의 `sessionStorage` 기반 플래그에서 온 **client-asserted hint**이며 보안 경계나 서버 검증 결과가 아닙니다.
+
+ssuAgent는 이 힌트를 사전 안내용 short-circuit에만 사용합니다. 실제 좌석 예약 게이트와 인증 강제는 ssuAgent/ssuMCP의 서버 측 세션 확인 및 기존 `AUTH_REQUIRED` 처리에 남아 있으므로, 클라이언트가 보낸 `library_connected` 값은 예약 권한을 부여하거나 우회하지 않습니다.
+
+---
+
 ## 3 Core Interview Questions (예상 면접 질문)
 
 ### Q1. EventSource API를 사용하지 않고 `fetch`와 `ReadableStream`으로 SSE를 직접 파싱한 구체적인 이유는 무엇인가요?

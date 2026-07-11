@@ -82,11 +82,17 @@ export async function startAgentStream(
   message: string,
   threadId: string,
   mcpSessionId: string | null,
+  libraryConnected: boolean,
 ): Promise<Response> {
   const response = await fetch(`${AGENT_PROXY_BASE}/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, thread_id: threadId, mcp_session_id: mcpSessionId }),
+    body: JSON.stringify({
+      message,
+      thread_id: threadId,
+      mcp_session_id: mcpSessionId,
+      library_connected: libraryConnected,
+    }),
   });
   if (!response.ok) {
     throw new AgentStreamError("/agent/stream", response.status);
@@ -100,6 +106,7 @@ export async function resumeAgentStream(
   approved: boolean,
   actionId: number | null,
   mcpSessionId: string | null,
+  libraryConnected: boolean,
 ): Promise<Response> {
   const response = await fetch(`${AGENT_PROXY_BASE}/resume`, {
     method: "POST",
@@ -109,6 +116,7 @@ export async function resumeAgentStream(
       approved,
       action_id: actionId,
       mcp_session_id: mcpSessionId,
+      library_connected: libraryConnected,
     }),
   });
   if (!response.ok) {
