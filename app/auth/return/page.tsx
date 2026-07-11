@@ -3,9 +3,15 @@
 import { Bot, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { useSaintAuth } from "@/hooks/useSaintAuth";
+import { exchangeAuthCode } from "@/lib/api/auth";
+
+// Prevent Vercel edge caching so the post-SSO return always renders with the
+// latest JS bundles rather than a stale cached HTML shell (same class of bug
+// previously fixed for / and /chat).
+export const dynamic = "force-dynamic";
 
 const ERROR_MESSAGES: Record<string, string> = {
   auth_failed: "유세인트 로그인에 실패했어요. 다시 시도해 주세요.",
@@ -31,30 +37,54 @@ function AuthReturnContent() {
   const { refresh } = useSaintAuth();
   const ok = params.get("ok") === "1";
   const lmsOk = params.get("lms_ok") === "1";
+  const code = params.get("code");
   const errorCode = params.get("error");
   const [refreshSettled, setRefreshSettled] = useState(false);
   const [refreshFailed, setRefreshFailed] = useState(false);
+  // Single-flights the one-time code exchange across React StrictMode's
+  // duplicate effect invocation (same pattern as the refreshInFlight ref in
+  // hooks/useSaintAuth.tsx). The exchange code is single-use — a second POST
+  // with the same code would 401, so the second effect instance must await
+  // the same in-flight exchange rather than firing its own.
+  const exchangeInFlightRef = useRef<Promise<void> | null>(null);
+
+  const hasReturnFlow = ok || lmsOk || !!code;
 
   useEffect(() => {
-    if (!ok && !lmsOk) return;
+    if (!hasReturnFlow) return;
     let cancelled = false;
-    refresh().then((success) => {
-      if (cancelled) return;
-      setRefreshSettled(true);
-      if (success) {
-        router.replace("/");
-      } else {
+
+    (async () => {
+      try {
+        if (code) {
+          if (!exchangeInFlightRef.current) {
+            exchangeInFlightRef.current = exchangeAuthCode(code).then(() => undefined);
+          }
+          await exchangeInFlightRef.current;
+        }
+        const success = await refresh();
+        if (cancelled) return;
+        setRefreshSettled(true);
+        if (success) {
+          router.replace("/");
+        } else {
+          setRefreshFailed(true);
+        }
+      } catch {
+        if (cancelled) return;
+        setRefreshSettled(true);
         setRefreshFailed(true);
       }
-    });
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [ok, lmsOk, refresh, router]);
+  }, [hasReturnFlow, code, refresh, router]);
 
-  // Pending only on the success path while the refresh round-trip is in
-  // flight. The error path renders immediately; no effect involved.
-  const pending = (ok || lmsOk) && !refreshSettled;
+  // Pending only on the success path while the exchange/refresh round-trip is
+  // in flight. The error path renders immediately; no effect involved.
+  const pending = hasReturnFlow && !refreshSettled;
 
   if (pending) {
     return <PendingLine label="로그인 처리 중…" />;
@@ -78,7 +108,7 @@ function AuthReturnContent() {
     );
   }
 
-  if (ok || lmsOk) {
+  if (hasReturnFlow) {
     // success path — already redirected via router.replace("/"); component is
     // about to unmount, render a quiet placeholder.
     return null;
