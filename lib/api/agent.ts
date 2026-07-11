@@ -125,10 +125,11 @@ export async function resumeAgentStream(
   return response;
 }
 
-/** Exchange JWT for mcp_session_id via ssuMCP web-session endpoint. */
-export function createMcpWebSession(accessToken: string) {
+/** Exchange optional JWT or library cookie session for mcp_session_id via ssuMCP web-session endpoint. */
+export function createMcpWebSession(accessToken: string | null) {
   return fetchJson<{ mcpSessionId: string; expiresAt: string }>("/api/mcp/auth/web-session", {
     method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    credentials: "include",
   });
 }

@@ -66,14 +66,36 @@ export function ChatPanel() {
   const streamingContentRef = useRef<string>("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const previousIsAuthenticatedRef = useRef(isAuthenticated);
+  const mcpSessionGrantsRef = useRef<{ jwt: boolean; library: boolean } | null>(null);
 
-  // Obtain mcp_session_id when JWT is available
+  // Obtain mcp_session_id from the strongest currently available web identity.
   useEffect(() => {
-    if (!isAuthenticated || !accessToken || mcpSessionId) return;
+    const wantJwt = isAuthenticated && !!accessToken;
+
+    if (!wantJwt && !libraryConnected) {
+      mcpSessionGrantsRef.current = null;
+      if (mcpSessionId) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- clear stale MCP session when all web identities disappear.
+        setMcpSessionId(null);
+      }
+      return;
+    }
+
+    const grants = mcpSessionGrantsRef.current;
+    if (
+      mcpSessionId &&
+      grants &&
+      (!wantJwt || grants.jwt) &&
+      (!libraryConnected || grants.library)
+    ) {
+      return;
+    }
+
     let cancelled = false;
-    createMcpWebSession(accessToken)
+    createMcpWebSession(wantJwt ? accessToken : null)
       .then((res) => {
         if (!cancelled) {
+          mcpSessionGrantsRef.current = { jwt: wantJwt, library: libraryConnected };
           setMcpSessionId(res.mcpSessionId);
         }
       })
@@ -88,7 +110,7 @@ export function ChatPanel() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, accessToken, mcpSessionId]);
+  }, [isAuthenticated, accessToken, libraryConnected, mcpSessionId]);
 
   useEffect(() => {
     const wasAuthenticated = previousIsAuthenticatedRef.current;
