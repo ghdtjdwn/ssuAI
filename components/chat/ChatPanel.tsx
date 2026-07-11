@@ -13,6 +13,7 @@ import {
 import { HitlCard, HitlDoneCard, formatHitlSummary } from "@/components/chat/HitlCard";
 import { MessageBubble, type ChatMessageRole } from "@/components/chat/MessageBubble";
 import { Button } from "@/components/ui/button";
+import { useLibraryAuth } from "@/contexts/LibraryAuthContext";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import {
   AgentStreamError,
@@ -49,6 +50,7 @@ interface ChatMessage {
 
 export function ChatPanel() {
   const { accessToken, isAuthenticated } = useSaintAuth();
+  const { isConnected: libraryConnected } = useLibraryAuth();
 
   const [threadId, setThreadId] = useState<string>(getOrCreateAgentThreadId);
   const [mcpSessionId, setMcpSessionId] = useState<string | null>(null);
@@ -185,7 +187,7 @@ export function ChatPanel() {
       let activeThread = threadId;
       let response: Response;
       try {
-        response = await startAgentStream(trimmed, activeThread, mcpSessionId);
+        response = await startAgentStream(trimmed, activeThread, mcpSessionId, libraryConnected);
       } catch (err) {
         // 403 = this thread is owned by a prior mcp_session (the session rotates
         // on every SSO re-login, and the thread id survives in sessionStorage).
@@ -195,7 +197,7 @@ export function ChatPanel() {
           clearAgentThread();
           activeThread = getOrCreateAgentThreadId();
           setThreadId(activeThread);
-          response = await startAgentStream(trimmed, activeThread, mcpSessionId);
+          response = await startAgentStream(trimmed, activeThread, mcpSessionId, libraryConnected);
         } else {
           throw err;
         }
@@ -230,6 +232,7 @@ export function ChatPanel() {
         approved,
         pendingInterrupt.action_id ?? null,
         mcpSessionId,
+        libraryConnected,
       );
       await consumeStream(response);
     } catch (err) {

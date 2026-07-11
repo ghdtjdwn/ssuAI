@@ -3,11 +3,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { ToastProvider } from "@/components/ui/toast";
+import { useLibraryAuth } from "@/contexts/LibraryAuthContext";
 import { useSaintAuth, type SaintAuthState } from "@/hooks/useSaintAuth";
-import { AgentStreamError, createMcpWebSession, startAgentStream } from "@/lib/api/agent";
+import {
+  AgentStreamError,
+  createMcpWebSession,
+  readAgentStream,
+  resumeAgentStream,
+  startAgentStream,
+} from "@/lib/api/agent";
 
 vi.mock("@/hooks/useSaintAuth", () => ({
   useSaintAuth: vi.fn(),
+}));
+
+vi.mock("@/contexts/LibraryAuthContext", () => ({
+  useLibraryAuth: vi.fn(),
 }));
 
 vi.mock("@/lib/api/agent", () => {
@@ -32,6 +43,7 @@ vi.mock("@/lib/api/agent", () => {
 const THREAD_ID_KEY = "ssuagent_thread_id";
 
 let authState: SaintAuthState;
+let libraryAuthState: ReturnType<typeof useLibraryAuth>;
 
 function setAuthState(overrides: Partial<SaintAuthState>) {
   authState = {
@@ -45,12 +57,26 @@ function setAuthState(overrides: Partial<SaintAuthState>) {
   };
 }
 
+function setLibraryAuthState(overrides: Partial<ReturnType<typeof useLibraryAuth>> = {}) {
+  libraryAuthState = {
+    isConnected: false,
+    logout: vi.fn(),
+    setConnected: vi.fn(),
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   sessionStorage.clear();
   vi.mocked(createMcpWebSession).mockReset();
+  vi.mocked(readAgentStream).mockReset();
+  vi.mocked(resumeAgentStream).mockReset();
+  vi.mocked(startAgentStream).mockReset();
   vi.mocked(useSaintAuth).mockImplementation(() => authState);
+  vi.mocked(useLibraryAuth).mockImplementation(() => libraryAuthState);
   setAuthState({});
+  setLibraryAuthState();
 });
 
 describe("ChatPanel", () => {
@@ -95,6 +121,7 @@ describe("ChatPanel", () => {
   it("self-heals a 403 by abandoning the orphaned thread and retrying once", async () => {
     // A stale thread from a prior mcp_session is now owned by someone else.
     sessionStorage.setItem(THREAD_ID_KEY, "stale-thread");
+    setLibraryAuthState({ isConnected: true });
     setAuthState({
       accessToken: "access-token",
       isAuthenticated: true,
@@ -109,7 +136,6 @@ describe("ChatPanel", () => {
       expiresAt: "2026-06-30T01:00:00Z",
       mcpSessionId: "mcp-session-new",
     });
-    const { readAgentStream } = await import("@/lib/api/agent");
     vi.mocked(readAgentStream).mockImplementation(async function* () {
       yield { type: "done" } as never;
     });
@@ -132,6 +158,8 @@ describe("ChatPanel", () => {
     const retryThread = vi.mocked(startAgentStream).mock.calls[1][1];
     expect(firstThread).toBe("stale-thread");
     expect(retryThread).not.toBe("stale-thread");
+    expect(vi.mocked(startAgentStream).mock.calls[0][3]).toBe(true);
+    expect(vi.mocked(startAgentStream).mock.calls[1][3]).toBe(true);
     expect(sessionStorage.getItem(THREAD_ID_KEY)).toBe(retryThread);
     // The 403 was healed, so no error surfaces to the user.
     expect(
@@ -175,7 +203,6 @@ describe("ChatPanel", () => {
     async function mockStream(
       events: Array<Record<string, unknown>>,
     ) {
-      const { readAgentStream } = await import("@/lib/api/agent");
       vi.mocked(readAgentStream).mockImplementation(async function* () {
         for (const event of events) {
           yield event as never;
@@ -188,6 +215,58 @@ describe("ChatPanel", () => {
       fireEvent.change(input, { target: { value: text } });
       fireEvent.submit(input.closest("form")!);
     }
+
+    it("passes the current library connection flag to startAgentStream", async () => {
+      setAuthedUser();
+      setLibraryAuthState({ isConnected: true });
+      await mockStream([{ type: "done" }]);
+
+      render(<ChatPanel />);
+      await screen.findByText("MCP 연결됨");
+      submit("도서관 자리 있어?");
+
+      await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
+      expect(startAgentStream).toHaveBeenCalledWith(
+        "도서관 자리 있어?",
+        expect.any(String),
+        "mcp-session",
+        true,
+      );
+    });
+
+    it("passes the current library connection flag to resumeAgentStream", async () => {
+      setAuthedUser();
+      setLibraryAuthState({ isConnected: true });
+      vi.mocked(resumeAgentStream).mockResolvedValue({} as Response);
+      vi.mocked(readAgentStream)
+        .mockImplementationOnce(async function* () {
+          yield {
+            type: "interrupt",
+            data: {
+              type: "approval",
+              action_id: 7,
+              details: { message: "도서관 3층 12번 좌석 예약" },
+            },
+          } as never;
+        })
+        .mockImplementationOnce(async function* () {
+          yield { type: "done" } as never;
+        });
+
+      render(<ChatPanel />, { wrapper: ToastProvider });
+      await screen.findByText("MCP 연결됨");
+      submit("자리 예약해줘");
+      fireEvent.click(await screen.findByRole("button", { name: "승인" }));
+
+      await waitFor(() => expect(resumeAgentStream).toHaveBeenCalledTimes(1));
+      expect(resumeAgentStream).toHaveBeenCalledWith(
+        expect.any(String),
+        true,
+        7,
+        "mcp-session",
+        true,
+      );
+    });
 
     it("streams assistant text and settles the bubble when the stream is done", async () => {
       setAuthedUser();
