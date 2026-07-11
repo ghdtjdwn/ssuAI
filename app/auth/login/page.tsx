@@ -3,6 +3,11 @@ import Link from "next/link";
 
 import { SaintLoginButton } from "@/components/auth/SaintLoginButton";
 
+// Prevent Vercel edge caching so the post-SSO return always renders with the
+// latest JS bundles rather than a stale cached HTML shell (same class of bug
+// previously fixed for / and /chat).
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "SmartID 로그인 · ssuAI",
 };

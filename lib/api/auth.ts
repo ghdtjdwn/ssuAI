@@ -19,6 +19,23 @@ export async function refreshAccessToken(): Promise<RefreshResponse> {
   });
 }
 
+/**
+ * Exchange the one-time SSO authorization code (from the backend's
+ * `/auth/return?code=...` redirect) for the `ssuai_refresh` cookie via a
+ * same-origin, non-redirect POST. Mirrors `refreshAccessToken`'s response
+ * shape — the backend replies with the same `ApiResponse<RefreshResponse>`
+ * envelope and a `Set-Cookie` on success. The code is single-use: a repeat
+ * call with the same code fails with 401.
+ */
+export async function exchangeAuthCode(code: string): Promise<RefreshResponse> {
+  return fetchJson<RefreshResponse>("/api/auth/exchange", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ code }),
+  });
+}
+
 export async function fetchMe(accessToken: string): Promise<AuthMe> {
   return fetchJson<AuthMe>("/api/auth/me", {
     method: "GET",
