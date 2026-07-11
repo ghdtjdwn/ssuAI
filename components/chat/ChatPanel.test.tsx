@@ -181,6 +181,116 @@ describe("ChatPanel", () => {
     expect(createMcpWebSession).not.toHaveBeenCalled();
   });
 
+  describe("MCP session acquisition", () => {
+    function mockDoneStream() {
+      vi.mocked(startAgentStream).mockResolvedValue({} as Response);
+      vi.mocked(readAgentStream).mockImplementation(async function* () {
+        yield { type: "done" } as never;
+      });
+    }
+
+    function submit(text: string) {
+      const input = screen.getByPlaceholderText("메시지를 입력하세요");
+      fireEvent.change(input, { target: { value: text } });
+      fireEvent.submit(input.closest("form")!);
+    }
+
+    it("mints a library-only MCP session and sends it to the agent stream", async () => {
+      setLibraryAuthState({ isConnected: true });
+      vi.mocked(createMcpWebSession).mockResolvedValue({
+        expiresAt: "2026-06-30T01:00:00Z",
+        mcpSessionId: "library-mcp-session",
+      });
+      mockDoneStream();
+
+      render(<ChatPanel />);
+
+      await waitFor(() => expect(createMcpWebSession).toHaveBeenCalledWith(null));
+      await screen.findByText("MCP 연결됨");
+      submit("도서관 자리 있어?");
+
+      await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
+      expect(startAgentStream).toHaveBeenCalledWith(
+        "도서관 자리 있어?",
+        expect.any(String),
+        "library-mcp-session",
+        true,
+      );
+    });
+
+    it("mints a SAINT-backed MCP session when only SAINT is authenticated", async () => {
+      setAuthState({
+        accessToken: "access-token",
+        isAuthenticated: true,
+        user: {
+          enrollmentStatus: "재학",
+          major: "컴퓨터학부",
+          name: "홍길동",
+          studentId: "20231234",
+        },
+      });
+      vi.mocked(createMcpWebSession).mockResolvedValue({
+        expiresAt: "2026-06-30T01:00:00Z",
+        mcpSessionId: "saint-mcp-session",
+      });
+      mockDoneStream();
+
+      render(<ChatPanel />);
+
+      await waitFor(() => expect(createMcpWebSession).toHaveBeenCalledWith("access-token"));
+      await screen.findByText("MCP 연결됨");
+      submit("졸업까지 어떤 조건들이 남았어?");
+
+      await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
+      expect(startAgentStream).toHaveBeenCalledWith(
+        "졸업까지 어떤 조건들이 남았어?",
+        expect.any(String),
+        "saint-mcp-session",
+        false,
+      );
+    });
+
+    it("re-mints when the library identity becomes available after a SAINT session", async () => {
+      setAuthState({
+        accessToken: "access-token",
+        isAuthenticated: true,
+        user: {
+          enrollmentStatus: "재학",
+          major: "컴퓨터학부",
+          name: "홍길동",
+          studentId: "20231234",
+        },
+      });
+      vi.mocked(createMcpWebSession)
+        .mockResolvedValueOnce({
+          expiresAt: "2026-06-30T01:00:00Z",
+          mcpSessionId: "saint-mcp-session",
+        })
+        .mockResolvedValueOnce({
+          expiresAt: "2026-06-30T01:00:00Z",
+          mcpSessionId: "saint-library-mcp-session",
+        });
+
+      const { rerender } = render(<ChatPanel />);
+
+      await waitFor(() => expect(createMcpWebSession).toHaveBeenCalledTimes(1));
+      expect(createMcpWebSession).toHaveBeenLastCalledWith("access-token");
+
+      setLibraryAuthState({ isConnected: true });
+      rerender(<ChatPanel />);
+
+      await waitFor(() => expect(createMcpWebSession).toHaveBeenCalledTimes(2));
+      expect(createMcpWebSession).toHaveBeenLastCalledWith("access-token");
+    });
+
+    it("does not mint an MCP session without SAINT or library identity", () => {
+      render(<ChatPanel />);
+
+      expect(screen.getByText("공개 도구 모드")).toBeInTheDocument();
+      expect(createMcpWebSession).not.toHaveBeenCalled();
+    });
+  });
+
   describe("streaming render", () => {
     function setAuthedUser() {
       setAuthState({
