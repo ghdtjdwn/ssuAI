@@ -2,7 +2,8 @@
 
 - **Status**: Accepted — 구현
 - **Date**: 2026-07-12
-- **Scope**: `proxy.ts`(삭제), `lib/api/auth.ts`, `app/auth/return/page.tsx`, `app/auth/login/page.tsx`,
+- **Scope**: `proxy.ts`(삭제), `lib/api/auth.ts`, `app/auth/return/page.tsx`,
+  `components/auth/AuthReturnContent.tsx`, `app/auth/login/page.tsx`,
   `app/auth/return/page.test.tsx`, `lib/api/auth.test.ts`
 - **연관**: ssuMCP `POST /api/auth/exchange`(병행 구현), ssuMCP ADR 0092(멀티포드 MCP 세션 어피니티:
   Traefik sticky 쿠키), commit `8ef5bad`(`/`, `/chat` force-dynamic 캐시 우회)
@@ -78,6 +79,15 @@ HTML shell을 캐시해 배포 후에도 죽은 JS 청크 해시를 참조하는
 동일하게 `export const dynamic = "force-dynamic"`을 추가해 매 요청마다 최신 번들을 참조하는
 HTML을 새로 렌더링하게 한다. `/auth/return`은 SSO 직후 가장 먼저 도달하는 페이지라 이 문제의
 영향이 특히 크다.
+
+주의: Next.js의 route segment config(`dynamic` 등)는 **`"use client"` 모듈에서는 조용히
+무시된다**. `/auth/return` 페이지는 원래 파일 전체가 클라이언트 컴포넌트였기 때문에 export만
+추가해서는 빌드 route table에 `○`(static)로 남았다(`/chat`은 서버 페이지라 `8ef5bad`가 그대로
+통했다). 그래서 `page.tsx`는 서버 컴포넌트로 남겨 segment config와 레이아웃 shell·`<Suspense>`
+경계만 갖게 하고, 인터랙티브 로직 전부(`AuthReturnContent`, `PendingLine`, 에러 메시지 맵)는
+`components/auth/AuthReturnContent.tsx`(클라이언트)로 분리했다 — `/chat`의
+`page.tsx`(서버) + `components/chat/ChatPanel`(클라이언트) 구조와 동일한 관례다. 빌드 route
+table에서 `ƒ /auth/return`(dynamic)을 확인했다.
 
 ## 검증
 
