@@ -33,8 +33,8 @@ const SSUAGENT_BASE =
  * identity available at this route. The SmartID access JWT lives only in browser
  * memory (`useSaintAuth`) and is never attached to the `/api/agent/*` fetch calls
  * (`lib/api/agent.ts` sends no `Authorization` header), and the httpOnly refresh
- * cookie set in `proxy.ts` is scoped to `Path=/api/auth`, so browsers never send it
- * on `/api/agent/*` requests either — there is nothing here to verify. Wiring this
+ * cookie set by the backend's `/api/auth/exchange` response is scoped to
+ * `Path=/api/auth`, so browsers never send it on `/api/agent/*` requests either — there is nothing here to verify. Wiring this
  * live requires a follow-up (e.g. attach `Authorization: Bearer <accessToken>` from
  * `lib/api/agent.ts` and verify it here against ssuMCP, or widen the refresh cookie's
  * path) that is out of scope for this unit; see the ADR note for details.

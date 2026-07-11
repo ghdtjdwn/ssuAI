@@ -53,7 +53,16 @@ export function AuthReturnContent() {
       try {
         if (code) {
           if (!exchangeInFlightRef.current) {
-            exchangeInFlightRef.current = exchangeAuthCode(code).then(() => undefined);
+            // An exchange failure is non-fatal: reloading /auth/return with an
+            // already-consumed code 401s here, but the first exchange already
+            // set the refresh cookie, so the refresh() below still signs the
+            // user in. The rejection is converted (never rethrown) so every
+            // awaiter of the single-flight promise falls through to refresh(),
+            // which is the sole arbiter of success.
+            exchangeInFlightRef.current = exchangeAuthCode(code).then(
+              () => undefined,
+              () => undefined,
+            );
           }
           await exchangeInFlightRef.current;
         }
@@ -66,6 +75,8 @@ export function AuthReturnContent() {
           setRefreshFailed(true);
         }
       } catch {
+        // Defensive: refresh() resolves false rather than throwing, but never
+        // strand the user on the pending spinner if that contract changes.
         if (cancelled) return;
         setRefreshSettled(true);
         setRefreshFailed(true);
