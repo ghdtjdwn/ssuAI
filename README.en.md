@@ -1,12 +1,12 @@
 # ssuAI — Soongsil University AI Web Client
 
-[![CI](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml)
+[![CI](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml)
 
 **한국어** [README.md](README.md) · **English** (this document)
 
-> 🧩 **Soongsil Campus AI Platform** (1 of 4 services) · [ssuMCP](https://github.com/hoeongj/ssuMCP) · **ssuAI** · [ssuAgent](https://github.com/hoeongj/ssuAgent) · [ssu-ai-service](https://github.com/hoeongj/ssu-ai-service) · 🟢 [Live](https://ssuai.vercel.app)
+> 🧩 **Soongsil Campus AI Platform** (1 of 4 services) · [ssuMCP](https://github.com/ghdtjdwn/ssuMCP) · **ssuAI** · [ssuAgent](https://github.com/ghdtjdwn/ssuAgent) · [ssu-ai-service](https://github.com/ghdtjdwn/ssu-ai-service) · 🟢 [Live](https://ssuai.vercel.app)
 
-A Next.js web client for [ssuMCP](https://github.com/hoeongj/ssuMCP), the Soongsil University MCP server.
+A Next.js web client for [ssuMCP](https://github.com/ghdtjdwn/ssuMCP), the Soongsil University MCP server.
 Five screens (Home · Chatbot · Academics · Library · Campus) plus a natural-language chatbot for browsing public campus information and personal academic records.
 
 | | URL |
@@ -43,7 +43,7 @@ On top of a single design system (Soongsil blue + mint tokens, Pretendard/JetBra
 
 ## Why I Built It
 
-[ssuMCP](https://github.com/hoeongj/ssuMCP) already serves university data as an MCP server, but it had to be usable by people without Claude Desktop. ssuAI is the answer: a chatbot and dashboard reachable straight from the browser, turning ssuMCP into something anyone can use as its web client.
+[ssuMCP](https://github.com/ghdtjdwn/ssuMCP) already serves university data as an MCP server, but it had to be usable by people without Claude Desktop. ssuAI is the answer: a chatbot and dashboard reachable straight from the browser, turning ssuMCP into something anyone can use as its web client.
 
 ---
 
@@ -219,14 +219,14 @@ pnpm build
 
 - [Product status and scope](docs/product.md) (Korean)
 - [Long-term vision and roadmap](docs/vision.md) (Korean)
-- [Security policy (ssuMCP)](https://github.com/hoeongj/ssuMCP/blob/main/docs/security.md) (Korean)
+- [Security policy (ssuMCP)](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/security.md) (Korean)
 
 ---
 
 ## MCP Server
 
 The MCP server this app consumes:
-**[hoeongj/ssuMCP](https://github.com/hoeongj/ssuMCP)** · `https://ssumcp.duckdns.org/mcp`
+**[ghdtjdwn/ssuMCP](https://github.com/ghdtjdwn/ssuMCP)** · `https://ssumcp.duckdns.org/mcp`
 
 ---
 

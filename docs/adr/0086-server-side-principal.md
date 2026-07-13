@@ -3,7 +3,7 @@
 - **Status**: Accepted — strip-only 구현 완료, 서버측 identity 주입은 dormant(배선 없음)
 - **Date**: 2026-07-10
 - **Scope**: `lib/server/agentProxy.ts`(`/api/agent/stream`, `/api/agent/resume`가 공유하는 프록시), `lib/server/agentProxy.test.ts`
-- **연관**: [ssuAgent ADR 0011](https://github.com/hoeongj/ssuAgent/blob/main/docs/adr/0011-thread-stable-principal-binding.md) — 회전하는 `mcp_session_id` 대신 안정적인 `principal`로 thread 소유권을 재바인딩하는 ssuAgent 측 절반. **그 ADR의 신뢰 모델을 그대로 계승한다**: "principal은 절대 클라이언트가 주장할 수 있는 값이어서는 안 되고, 오직 ssuAI의 서버측 프록시만 주입할 수 있다."
+- **연관**: [ssuAgent ADR 0011](https://github.com/ghdtjdwn/ssuAgent/blob/main/docs/adr/0011-thread-stable-principal-binding.md) — 회전하는 `mcp_session_id` 대신 안정적인 `principal`로 thread 소유권을 재바인딩하는 ssuAgent 측 절반. **그 ADR의 신뢰 모델을 그대로 계승한다**: "principal은 절대 클라이언트가 주장할 수 있는 값이어서는 안 되고, 오직 ssuAI의 서버측 프록시만 주입할 수 있다."
 
 ## 배경
 

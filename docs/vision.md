@@ -2,7 +2,7 @@
 
 > 장기 제품 방향 문서. 현재 배포된 기능은 [product.md](product.md)에,
 > MCP/보안 구현 계약은
-> [ssuMCP 문서](https://github.com/hoeongj/ssuMCP/tree/main/docs)에 기록한다.
+> [ssuMCP 문서](https://github.com/ghdtjdwn/ssuMCP/tree/main/docs)에 기록한다.
 > 기준일: 2026-07-02.
 
 ## 1. 목표
@@ -151,7 +151,7 @@ provider 정책으로 전송한다.
 
 모든 기능(Phase 1–7)이 완성된 후 마지막으로 수행한다. 미완성 코드에서 성능 최적화를 하면 기능 추가 시 다시 무너지기 때문이다.
 
-> **현황 (2026-07-02)**: 이 섹션의 상당 부분은 ssuMCP 백엔드에서 이미 라이브다 — 관측성 3종(Prometheus 메트릭 + Tempo 트레이스 + Loki 로그, Grafana RED 대시보드), k6 부하 테스트 1차 측정, prod PostgreSQL 전환. 남은 것은 knee-point 재측정 등 추가 비교 측정이다. 현재 구현 상태의 정본은 [ssuMCP docs](https://github.com/hoeongj/ssuMCP/tree/main/docs)(architecture·ADR 0069·performance)를 따른다. 아래 본문은 계획 당시 기록으로 보존한다.
+> **현황 (2026-07-02)**: 이 섹션의 상당 부분은 ssuMCP 백엔드에서 이미 라이브다 — 관측성 3종(Prometheus 메트릭 + Tempo 트레이스 + Loki 로그, Grafana RED 대시보드), k6 부하 테스트 1차 측정, prod PostgreSQL 전환. 남은 것은 knee-point 재측정 등 추가 비교 측정이다. 현재 구현 상태의 정본은 [ssuMCP docs](https://github.com/ghdtjdwn/ssuMCP/tree/main/docs)(architecture·ADR 0069·performance)를 따른다. 아래 본문은 계획 당시 기록으로 보존한다.
 
 ### 목표
 
@@ -231,7 +231,7 @@ spring:
 
 **② H2 → PostgreSQL 전환 + HikariCP 튜닝**
 
-H2 인메모리 DB는 동시 write에서 제한적이다. PostgreSQL로 전환 후 커넥션 풀 크기를 부하 테스트 결과 기반으로 조정한다. (prod는 이미 in-cluster PostgreSQL로 전환 완료 — [ssuMCP architecture](https://github.com/hoeongj/ssuMCP/blob/main/docs/architecture.md) 참고.)
+H2 인메모리 DB는 동시 write에서 제한적이다. PostgreSQL로 전환 후 커넥션 풀 크기를 부하 테스트 결과 기반으로 조정한다. (prod는 이미 in-cluster PostgreSQL로 전환 완료 — [ssuMCP architecture](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/architecture.md) 참고.)
 
 **③ `/api/chat` Rate Limiting 강화**
 
@@ -301,7 +301,7 @@ Phase 9 부하 테스트 전에 먼저 수행한다. 외부 학교 시스템에 
 
 ### 2. Rate Limiting (Token Bucket) 구현 확인
 
-[ssuMCP architecture](https://github.com/hoeongj/ssuMCP/blob/main/docs/architecture.md)에 "커넥터별 최대 1 req/sec 토큰 버킷 구현" 계획이 명시되어 있고, 실제로 구현·운영 중이다(특히 `RealLibrarySeatConnector`).
+[ssuMCP architecture](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/architecture.md)에 "커넥터별 최대 1 req/sec 토큰 버킷 구현" 계획이 명시되어 있고, 실제로 구현·운영 중이다(특히 `RealLibrarySeatConnector`).
 
 ### 3. Exponential Backoff 추가
 
@@ -340,6 +340,6 @@ Phase 9 부하 테스트 전에 먼저 수행한다. 외부 학교 시스템에 
 
 - [현재 제품 범위](product.md)
 - [문서 지도](README.md)
-- [서버 도구 계약](https://github.com/hoeongj/ssuMCP/blob/main/docs/mcp-tools.md)
-- [서버 보안 정책](https://github.com/hoeongj/ssuMCP/blob/main/docs/security.md)
-- [서버 아키텍처](https://github.com/hoeongj/ssuMCP/blob/main/docs/architecture.md)
+- [서버 도구 계약](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md)
+- [서버 보안 정책](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/security.md)
+- [서버 아키텍처](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/architecture.md)

@@ -1,12 +1,12 @@
 # ssuAI — 숭실대학교 AI 웹 클라이언트
 
-[![CI](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/hoeongj/ssuAI/actions/workflows/ci.yml)
+[![CI](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml)
 
 > 🇺🇸 English version: [README.en.md](README.en.md)
 
-> 🧩 **숭실대 캠퍼스 AI 플랫폼** (4-서비스 중 하나) · [ssuMCP](https://github.com/hoeongj/ssuMCP) · **ssuAI** · [ssuAgent](https://github.com/hoeongj/ssuAgent) · [ssu-ai-service](https://github.com/hoeongj/ssu-ai-service) · 🟢 [Live](https://ssuai.vercel.app)
+> 🧩 **숭실대 캠퍼스 AI 플랫폼** (4-서비스 중 하나) · [ssuMCP](https://github.com/ghdtjdwn/ssuMCP) · **ssuAI** · [ssuAgent](https://github.com/ghdtjdwn/ssuAgent) · [ssu-ai-service](https://github.com/ghdtjdwn/ssu-ai-service) · 🟢 [Live](https://ssuai.vercel.app)
 
-숭실대학교 MCP 서버 [ssuMCP](https://github.com/hoeongj/ssuMCP)를 소비하는 Next.js 웹 클라이언트.  
+숭실대학교 MCP 서버 [ssuMCP](https://github.com/ghdtjdwn/ssuMCP)를 소비하는 Next.js 웹 클라이언트.  
 5개 화면(홈·챗봇·학사·도서관·캠퍼스)과 자연어 챗봇으로 공개 캠퍼스 정보와 개인 학사 정보를 조회한다.
 
 | | URL |
@@ -43,7 +43,7 @@
 
 ## 왜 만들었나
 
-[ssuMCP](https://github.com/hoeongj/ssuMCP)가 MCP 서버로 학교 데이터를 제공하지만, Claude Desktop이 없는 사람도 쓸 수 있어야 했다. 브라우저에서 바로 접근할 수 있는 챗봇과 대시보드를 만들어 ssuMCP의 웹 클라이언트로 만든 게 ssuAI다.
+[ssuMCP](https://github.com/ghdtjdwn/ssuMCP)가 MCP 서버로 학교 데이터를 제공하지만, Claude Desktop이 없는 사람도 쓸 수 있어야 했다. 브라우저에서 바로 접근할 수 있는 챗봇과 대시보드를 만들어 ssuMCP의 웹 클라이언트로 만든 게 ssuAI다.
 
 ---
 
@@ -219,14 +219,14 @@ pnpm build
 
 - [제품 현황 및 범위](docs/product.md)
 - [장기 비전과 로드맵](docs/vision.md)
-- [보안 정책 (ssuMCP)](https://github.com/hoeongj/ssuMCP/blob/main/docs/security.md)
+- [보안 정책 (ssuMCP)](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/security.md)
 
 ---
 
 ## MCP 서버
 
 이 앱이 소비하는 MCP 서버:  
-**[hoeongj/ssuMCP](https://github.com/hoeongj/ssuMCP)** · `https://ssumcp.duckdns.org/mcp`
+**[ghdtjdwn/ssuMCP](https://github.com/ghdtjdwn/ssuMCP)** · `https://ssumcp.duckdns.org/mcp`
 
 ---
 

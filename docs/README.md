@@ -18,7 +18,7 @@
 
 ## Backend Sources Of Truth
 
-- [ssuMCP architecture](https://github.com/hoeongj/ssuMCP/blob/main/docs/architecture.md)
-- [ssuMCP MCP tools](https://github.com/hoeongj/ssuMCP/blob/main/docs/mcp-tools.md)
-- [ssuMCP security](https://github.com/hoeongj/ssuMCP/blob/main/docs/security.md)
-- [ssuMCP deployment](https://github.com/hoeongj/ssuMCP/blob/main/deploy/README.md)
+- [ssuMCP architecture](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/architecture.md)
+- [ssuMCP MCP tools](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md)
+- [ssuMCP security](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/security.md)
+- [ssuMCP deployment](https://github.com/ghdtjdwn/ssuMCP/blob/main/deploy/README.md)

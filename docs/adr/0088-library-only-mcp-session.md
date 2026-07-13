@@ -3,7 +3,7 @@
 - **Status**: Accepted — 구현
 - **Date**: 2026-07-11
 - **Scope**: `components/chat/ChatPanel.tsx`, `lib/api/agent.ts`, `components/chat/ChatPanel.test.tsx`
-- **연관**: [ssuAgent ADR 0013 후속 수정](https://github.com/hoeongj/ssuAgent/blob/main/docs/adr/0013-library-reservation-preauth-gate.md), ssuMCP `POST /api/mcp/auth/web-session` JWT 선택화
+- **연관**: [ssuAgent ADR 0013 후속 수정](https://github.com/ghdtjdwn/ssuAgent/blob/main/docs/adr/0013-library-reservation-preauth-gate.md), ssuMCP `POST /api/mcp/auth/web-session` JWT 선택화
 
 ## 배경
 
