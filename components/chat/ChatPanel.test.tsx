@@ -215,6 +215,7 @@ describe("ChatPanel", () => {
         expect.any(String),
         "library-mcp-session",
         true,
+        null,
       );
     });
 
@@ -247,6 +248,7 @@ describe("ChatPanel", () => {
         expect.any(String),
         "saint-mcp-session",
         false,
+        "access-token",
       );
     });
 
@@ -341,6 +343,7 @@ describe("ChatPanel", () => {
         expect.any(String),
         "mcp-session",
         true,
+        "access-token",
       );
     });
 
@@ -375,6 +378,7 @@ describe("ChatPanel", () => {
         7,
         "mcp-session",
         true,
+        "access-token",
       );
     });
 

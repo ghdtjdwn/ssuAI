@@ -4,6 +4,7 @@ import { deriveServerPrincipal, proxyToAgent, stripAndInjectPrincipal } from "./
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.resetModules();
 });
 
@@ -56,19 +57,50 @@ describe("stripAndInjectPrincipal", () => {
 });
 
 describe("deriveServerPrincipal", () => {
-  it("returns null: no server-verified identity source is wired to this route yet", () => {
+  it("returns null when the browser did not send an access token", async () => {
     const request = new Request("https://ssuai.example/api/agent/stream", { method: "POST" });
 
-    expect(deriveServerPrincipal(request)).toBeNull();
+    await expect(deriveServerPrincipal(request)).resolves.toBeNull();
   });
 
-  it("ignores any Authorization header on the request (no verification infra exists to trust it)", () => {
+  it("uses only the subject verified by ssuMCP", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: { studentId: "20201234" },
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
     const request = new Request("https://ssuai.example/api/agent/stream", {
       method: "POST",
-      headers: { Authorization: "Bearer some-jwt" },
+      headers: { Authorization: "Bearer access-jwt" },
     });
 
-    expect(deriveServerPrincipal(request)).toBeNull();
+    await expect(deriveServerPrincipal(request)).resolves.toBe("20201234");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/api/auth/me",
+      expect.objectContaining({
+        headers: { Authorization: "Bearer access-jwt", Accept: "application/json" },
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("fails closed when an access token is rejected", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+    const request = new Request("https://ssuai.example/api/agent/stream", {
+      method: "POST",
+      headers: { Authorization: "Bearer expired-jwt" },
+    });
+
+    await expect(deriveServerPrincipal(request)).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("fails closed when the verifier is unavailable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+    const request = new Request("https://ssuai.example/api/agent/stream", {
+      method: "POST",
+      headers: { Authorization: "Bearer access-jwt" },
+    });
+
+    await expect(deriveServerPrincipal(request)).rejects.toMatchObject({ status: 503 });
   });
 });
 
@@ -98,6 +130,24 @@ describe("proxyToAgent", () => {
     expect(forwardedBody.message).toBe("hi");
   });
 
+  it("injects only a principal verified by ssuMCP and never forwards the bearer token", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { studentId: "20201234" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response("data: {}\n\n", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new Request("https://ssuai.example/api/agent/stream", {
+      method: "POST",
+      headers: { Authorization: "Bearer access-jwt" },
+      body: JSON.stringify({ message: "hi", principal: "client-asserted" }),
+    });
+
+    await proxyToAgent("/agent/stream", request);
+
+    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ message: "hi", principal: "20201234" });
+    expect(init.headers).not.toHaveProperty("Authorization");
+  });
+
   it("forwards without a principal field when the client sends none", async () => {
     const fetchMock = stubFetchOnce();
     const request = new Request("https://ssuai.example/api/agent/resume", {
@@ -112,6 +162,36 @@ describe("proxyToAgent", () => {
     expect(forwardedBody).toEqual({ thread_id: "t1", approved: true, action_id: 1, mcp_session_id: "s1" });
   });
 
+  it("does not call ssuAgent when bearer verification fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new Request("https://ssuai.example/api/agent/stream", {
+      method: "POST",
+      headers: { Authorization: "Bearer expired-jwt" },
+      body: JSON.stringify({ message: "hi", thread_id: "t1" }),
+    });
+
+    const response = await proxyToAgent("/agent/stream", request);
+
+    expect(response.status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 503 without calling ssuAgent when principal verification is unavailable", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new Request("https://ssuai.example/api/agent/stream", {
+      method: "POST",
+      headers: { Authorization: "Bearer access-jwt" },
+      body: JSON.stringify({ message: "hi", thread_id: "t1" }),
+    });
+
+    const response = await proxyToAgent("/agent/stream", request);
+
+    expect(response.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("forwards to the configured ssuAgent base URL and path", async () => {
     const fetchMock = stubFetchOnce();
     const request = new Request("https://ssuai.example/api/agent/stream", {
@@ -123,5 +203,21 @@ describe("proxyToAgent", () => {
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://ssuagent.duckdns.org/agent/stream");
+  });
+
+  it("fails closed before any upstream call when the production proxy key is missing", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("AGENT_API_KEY", "");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new Request("https://ssuai.example/api/agent/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "hi", thread_id: "t1" }),
+    });
+
+    const response = await proxyToAgent("/agent/stream", request);
+
+    expect(response.status).toBe(503);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

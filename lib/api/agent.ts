@@ -29,6 +29,17 @@ function parseSseData(raw: string): AgentEvent | null {
   }
 }
 
+/**
+ * Normalize SSE line endings without consuming a trailing CR. A CRLF sequence
+ * may be split across network chunks, so the last CR is retained until the
+ * following chunk (or stream close) tells us whether it is paired with LF.
+ */
+function normalizeSseLineEndings(value: string, flush = false): string {
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(flush ? /\r/g : /\r(?!$)/g, "\n");
+}
+
 /** Async generator that yields AgentEvents from a fetch SSE response body. */
 export async function* readAgentStream(response: Response): AsyncGenerator<AgentEvent> {
   const reader = response.body?.getReader();
@@ -42,24 +53,36 @@ export async function* readAgentStream(response: Response): AsyncGenerator<Agent
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
+      buffer = normalizeSseLineEndings(buffer);
 
-      // SSE messages are separated by double newlines
+      // SSE messages are separated by a blank line. Keep an incomplete frame
+      // for the next chunk; a proxy is free to split a frame anywhere.
       const parts = buffer.split("\n\n");
       buffer = parts.pop() ?? "";
 
       for (const part of parts) {
-        for (const line of part.split("\n")) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith("data: ")) {
-            const event = parseSseData(trimmed.slice(6));
-            if (event) yield event;
-          }
+        const data = part
+          .split("\n")
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).replace(/^ /, ""))
+          .join("\n");
+        if (data) {
+          const event = parseSseData(data);
+          if (event) yield event;
         }
       }
     }
-    // Flush remaining buffer
-    if (buffer.trim().startsWith("data: ")) {
-      const event = parseSseData(buffer.trim().slice(6));
+    // Flush TextDecoder's trailing bytes and a final frame even if the upstream
+    // closes without the optional terminating blank line.
+    buffer += decoder.decode();
+    buffer = normalizeSseLineEndings(buffer, true);
+    const trailingData = buffer
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).replace(/^ /, ""))
+      .join("\n");
+    if (trailingData) {
+      const event = parseSseData(trailingData);
       if (event) yield event;
     }
   } finally {
@@ -83,10 +106,14 @@ export async function startAgentStream(
   threadId: string,
   mcpSessionId: string | null,
   libraryConnected: boolean,
+  accessToken: string | null,
 ): Promise<Response> {
   const response = await fetch(`${AGENT_PROXY_BASE}/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({
       message,
       thread_id: threadId,
@@ -107,10 +134,14 @@ export async function resumeAgentStream(
   actionId: number | null,
   mcpSessionId: string | null,
   libraryConnected: boolean,
+  accessToken: string | null,
 ): Promise<Response> {
   const response = await fetch(`${AGENT_PROXY_BASE}/resume`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({
       thread_id: threadId,
       approved,

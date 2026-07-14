@@ -1,6 +1,6 @@
 # ADR 0086 — 에이전트 프록시에서 클라이언트발 `principal` 무조건 제거 (ssuAgent ADR 0011 짝꿍)
 
-- **Status**: Accepted — strip-only 구현 완료, 서버측 identity 주입은 dormant(배선 없음)
+- **Status**: Accepted — server-verified principal 주입 구현 완료
 - **Date**: 2026-07-10
 - **Scope**: `lib/server/agentProxy.ts`(`/api/agent/stream`, `/api/agent/resume`가 공유하는 프록시), `lib/server/agentProxy.test.ts`
 - **연관**: [ssuAgent ADR 0011](https://github.com/ghdtjdwn/ssuAgent/blob/main/docs/adr/0011-thread-stable-principal-binding.md) — 회전하는 `mcp_session_id` 대신 안정적인 `principal`로 thread 소유권을 재바인딩하는 ssuAgent 측 절반. **그 ADR의 신뢰 모델을 그대로 계승한다**: "principal은 절대 클라이언트가 주장할 수 있는 값이어서는 안 되고, 오직 ssuAI의 서버측 프록시만 주입할 수 있다."
@@ -22,7 +22,7 @@ ssuAgent는 `AgentRequest`/`ResumeRequest`에 `principal: str | None` 필드를 
 - **`next.config.ts`의 `rewrites()`**: `/api/auth/*`, `/api/mcp/*` 같은 인증/세션 관련 경로는 전부 백엔드(ssuMCP, `SSUAI_API_PROXY_TARGET`)로 바이트 그대로 포워딩되는 rewrite다. 즉 JWT 발급·검증은 전부 백엔드가 수행하고, **ssuAI의 Next.js 서버 코드는 JWT를 파싱하거나 검증하는 로직을 어디에도 갖고 있지 않다**(`jsonwebtoken`/`jose` 등 미사용, 확인됨). `/api/agent/*`만 실제 App Router 라우트 핸들러라 이 rewrite 대상에서 제외된다(그래서 `agentProxy.ts`가 별도로 존재).
 - **`middleware.ts`**: 존재하지 않는다. 요청에 identity 헤더를 주입하는 엣지 레이어도 없다.
 
-**결론: 오늘 시점에 ssuAI의 Next.js 서버는 `/api/agent/*` 라우트에서 검증 가능한 identity를 전혀 갖고 있지 않다.** JWT는 브라우저에만 있고, 이 라우트로는 전달되지 않는다(헤더도 쿠키도 없음). ssuMCP가 JWT를 검증하지만 그 결과가 이 프록시로 돌아오는 배선이 없다.
+**초기 결론**은 위와 같았다. 이후 배선 유닛에서 브라우저가 이미 메모리에 보유한 짧은-lived access JWT를 same-origin `/api/agent/*` 요청의 `Authorization` 헤더로만 보내고, Next route handler가 ssuMCP `GET /api/auth/me`로 이를 검증하도록 연결했다. ssuAgent에는 JWT를 전달하지 않고, 검증 응답의 `studentId`만 `principal`로 주입한다.
 
 ## 대안 비교
 
@@ -34,15 +34,13 @@ ssuAgent는 `AgentRequest`/`ResumeRequest`에 `principal: str | None` 필드를 
 
 ### B. Strip만 하고 주입은 보류, 배선 필요 지점을 문서화
 
-**채택.** 오늘 진짜로 존재하는 것만 구현한다: 클라이언트발 `principal`은 무조건 제거(방어), 서버 검증 identity 주입은 `deriveServerPrincipal()`이라는 이름 붙은 훅으로 명시적으로 dormant 상태를 유지한다. 이 함수는 항상 `null`을 반환하며, 왜 그런지(위 탐색 결과)를 코드 주석과 이 문서에 남긴다. 실제로 배선하려면 다음 중 하나가 후속 유닛으로 필요하다:
-- `lib/api/agent.ts`의 fetch 호출에 `Authorization: Bearer <accessToken>`을 실어 보내고, `agentProxy.ts`가 그 토큰을 ssuMCP의 검증 엔드포인트(예: `/api/auth/me` 상당)로 확인한 뒤 학번을 `principal`로 주입, 또는
-- refresh-token 쿠키의 `Path`를 `/api/agent`까지 넓히고, 라우트 핸들러가 그 쿠키로 백엔드에 검증을 위임.
+**초기 채택.** client-sent `principal`은 무조건 제거하고, 서버 검증 주입만 후속 유닛으로 남겼다.
 
-두 방법 모두 이번 유닛의 범위(방어 + 배선 여부 판단) 밖이라 별도 유닛으로 남긴다.
+**후속 구현.** 첫 번째 경로를 채택했다. `lib/api/agent.ts`는 이미 메모리에 존재하는 access JWT를 same-origin 프록시에만 전송한다. `agentProxy.ts`는 `SSUAI_API_PROXY_TARGET`(또는 기존 backend base)으로 `/api/auth/me`를 호출해 JWT를 검증하고, 성공 때만 응답의 `studentId`를 주입한다. Authorization이 없는 익명 요청만 기존 MCP-session 소유권 경로를 사용한다. Bearer가 제시된 뒤 검증이 실패하면 소유권 tier를 조용히 낮추지 않고 만료는 401, verifier 장애·잘못된 응답은 503으로 upstream 호출 전에 중단한다. refresh-cookie path를 넓히는 방법은 cross-site cookie 범위를 불필요하게 늘리므로 기각했다.
 
-### C. 하이브리드(주입 시도 후 실패 시 strip으로 폴백)
+### C. 하이브리드(주입 시도 후 실패 시 session owner로 폴백)
 
-**B에 포함.** `deriveServerPrincipal`이 `null`을 반환하면 자연히 principal 없이 포워딩되므로(ssuAgent ADR 0011의 세션 바인딩 폴백으로 흐름), 별도의 "폴백 로직"이 필요 없다 — B 자체가 이미 하이브리드 구조다.
+**기각.** stable principal로 이미 귀속된 thread에 session-only 요청을 보내면 ssuAgent가 403으로 거부한다. 프론트가 이 403을 복구하며 새 thread를 만들면 사용자는 기존 대화 포인터를 잃는다. 더 중요하게는 인증 토큰을 보낸 요청의 검증 실패를 익명과 동일하게 처리하면 인증 상태를 조용히 강등한다. 따라서 bearer가 있으면 fail-closed하고, bearer 자체가 없는 요청만 session owner를 사용한다.
 
 ## 결정
 
@@ -50,22 +48,24 @@ ssuAgent는 `AgentRequest`/`ResumeRequest`에 `principal: str | None` 필드를 
 
 1. body를 파싱해 `principal` 키를 무조건 삭제한다(클라이언트가 무엇을 보냈든).
 2. `deriveServerPrincipal(request)`가 non-null을 반환하면 그 값을 `principal`로 주입한다.
-3. `deriveServerPrincipal`은 오늘 항상 `null`을 반환한다(위 탐색 결과, 검증 가능한 identity가 없음) — 즉 오늘은 모든 요청이 `principal` 없이 ssuAgent로 전달되고, ssuAgent ADR 0011의 세션 바인딩(규칙 2) 경로로만 흐른다.
-4. JSON 파싱에 실패하는 malformed body는 그대로 통과시킨다 — ssuAgent 자체의 pydantic 검증이 거부한다.
+3. `deriveServerPrincipal`은 bearer가 없을 때만 `null`을 반환한다. bearer가 있으면 ssuMCP `/api/auth/me`를 3초 timeout으로 호출하고, 검증된 `studentId`만 principal로 사용한다.
+4. bearer 만료·거부는 401, verifier timeout·네트워크/5xx·잘못된 subject는 503으로 종료하며 ssuAgent를 호출하지 않는다.
+5. JSON 파싱에 실패하는 malformed body는 그대로 통과시킨다 — ssuAgent 자체의 pydantic 검증이 거부한다.
 
 ## 구현 선택
 
 - **`stripAndInjectPrincipal`을 순수 함수로 분리**: `fetch`/`Request`를 모킹하지 않고도 strip/inject 조합(클라이언트 있음+서버 있음, 클라이언트 있음+서버 없음, 둘 다 없음, malformed)을 직접 단위 테스트할 수 있다. `proxyToAgent` 통합 테스트는 `vi.stubGlobal("fetch", ...)`로 별도로 얇게 덮는다(`lib/api/client.test.ts`와 동일 패턴).
-- **`deriveServerPrincipal`을 이름 있는 별도 함수로 노출**: 오늘은 `null`만 반환하지만, 함수 경계를 미리 그어두면 후속 유닛이 이 함수 내부만 채우면 되고 `stripAndInjectPrincipal`/`proxyToAgent`는 건드릴 필요가 없다. 또한 이 함수가 **요청 body의 `principal`을 절대 읽지 않는다**는 계약(클라이언트 주장값을 서버 검증값으로 세탁하는 경로 원천 차단)을 시그니처와 주석으로 고정한다.
+- **`deriveServerPrincipal`을 이름 있는 별도 함수로 노출**: 검증 호출과 실패 정책을 한 경계에 모으고, 이 함수가 **요청 body의 `principal`을 절대 읽지 않는다**는 계약(클라이언트 주장값을 서버 검증값으로 세탁하는 경로 원천 차단)을 시그니처와 주석으로 고정한다.
+- **짧은 verifier timeout + fail-closed 상태 분리**: 인증 거부는 재로그인이 가능한 401, verifier 가용성 문제는 503으로 구분한다. 둘 다 ssuAgent 호출 전에 끝내므로 ownership tier가 바뀌지 않고 60초 스트림 실행 예산을 검증 호출이 소진하지 않는다.
 - **malformed JSON은 그대로 통과**: strip을 위해 굳이 엄격한 스키마 검증까지 이 계층에서 할 필요가 없다 — ssuAgent가 이미 pydantic으로 요청을 검증하므로, 여기서는 "파싱 가능하면 principal을 제거/주입, 아니면 손대지 않고 통과"만 책임진다.
 
 ## 트레이드오프
 
-- **얻는 것**: 오늘 이 순간부터 `/api/agent/*`로 임의 `principal`을 주장하는 요청은 전부 무력화된다(ssuAgent가 어차피 세션 바인딩으로 폴백하므로 있으나 마나였지만, 명시적 방어를 코드로 고정).
-- **잃는 것 / 남는 리스크**: ssuAgent ADR 0011이 노린 실제 효과(재로그인·멀티기기 히스토리 보존)는 **오늘은 전혀 발생하지 않는다** — `deriveServerPrincipal`이 dormant이기 때문이다. ssuAgent 쪽과 마찬가지로 이 변경도 "절반의 배선"이며, 나머지 절반(서버 검증 identity를 실제로 이 라우트까지 끌어오는 배선)은 후속 유닛 과제로 남는다.
+- **얻는 것**: `/api/agent/*`의 client-sent principal을 제거하고 서버 검증 subject만 주입한다. 로그인 사용자의 thread ownership이 access-token 회전과 MCP session 교체에 흔들리지 않으며, 검증 실패 때 기존 thread를 잘못 session-only로 재해석하지 않는다.
+- **잃는 것 / 남는 리스크**: 로그인 요청마다 ssuMCP `/api/auth/me` 왕복이 한 번 추가된다. 3초 timeout과 명확한 503으로 장애 전파를 제한한다. 운영에서는 ssuAI와 ssuAgent 양쪽의 동일 `AGENT_API_KEY`가 필수이며, 이 경계가 꺼진 공개 ssuAgent에는 stable principal을 신뢰할 수 없다.
 
 ## 예상 면접 질문
 
-1. "principal 주입을 왜 지금 구현하지 않고 strip만 했나요? 판단 근거는?"
-2. "브라우저가 이미 갖고 있다는 SmartID JWT가 왜 이 프록시 라우트에는 도달하지 않나요? (Authorization 헤더 미부착 + 쿠키 Path 스코프, 두 가지 근거를 각각 설명)"
-3. "`deriveServerPrincipal`이 요청 body를 읽지 않는다는 계약이 왜 중요한가요? 만약 body의 principal을 읽어서 그대로 반환하면 어떤 공격이 가능해지나요?"
+1. "왜 bearer 검증 실패를 session owner로 폴백하지 않고 401/503으로 중단하나요?"
+2. "브라우저의 JWT를 왜 ssuAgent까지 전달하지 않고 ssuMCP `/api/auth/me`에서 subject로 축약하나요?"
+3. "`deriveServerPrincipal`이 요청 body를 읽지 않는다는 계약과 `AGENT_API_KEY` 강제가 함께 필요한 이유는 무엇인가요?"

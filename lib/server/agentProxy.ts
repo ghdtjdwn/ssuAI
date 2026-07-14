@@ -7,41 +7,82 @@
  * server-only env var, and stream the SSE response straight back to the browser, which
  * now calls the same-origin `/api/agent/*` routes instead (security follow-up #11).
  *
- * Rollout is safe and incremental: when AGENT_API_KEY is unset no header is sent and
- * ssuAgent's gate is a no-op (current behavior). Setting the matching key on both this
- * app and ssuAgent then activates enforcement without any code change.
+ * Production configures the same AGENT_API_KEY on this app and ssuAgent so only this
+ * trusted server boundary can assert a principal. Local development may omit the key
+ * while ssuAgent's matching development gate is disabled.
  *
  * `principal` handling (ssuAgent ADR 0011 companion, P1-8b): `principal` binds thread
  * ownership to a stable subject instead of the rotating `mcp_session_id`. Per ADR
  * 0011's trust model, `principal` must NEVER be client-assertable — only this
  * server-side proxy may set it. So every request body is stripped of any client-sent
  * `principal` before forwarding, then `deriveServerPrincipal` re-injects it ONLY from
- * a source this server itself has verified. See docs/adr/0086-server-side-principal.md
- * for why `deriveServerPrincipal` returns null today (dormant, strip-only).
+ * a source this server itself has verified. The browser provides its short-lived
+ * access token only to this same-origin route; this server verifies it with
+ * ssuMCP and forwards only the verified subject to ssuAgent.
  */
 const SSUAGENT_BASE =
   process.env.SSUAGENT_BASE_URL?.trim() ||
   process.env.NEXT_PUBLIC_SSUAGENT_BASE_URL?.trim() ||
   "https://ssuagent.duckdns.org";
 
+const SSUMCP_BASE = (
+  process.env.SSUAI_API_PROXY_TARGET?.trim() ||
+  process.env.NEXT_PUBLIC_SSUAI_API_BASE?.trim() ||
+  "http://localhost:8080"
+).replace(/\/$/, "");
+
+const PRINCIPAL_VERIFICATION_TIMEOUT_MS = 3_000;
+
+class PrincipalVerificationError extends Error {
+  constructor(
+    readonly status: 401 | 503,
+    message: string,
+  ) {
+    super(message);
+    this.name = "PrincipalVerificationError";
+  }
+}
+
 /**
  * Derive a server-verified stable principal for the caller of this request, if one
  * exists. MUST NEVER read `principal` (or any other identity claim) out of the
  * request body — that value is client-asserted and is stripped, never trusted.
  *
- * Today this always returns null: this Next.js server has no server-verified
- * identity available at this route. The SmartID access JWT lives only in browser
- * memory (`useSaintAuth`) and is never attached to the `/api/agent/*` fetch calls
- * (`lib/api/agent.ts` sends no `Authorization` header), and the httpOnly refresh
- * cookie set by the backend's `/api/auth/exchange` response is scoped to
- * `Path=/api/auth`, so browsers never send it on `/api/agent/*` requests either — there is nothing here to verify. Wiring this
- * live requires a follow-up (e.g. attach `Authorization: Bearer <accessToken>` from
- * `lib/api/agent.ts` and verify it here against ssuMCP, or widen the refresh cookie's
- * path) that is out of scope for this unit; see the ADR note for details.
+ * The bearer token is never sent to ssuAgent. It is accepted only by this
+ * same-origin server route and verified with ssuMCP's authenticated `/api/auth/me`
+ * endpoint. A request without a bearer token uses the existing session-scoped
+ * owner. Once a bearer token is presented, verification is fail-closed: an expired
+ * token returns 401 and verifier failure returns 503 instead of silently changing
+ * the thread's ownership tier.
  */
-export function deriveServerPrincipal(request: Request): string | null {
-  void request; // no server-verified identity source reaches this route yet (see comment above)
-  return null;
+export async function deriveServerPrincipal(request: Request): Promise<string | null> {
+  const authorization = request.headers.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${SSUMCP_BASE}/api/auth/me`, {
+      headers: { Authorization: authorization, Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(PRINCIPAL_VERIFICATION_TIMEOUT_MS),
+    });
+    if (response.status === 401 || response.status === 403) {
+      throw new PrincipalVerificationError(401, "Authentication expired");
+    }
+    if (!response.ok) {
+      throw new PrincipalVerificationError(503, "Authentication verifier unavailable");
+    }
+
+    const body = (await response.json()) as { data?: { studentId?: unknown } };
+    if (typeof body.data?.studentId !== "string" || body.data.studentId.length === 0) {
+      throw new PrincipalVerificationError(503, "Authentication verifier returned an invalid subject");
+    }
+    return body.data.studentId;
+  } catch (error) {
+    if (error instanceof PrincipalVerificationError) throw error;
+    throw new PrincipalVerificationError(503, "Authentication verifier unavailable");
+  }
 }
 
 /**
@@ -75,10 +116,23 @@ export function stripAndInjectPrincipal(rawBody: string, serverPrincipal: string
 
 export async function proxyToAgent(path: string, request: Request): Promise<Response> {
   const rawBody = await request.text();
-  const body = stripAndInjectPrincipal(rawBody, deriveServerPrincipal(request));
+  const key = process.env.AGENT_API_KEY?.trim();
+  if (!key && process.env.VERCEL_ENV === "production") {
+    return Response.json({ error: "Agent proxy authentication is unavailable" }, { status: 503 });
+  }
+
+  let serverPrincipal: string | null;
+  try {
+    serverPrincipal = await deriveServerPrincipal(request);
+  } catch (error) {
+    if (error instanceof PrincipalVerificationError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
+  const body = stripAndInjectPrincipal(rawBody, serverPrincipal);
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const key = process.env.AGENT_API_KEY?.trim();
   if (key) {
     headers["X-Agent-Key"] = key;
   }

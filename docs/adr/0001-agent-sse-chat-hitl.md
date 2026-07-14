@@ -96,7 +96,7 @@ ssuAgent는 `thread_id`를 생성 당시의 `mcp_session_id`에 바인딩하고,
 `/api/agent/{stream,resume}` Next.js Route Handler 프록시(`lib/server/agentProxy.ts`)가 server-only `AGENT_API_KEY`를 `X-Agent-Key` 헤더로 주입하고 SSE 응답을 pass-through 스트리밍합니다. 브라우저 코드는 same-origin `/api/agent/*`만 호출합니다(`lib/api/agent.ts`).
 
 - 당초 프록시를 기각했던 사유(이중 트래픽·스트림 지연)보다, **키를 서버에만 두는 인증 경계**가 우선한다고 재평가했습니다. SSE pass-through는 버퍼링 없이 릴레이해 체감 지연은 무시할 수준입니다.
-- `NEXT_PUBLIC_SSUAGENT_BASE_URL`은 로컬 개발·레거시 폴백으로만 남습니다. 키 미설정 시 헤더를 생략해 ssuAgent 게이트가 no-op인 하위호환을 유지합니다.
+- `NEXT_PUBLIC_SSUAGENT_BASE_URL`은 로컬 개발·레거시 폴백으로만 남습니다. 운영에서는 양쪽 서비스에 동일한 `AGENT_API_KEY`를 설정해 ssuAI 서버만 principal을 주장할 수 있게 한다. 키 생략은 ssuAgent 게이트도 비활성인 로컬 개발에만 허용한다.
 - 「트레이드오프 — CORS 의존성」 항목도 이 전환으로 해소되었습니다(브라우저는 더 이상 cross-origin 호출을 하지 않음).
 
 ---

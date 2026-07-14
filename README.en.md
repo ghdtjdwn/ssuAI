@@ -211,7 +211,7 @@ pnpm build
 | `SSUAI_API_PROXY_TARGET` | (server-only) override for the `/api/*` proxy target. Takes precedence over `NEXT_PUBLIC_SSUAI_API_BASE` when set |
 | `SSUAGENT_BASE_URL` | (server-only) ssuAgent server URL the `/api/agent` proxy forwards to. If unset, falls back to `NEXT_PUBLIC_SSUAGENT_BASE_URL`, then `https://ssuagent.duckdns.org` |
 | `NEXT_PUBLIC_SSUAGENT_BASE_URL` | (public, legacy) fallback ssuAgent server URL, mainly for local development |
-| `AGENT_API_KEY` | (server-only) `X-Agent-Key` credential the `/api/agent` proxy injects when calling ssuAgent. Never exposed to the browser; if unset, the header is not sent and the gate becomes a no-op |
+| `AGENT_API_KEY` | (server-only, required in production) `X-Agent-Key` credential the `/api/agent` proxy injects when calling ssuAgent. It must match ssuAgent and is never exposed to the browser. It may be omitted only for local development with both gates disabled |
 
 ---
 
