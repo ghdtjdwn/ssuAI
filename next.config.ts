@@ -7,6 +7,11 @@ const rawApiProxyTarget =
 const apiProxyTarget = rawApiProxyTarget.replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    // The developer home contains an unrelated package-lock.json. Pinning the
+    // root keeps Next.js file tracing and cache keys scoped to this repository.
+    root: process.cwd(),
+  },
   async rewrites() {
     return [
       {
