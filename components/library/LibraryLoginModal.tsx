@@ -25,7 +25,7 @@ export function LibraryLoginModal({ onClose }: LibraryLoginModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const { setConnected } = useLibraryAuth();
+  const { markCredentialsRefreshed } = useLibraryAuth();
   const queryClient = useQueryClient();
   const loginIdRef = useRef<HTMLInputElement>(null);
 
@@ -49,7 +49,7 @@ export function LibraryLoginModal({ onClose }: LibraryLoginModalProps) {
     try {
       await loginLibrary(loginId.trim(), await encryptLibraryPassword(password));
       setSuccess(true);
-      setConnected(true);
+      markCredentialsRefreshed();
       await queryClient.invalidateQueries({ queryKey: ["library", "loans"] });
       await queryClient.invalidateQueries({ queryKey: ["library", "seats"] });
       await queryClient.invalidateQueries({ queryKey: ["library", "recommendations"] });

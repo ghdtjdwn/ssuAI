@@ -17,8 +17,11 @@ ssuAI는 SAINT access JWT가 있으면 SAINT를 연결됨으로 표시하고, LM
 2. ssuMCP의 `linkedProviders`만 SAINT/LMS/LIBRARY 연결 여부로 인정한다. 필드가 없는 구버전 응답은 rolling deployment 동안 빈 grant로 해석해 fail-closed한다.
 3. 인증 가능한 웹 identity가 있으면 채팅 전송과 HITL 재개는 single-flight `ensureSession()`을 기다린다. 발급 실패 시 null 세션으로 조용히 강등하지 않고 사용자가 재시도할 수 있는 연결 오류를 표시한다.
 4. 실패한 발급 promise는 캐시하지 않는다. 다음 메시지는 새 발급을 시도한다. identity가 바뀐 동안 완료된 이전 응답은 폐기하고 현재 identity로 다시 발급한다.
-5. `expiresAt` 30초 전에 세션을 갱신한다. 만료된 ID를 연결됨으로 계속 표시하거나 agent 요청에 싣지 않는다.
-6. `library_connected` 힌트도 `LibraryAuthContext`의 로컬 플래그가 아니라 같은 MCP 세션의 실제 `LIBRARY` grant에서 계산한다. 이 값은 여전히 권한 부여 수단이 아니지만 UI와 server-confirmed 상태가 일치한다.
+5. MCP 세션 identity는 raw access JWT가 아니라 안정된 학생 subject와 도서관 웹 연결 상태로 구성한다. 15분 access JWT 갱신은 agent thread·HITL action을 소유한 MCP 세션을 회전시키지 않고 이후 API 호출의 bearer만 교체한다.
+6. 창 focus와 60초 주기에는 live-status API로 같은 MCP session ID의 실제 link와 credential 가용성을 다시 읽는다. provider callback·logout·만료가 7일짜리 발급 스냅샷에 갇히지 않는다. 일시적인 네트워크·5xx·rate-limit 실패는 마지막으로 확인된 유효 세션을 폐기하지 않고 다음 주기에 재시도한다.
+7. `expiresAt` 30초 전에만 새 세션을 발급한다. 만료된 ID를 연결됨으로 계속 표시하거나 agent 요청에 싣지 않는다.
+8. `library_connected` 힌트도 `LibraryAuthContext`의 로컬 플래그가 아니라 같은 MCP 세션의 실제 `LIBRARY` grant에서 계산한다. 이 값은 여전히 권한 부여 수단이 아니지만 UI와 server-confirmed 상태가 일치한다.
+9. 도서관 로그인이 이미 연결된 상태에서 새 credential을 발급해도 revision을 증가시킨다. 이 명시적 재인증은 이전 credential snapshot을 재사용하지 않도록 MCP 세션을 다시 발급한다.
 
 ## 검토한 대안
 
@@ -33,5 +36,9 @@ ssuAI는 SAINT access JWT가 있으면 SAINT를 연결됨으로 표시하고, LM
 - `linkedProviders`가 없거나 비어 있으면 session ID가 있어도 연결 개수는 0이다.
 - library 로컬 상태와 무관하게 agent의 `library_connected`는 실제 `LIBRARY` grant와 일치한다.
 - 로그아웃·identity 강화·세션 만료 시 기존 grant를 폐기하고 새 세션을 발급한다.
+- 같은 학생의 access JWT만 갱신되면 MCP session ID와 진행 중 thread/HITL 소유권을 유지한다.
+- provider callback·logout 뒤 창 focus 시 같은 session ID의 live grant가 갱신된다.
+- 일시적인 live-status 실패는 유효한 session ID와 provider grant를 삭제하지 않는다.
+- 도서관 `연결됨 → 연결됨` 재로그인도 credential revision 변경으로 감지한다.
 
 백엔드가 `linkedProviders`를 먼저 배포하고 프론트엔드를 뒤이어 배포한다. 역순이나 부분 rollout에서도 필드 부재를 빈 grant로 처리하므로 거짓 연결 상태는 만들지 않는다.

@@ -12,8 +12,16 @@ vi.mock("@/lib/api/library", () => ({
 const STORAGE_KEY = "library_connected";
 
 function Harness() {
-  const { isConnected } = useLibraryAuth();
-  return <span data-testid="connected">{String(isConnected)}</span>;
+  const { credentialRevision, isConnected, markCredentialsRefreshed } = useLibraryAuth();
+  return (
+    <>
+      <span data-testid="connected">{String(isConnected)}</span>
+      <span data-testid="revision">{credentialRevision}</span>
+      <button type="button" onClick={markCredentialsRefreshed}>
+        refresh credentials
+      </button>
+    </>
+  );
 }
 
 function setup() {
@@ -78,6 +86,19 @@ describe("LibraryAuthProvider", () => {
       expect(screen.getByTestId("connected").textContent).toBe("true");
     });
     expect(sessionStorage.getItem(STORAGE_KEY)).toBe("true");
+  });
+
+  it("advances the credential revision even when a fresh login stays connected", () => {
+    sessionStorage.setItem(STORAGE_KEY, "true");
+    setup();
+
+    expect(screen.getByTestId("connected").textContent).toBe("true");
+    expect(screen.getByTestId("revision").textContent).toBe("0");
+
+    act(() => screen.getByRole("button", { name: "refresh credentials" }).click());
+
+    expect(screen.getByTestId("connected").textContent).toBe("true");
+    expect(screen.getByTestId("revision").textContent).toBe("1");
   });
 
   it("marks disconnected when the loans query fails with LIBRARY_SESSION_REQUIRED", async () => {

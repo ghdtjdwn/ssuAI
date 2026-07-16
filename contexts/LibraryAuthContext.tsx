@@ -26,23 +26,34 @@ function writeStorage(v: boolean) {
 
 interface LibraryAuthState {
   isConnected: boolean;
+  credentialRevision: number;
   setConnected: (v: boolean) => void;
+  markCredentialsRefreshed: () => void;
   logout: () => Promise<void>;
 }
 
 const LibraryAuthContext = createContext<LibraryAuthState>({
   isConnected: false,
+  credentialRevision: 0,
   setConnected: () => {},
+  markCredentialsRefreshed: () => {},
   logout: async () => {},
 });
 
 export function LibraryAuthProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState<boolean>(readStorage);
+  const [credentialRevision, setCredentialRevision] = useState(0);
   const queryClient = useQueryClient();
 
   const setConnected = useCallback((v: boolean) => {
     writeStorage(v);
     setIsConnected(v);
+  }, []);
+
+  const markCredentialsRefreshed = useCallback(() => {
+    writeStorage(true);
+    setIsConnected(true);
+    setCredentialRevision((revision) => revision + 1);
   }, []);
 
   const logout = useCallback(async () => {
@@ -82,7 +93,15 @@ export function LibraryAuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient, setConnected]);
 
   return (
-    <LibraryAuthContext.Provider value={{ isConnected, setConnected, logout }}>
+    <LibraryAuthContext.Provider
+      value={{
+        isConnected,
+        credentialRevision,
+        setConnected,
+        markCredentialsRefreshed,
+        logout,
+      }}
+    >
       {children}
     </LibraryAuthContext.Provider>
   );

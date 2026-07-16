@@ -14,11 +14,14 @@ import { useLibraryAuth } from "@/contexts/LibraryAuthContext";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import {
   createMcpWebSession,
+  getMcpWebSessionStatus,
   type McpProvider,
   type McpWebSessionResponse,
 } from "@/lib/api/agent";
+import { ApiError } from "@/lib/api/types";
 
 const REFRESH_SKEW_MS = 30_000;
+const STATUS_REFRESH_MS = 60_000;
 const MAX_TIMER_MS = 2_147_000_000;
 const SESSION_ERROR_MESSAGE =
   "개인 서비스 연결 세션을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.";
@@ -67,11 +70,25 @@ function normalizeSession(response: McpWebSessionResponse): McpSession {
   };
 }
 
+function isRetryableStatusFailure(cause: unknown) {
+  if (!(cause instanceof ApiError)) {
+    return true;
+  }
+  return cause.httpStatus >= 500 || [408, 425, 429].includes(cause.httpStatus);
+}
+
 export function McpSessionProvider({ children }: { children: React.ReactNode }) {
-  const { accessToken, isAuthenticated } = useSaintAuth();
-  const { isConnected: libraryConnected } = useLibraryAuth();
+  const { accessToken, isAuthenticated, user } = useSaintAuth();
+  const {
+    isConnected: libraryConnected,
+    credentialRevision: libraryCredentialRevision,
+  } = useLibraryAuth();
   const jwtToken = isAuthenticated && accessToken ? accessToken : null;
-  const identityKey = `${jwtToken ?? "anonymous"}:${libraryConnected ? "library" : "none"}`;
+  const saintSubject = jwtToken ? (user?.studentId ?? "authenticated") : null;
+  const libraryIdentity = libraryConnected
+    ? `library-${libraryCredentialRevision}`
+    : "none";
+  const identityKey = `${saintSubject ?? "anonymous"}:${libraryIdentity}`;
   const identityRef = useRef<WebIdentity>({
     key: identityKey,
     accessToken: jwtToken,
@@ -87,7 +104,7 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
   const [status, setStatus] = useState<McpSessionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const ensureSession = useCallback(async (): Promise<McpSession | null> => {
+  const acquireSession = useCallback(async (forceStatus = false): Promise<McpSession | null> => {
     const acquireCurrent = async (): Promise<McpSession | null> => {
       const identity = identityRef.current;
       if (!identity.available) {
@@ -95,17 +112,40 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
       }
 
       const cached = cachedRef.current;
-      if (cached?.key === identity.key && isFresh(cached.session)) {
+      if (cached?.key === identity.key && isFresh(cached.session) && !forceStatus) {
         return cached.session;
       }
       if (inFlightRef.current?.key === identity.key) {
         return inFlightRef.current.promise;
       }
 
-      setStatus("connecting");
+      if (!cached || cached.key !== identity.key) {
+        setStatus("connecting");
+      }
       setError(null);
-      const request: Promise<McpSession | null> = createMcpWebSession(identity.accessToken)
+      const hasRefreshableSession =
+        cached?.key === identity.key && isFresh(cached.session);
+      const responsePromise = hasRefreshableSession
+        ? getMcpWebSessionStatus(cached.session.mcpSessionId, identity.accessToken).catch(
+            (cause: unknown) => {
+              if (identityRef.current.key !== identity.key) {
+                return acquireCurrent();
+              }
+              if (cause instanceof ApiError && [401, 404].includes(cause.httpStatus)) {
+                return createMcpWebSession(identityRef.current.accessToken);
+              }
+              if (isRetryableStatusFailure(cause)) {
+                return cached.session;
+              }
+              throw cause;
+            },
+          )
+        : createMcpWebSession(identity.accessToken);
+      const request: Promise<McpSession | null> = responsePromise
         .then((response) => {
+          if (response === null) {
+            return null;
+          }
           if (identityRef.current.key !== identity.key) {
             return acquireCurrent();
           }
@@ -139,14 +179,30 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
     return acquireCurrent();
   }, []);
 
+  const ensureSession = useCallback(
+    () => acquireSession(false),
+    [acquireSession],
+  );
+  const refreshSession = useCallback(
+    () => acquireSession(true),
+    [acquireSession],
+  );
+
   useEffect(() => {
-    identityRef.current = {
+    const nextIdentity = {
       key: identityKey,
       accessToken: jwtToken,
       available: Boolean(jwtToken || libraryConnected),
     };
+    const identityChanged = identityRef.current.key !== nextIdentity.key;
+    identityRef.current = nextIdentity;
+    if (!identityChanged) {
+      if (nextIdentity.available && !cachedRef.current && !inFlightRef.current) {
+        void ensureSession().catch(() => undefined);
+      }
+      return;
+    }
     cachedRef.current = null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- identity changes invalidate the prior provider grants immediately.
     setSession(null);
     setStatus("idle");
     setError(null);
@@ -158,14 +214,25 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!session) return;
     const refreshIn = Date.parse(session.expiresAt) - Date.now() - REFRESH_SKEW_MS;
-    const timer = window.setTimeout(() => {
+    const expiryTimer = window.setTimeout(() => {
       if (cachedRef.current?.session.mcpSessionId === session.mcpSessionId) {
         cachedRef.current = null;
       }
       void ensureSession().catch(() => undefined);
     }, Math.max(0, Math.min(refreshIn, MAX_TIMER_MS)));
-    return () => window.clearTimeout(timer);
-  }, [session, ensureSession]);
+    const statusTimer = window.setInterval(() => {
+      void refreshSession().catch(() => undefined);
+    }, STATUS_REFRESH_MS);
+    const handleFocus = () => {
+      void refreshSession().catch(() => undefined);
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.clearTimeout(expiryTimer);
+      window.clearInterval(statusTimer);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [session, ensureSession, refreshSession]);
 
   const value = useMemo(
     () => ({ session, status, error, ensureSession }),

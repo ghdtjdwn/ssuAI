@@ -173,3 +173,13 @@ export function createMcpWebSession(accessToken: string | null) {
     credentials: "include",
   });
 }
+
+/** Re-read the live grants of an existing browser-owned MCP session without rotating it. */
+export function getMcpWebSessionStatus(mcpSessionId: string, accessToken: string | null) {
+  return fetchJson<McpWebSessionResponse>("/api/mcp/auth/web-session/status", {
+    method: "POST",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    credentials: "include",
+    body: JSON.stringify({ mcpSessionId }),
+  });
+}
