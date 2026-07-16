@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getSsoInitUrl } from "@/lib/api/auth";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
@@ -14,6 +14,20 @@ interface CircuitBreakerInfo {
 
 interface ResilienceResponse {
   circuitBreakers: CircuitBreakerInfo[];
+}
+
+class AdminApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`HTTP ${status}`);
+    this.name = "AdminApiError";
+    this.status = status;
+  }
+}
+
+function isAuthorizationError(error: unknown): error is AdminApiError {
+  return error instanceof AdminApiError && (error.status === 401 || error.status === 403);
 }
 
 function StateBadge({ state }: { state: string }) {
@@ -39,9 +53,12 @@ function formatRate(rate: number): string {
   return `${rate.toFixed(1)}%`;
 }
 
-async function fetchResilienceApi(): Promise<ResilienceResponse> {
-  const res = await fetch("/api/admin/resilience", { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+async function fetchResilienceApi(accessToken: string): Promise<ResilienceResponse> {
+  const res = await fetch("/api/admin/resilience", {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new AdminApiError(res.status);
   return res.json() as Promise<ResilienceResponse>;
 }
 
@@ -50,66 +67,104 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const requestGenerationRef = useRef(0);
   // Admin is owner-only on the backend (ssuai.admin.student-ids → 403). The page
   // requires a login before it even calls the API; a logged-in non-owner still
   // gets a 403 from the backend, surfaced as an access-denied message below.
-  const { isAuthenticated, isLoading: authLoading } = useSaintAuth();
+  const { accessToken, isAuthenticated, isLoading: authLoading } = useSaintAuth();
 
   useEffect(() => {
     // Not logged in: skip the API call entirely (the component early-returns the
     // login prompt below, so the dashboard's loading state is never shown).
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !accessToken) {
       return;
     }
     let cancelled = false;
+    const initialGeneration = ++requestGenerationRef.current;
 
-    fetchResilienceApi()
+    fetchResilienceApi(accessToken)
       .then((json) => {
-        if (!cancelled) {
+        if (!cancelled && initialGeneration === requestGenerationRef.current) {
           setData(json);
+          setError(null);
           setLastRefreshed(new Date());
           setLoading(false);
         }
       })
       .catch((e: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && initialGeneration === requestGenerationRef.current) {
+          if (isAuthorizationError(e)) {
+            setData(null);
+            setLastRefreshed(null);
+          }
           setError(e instanceof Error ? e.message : "알 수 없는 오류");
           setLoading(false);
         }
       });
 
     const interval = setInterval(() => {
-      fetchResilienceApi()
+      const pollingGeneration = ++requestGenerationRef.current;
+      fetchResilienceApi(accessToken)
         .then((json) => {
-          if (!cancelled) {
+          if (!cancelled && pollingGeneration === requestGenerationRef.current) {
             setData(json);
+            setError(null);
             setLastRefreshed(new Date());
           }
         })
-        .catch(() => {
-          // 자동 갱신 실패 시 기존 데이터 유지, 에러 표시 안 함
+        .catch((e: unknown) => {
+          if (
+            !cancelled &&
+            pollingGeneration === requestGenerationRef.current &&
+            isAuthorizationError(e)
+          ) {
+            setData(null);
+            setLastRefreshed(null);
+            setError(e.message);
+          }
+          // Transient polling failures keep the last known data without noise.
+          // Authentication/authorization failures are surfaced above because
+          // continuing to show a stale owner-only dashboard would be misleading.
+        })
+        .finally(() => {
+          if (!cancelled && pollingGeneration === requestGenerationRef.current) {
+            setLoading(false);
+          }
         });
     }, 30_000);
 
     return () => {
       cancelled = true;
+      requestGenerationRef.current += 1;
       clearInterval(interval);
     };
-  }, [isAuthenticated]);
+  }, [accessToken, isAuthenticated]);
 
   function handleRefresh() {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !accessToken) return;
+    const refreshGeneration = ++requestGenerationRef.current;
     setLoading(true);
     setError(null);
-    fetchResilienceApi()
+    fetchResilienceApi(accessToken)
       .then((json) => {
+        if (refreshGeneration !== requestGenerationRef.current) return;
         setData(json);
+        setError(null);
         setLastRefreshed(new Date());
       })
       .catch((e: unknown) => {
+        if (refreshGeneration !== requestGenerationRef.current) return;
+        if (isAuthorizationError(e)) {
+          setData(null);
+          setLastRefreshed(null);
+        }
         setError(e instanceof Error ? e.message : "알 수 없는 오류");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (refreshGeneration === requestGenerationRef.current) {
+          setLoading(false);
+        }
+      });
   }
 
   if (authLoading) {
