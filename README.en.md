@@ -29,7 +29,7 @@ On top of a single design system (Soongsil blue + mint tokens, Pretendard/JetBra
 - **Library** — real-time seats in 3 views (donut overview / rooms / full map) · seat recommendation → reservation · waitlist registration · loans · book search
 - **Campus** — cafeteria menu (today/weekly) · dormitory menu · notices (category filter) · facility search · entry point to AI evidence search
 
-> Home, Academics, Library, and Chatbot previews below are post-redesign captures. A Campus capture will be added when that screen materially changes.
+The captures below show the Home, Academics, Library, Campus, and service-connections screens as of 2026-07-16.
 
 ![Home — AI daily-briefing hero and customizable widget grid](docs/assets/dashboard.png)
 
@@ -37,7 +37,9 @@ On top of a single design system (Soongsil blue + mint tokens, Pretendard/JetBra
 |---|---|
 | ![Real-time library seat availability and book search](docs/assets/dashboard-library.png) | ![Graduation requirement progress · cumulative grades · chapel status](docs/assets/dashboard-academic.png) |
 
-![Chatbot — multi-agent SSE responses and the HITL approval flow](docs/assets/chat.png)
+| Campus — dining · notices · academic dates · facility search | Service connections — u-SAINT · LMS · Library |
+|---|---|
+| ![Today's dining, weekly dormitory meals, notices, academic dates, and facility search](docs/assets/dashboard-campus.png) | ![Connection status and available features for u-SAINT, LMS, and the library](docs/assets/service-connections.png) |
 
 > In the chatbot, actions that change university state — e.g. *"Reserve a library seat for me"* — require login and one more confirmation through an HITL approval card before they run.
 
