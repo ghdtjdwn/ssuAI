@@ -156,9 +156,18 @@ export async function resumeAgentStream(
   return response;
 }
 
-/** Exchange optional JWT or library cookie session for mcp_session_id via ssuMCP web-session endpoint. */
+export type McpProvider = "SAINT" | "LMS" | "LIBRARY";
+
+export interface McpWebSessionResponse {
+  mcpSessionId: string;
+  expiresAt: string;
+  /** Optional only during the backend-first rolling deployment; absence fails closed. */
+  linkedProviders?: McpProvider[];
+}
+
+/** Exchange optional JWT or library cookie session for an isolated MCP provider-grant session. */
 export function createMcpWebSession(accessToken: string | null) {
-  return fetchJson<{ mcpSessionId: string; expiresAt: string }>("/api/mcp/auth/web-session", {
+  return fetchJson<McpWebSessionResponse>("/api/mcp/auth/web-session", {
     method: "POST",
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     credentials: "include",

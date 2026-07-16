@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { ToastProvider } from "@/components/ui/toast";
 import { LibraryAuthProvider } from "@/contexts/LibraryAuthContext";
+import { McpSessionProvider } from "@/contexts/McpSessionContext";
 import { SaintAuthProvider } from "@/hooks/useSaintAuth";
 import { ApiError } from "@/lib/api/types";
 
@@ -39,7 +40,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <SaintAuthProvider>
           <LibraryAuthProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <McpSessionProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </McpSessionProvider>
           </LibraryAuthProvider>
         </SaintAuthProvider>
       </ThemeProvider>

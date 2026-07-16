@@ -105,3 +105,7 @@ MCP 세션을 다시 만든다.
 - SAINT session 발급 후 도서관 연결이 true가 되면 두 번째 `createMcpWebSession` 호출로
   재발급된다.
 - 둘 다 없으면 `createMcpWebSession`을 호출하지 않고 `mcp_session_id`는 null로 남는다.
+
+## 2026-07-16 후속 결정
+
+위의 "발급 실패를 공개 도구 모드로 조용히 강등"하는 정책과 요청한 identity를 grant로 간주하는 설명은 [ADR 0099](0099-authoritative-web-session-grants.md)로 대체한다. 현재는 server-confirmed `linkedProviders`만 연결 상태로 사용하고, 웹 identity가 있는 채팅은 발급 완료를 기다리며 실패를 사용자에게 표시한다. identity가 전혀 없는 실제 익명 사용자의 공개 도구 모드는 유지한다.

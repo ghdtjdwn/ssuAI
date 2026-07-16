@@ -13,13 +13,12 @@ import {
 import { HitlCard, HitlDoneCard, formatHitlSummary } from "@/components/chat/HitlCard";
 import { MessageBubble, type ChatMessageRole } from "@/components/chat/MessageBubble";
 import { Button } from "@/components/ui/button";
-import { useLibraryAuth } from "@/contexts/LibraryAuthContext";
+import { useMcpSession } from "@/contexts/McpSessionContext";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import {
   AgentStreamError,
   startAgentStream,
   resumeAgentStream,
-  createMcpWebSession,
   readAgentStream,
   type InterruptData,
 } from "@/lib/api/agent";
@@ -50,10 +49,10 @@ interface ChatMessage {
 
 export function ChatPanel() {
   const { accessToken, isAuthenticated } = useSaintAuth();
-  const { isConnected: libraryConnected } = useLibraryAuth();
+  const { session: mcpSession, status: mcpStatus, ensureSession } = useMcpSession();
+  const mcpSessionId = mcpSession?.mcpSessionId ?? null;
 
   const [threadId, setThreadId] = useState<string>(getOrCreateAgentThreadId);
-  const [mcpSessionId, setMcpSessionId] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState<string>("");
@@ -66,58 +65,12 @@ export function ChatPanel() {
   const streamingContentRef = useRef<string>("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const previousIsAuthenticatedRef = useRef(isAuthenticated);
-  const mcpSessionGrantsRef = useRef<{ jwt: boolean; library: boolean } | null>(null);
-
-  // Obtain mcp_session_id from the strongest currently available web identity.
-  useEffect(() => {
-    const wantJwt = isAuthenticated && !!accessToken;
-
-    if (!wantJwt && !libraryConnected) {
-      mcpSessionGrantsRef.current = null;
-      if (mcpSessionId) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- clear stale MCP session when all web identities disappear.
-        setMcpSessionId(null);
-      }
-      return;
-    }
-
-    const grants = mcpSessionGrantsRef.current;
-    if (
-      mcpSessionId &&
-      grants &&
-      (!wantJwt || grants.jwt) &&
-      (!libraryConnected || grants.library)
-    ) {
-      return;
-    }
-
-    let cancelled = false;
-    createMcpWebSession(wantJwt ? accessToken : null)
-      .then((res) => {
-        if (!cancelled) {
-          mcpSessionGrantsRef.current = { jwt: wantJwt, library: libraryConnected };
-          setMcpSessionId(res.mcpSessionId);
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Not fatal: mcp_session_id remains null; only public tools will work
-        if (process.env.NODE_ENV === "development") {
-          console.warn("Could not obtain mcp_session_id; public tools only.");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, accessToken, libraryConnected, mcpSessionId]);
 
   useEffect(() => {
     const wasAuthenticated = previousIsAuthenticatedRef.current;
     previousIsAuthenticatedRef.current = isAuthenticated;
     if (!wasAuthenticated || isAuthenticated) return;
 
-    setMcpSessionId(null);
     // useSaintAuth.logout() already clears the stored id (it must work even
     // when this panel is unmounted); this keeps the mounted panel's state in
     // sync and covers non-logout auth losses (e.g. refresh expiry).
@@ -206,10 +159,20 @@ export function ChatPanel() {
     setStreamingContent("");
 
     try {
+      const activeSession = await ensureSession();
+      const activeMcpSessionId = activeSession?.mcpSessionId ?? null;
+      const activeLibraryConnected =
+        activeSession?.linkedProviders.includes("LIBRARY") ?? false;
       let activeThread = threadId;
       let response: Response;
       try {
-        response = await startAgentStream(trimmed, activeThread, mcpSessionId, libraryConnected, accessToken);
+        response = await startAgentStream(
+          trimmed,
+          activeThread,
+          activeMcpSessionId,
+          activeLibraryConnected,
+          accessToken,
+        );
       } catch (err) {
         // 403 = this thread is owned by a prior mcp_session (the session rotates
         // on every SSO re-login, and the thread id survives in sessionStorage).
@@ -219,7 +182,13 @@ export function ChatPanel() {
           clearAgentThread();
           activeThread = getOrCreateAgentThreadId();
           setThreadId(activeThread);
-          response = await startAgentStream(trimmed, activeThread, mcpSessionId, libraryConnected, accessToken);
+          response = await startAgentStream(
+            trimmed,
+            activeThread,
+            activeMcpSessionId,
+            activeLibraryConnected,
+            accessToken,
+          );
         } else {
           throw err;
         }
@@ -249,12 +218,13 @@ export function ChatPanel() {
     setStreamingContent("");
 
     try {
+      const activeSession = await ensureSession();
       const response = await resumeAgentStream(
         threadId,
         approved,
         pendingInterrupt.action_id ?? null,
-        mcpSessionId,
-        libraryConnected,
+        activeSession?.mcpSessionId ?? null,
+        activeSession?.linkedProviders.includes("LIBRARY") ?? false,
         accessToken,
       );
       await consumeStream(response);
@@ -304,10 +274,25 @@ export function ChatPanel() {
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-muted px-3 py-1.5 text-[11.5px] font-semibold text-muted-foreground">
           <span
-            className={cn("h-[7px] w-[7px] rounded-full", mcpSessionId ? "bg-success" : "bg-mint")}
+            className={cn(
+              "h-[7px] w-[7px] rounded-full",
+              mcpStatus === "error"
+                ? "bg-danger"
+                : mcpStatus === "connected"
+                  ? "bg-success"
+                  : "bg-mint",
+            )}
             aria-hidden="true"
           />
-          {mcpSessionId ? "MCP 연결됨" : "공개 도구 모드"}
+          {mcpStatus === "connecting"
+            ? "연결 확인 중"
+            : mcpStatus === "error"
+              ? "연결 세션 오류"
+              : mcpSessionId && mcpSession?.linkedProviders.length
+                ? "MCP 연결됨"
+                : mcpSessionId
+                  ? "개인 서비스 재연결 필요"
+                  : "공개 도구 모드"}
         </span>
       </header>
 
