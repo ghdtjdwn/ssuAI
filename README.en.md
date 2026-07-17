@@ -30,6 +30,7 @@ On top of a single design system (Soongsil blue + mint tokens, Pretendard/JetBra
 - **Campus** — cafeteria menu (today/weekly) · dormitory menu · notices (category filter) · facility search · entry point to AI evidence search
 
 The captures below show the Home, Academics, Library, Campus, service-connections, and live chatbot flows as of 2026-07-17.
+Only personal value strings—such as names, academic or financial values, loan status, seat identifiers, and usage times—are strongly pixelated.
 
 ![Home — AI daily-briefing hero and customizable widget grid](docs/assets/dashboard.png)
 
