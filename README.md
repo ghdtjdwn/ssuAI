@@ -1,200 +1,102 @@
-# ssuAI — 숭실대학교 AI 웹 클라이언트
+# ssuAI
 
 [![CI](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml)
+[![Security](https://github.com/ghdtjdwn/ssuAI/actions/workflows/security.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/security.yml)
 
-> 🇺🇸 English version: [README.en.md](README.en.md)
+**한국어** · [English](README.en.md)
 
-> 🧩 **숭실대 캠퍼스 AI 플랫폼** (4-서비스 중 하나) · [ssuMCP](https://github.com/ghdtjdwn/ssuMCP) · **ssuAI** · [ssuAgent](https://github.com/ghdtjdwn/ssuAgent) · [ssu-ai-service](https://github.com/ghdtjdwn/ssu-ai-service) · 🟢 [Live](https://ssuai.vercel.app)
+공개 캠퍼스 정보, 개인 학사·LMS·도서관 데이터, 승인 기반 AI 작업을 하나의 웹 경험으로 연결한
+Next.js 애플리케이션이다. 브라우저에 비밀 값을 노출하지 않으면서 대시보드와 SSE 챗봇을 제공한다.
 
-숭실대학교 MCP 서버 [ssuMCP](https://github.com/ghdtjdwn/ssuMCP)를 소비하는 Next.js 웹 클라이언트.  
-5개 화면(홈·챗봇·학사·도서관·캠퍼스)과 자연어 챗봇으로 공개 캠퍼스 정보와 개인 학사 정보를 조회한다.
+[라이브 앱](https://ssuai.vercel.app) · [챗봇](https://ssuai.vercel.app/chat) ·
+[플랫폼 사례 연구](https://seongju.vercel.app/projects/ssu-platform/) · [문서 지도](docs/README.md)
 
-| | URL |
-|--|-----|
-| 홈 (AI 브리핑 + 커스터마이즈 위젯) | <https://ssuai.vercel.app/> |
-| 챗봇 | <https://ssuai.vercel.app/chat> |
-| 학사 | <https://ssuai.vercel.app/academics> |
-| 도서관 | <https://ssuai.vercel.app/library> |
-| 캠퍼스 | <https://ssuai.vercel.app/campus> |
+![ssuAI 홈 — 오늘의 브리핑과 사용자가 구성할 수 있는 위젯 대시보드](docs/assets/dashboard.png)
 
----
+## 플랫폼에서 맡는 역할
 
-## 화면 구성 (2026-07-02 전면 리디자인 — [ADR 0010](docs/adr/0010-ui-redesign.md))
+| 서비스 | 책임 | 저장소 |
+| --- | --- | --- |
+| **ssuAI** | **사용자 화면, same-origin BFF, 인증 상태와 SSE/HITL UX** | 현재 저장소 |
+| ssuAgent | LangGraph 라우팅, 대화 상태, HITL 오케스트레이션 | [ghdtjdwn/ssuAgent](https://github.com/ghdtjdwn/ssuAgent) |
+| ssuMCP | 캠퍼스 도메인 로직, MCP/REST 계약, 인증과 상태 변경 | [ghdtjdwn/ssuMCP](https://github.com/ghdtjdwn/ssuMCP) |
+| ssu-ai-service | 격리된 임베딩 요청 게이트웨이 | [ghdtjdwn/ssu-ai-service](https://github.com/ghdtjdwn/ssu-ai-service) |
 
-단일 디자인 시스템(숭실 블루 + 민트 토큰, Pretendard/JetBrains Mono, 시스템 추종 다크모드) 위에서 데스크톱은 사이드바+멀티컬럼, 모바일은 하단 탭바+단일 컬럼으로 레이아웃만 분기한다.
+이 저장소는 프론트엔드와 BFF 경계만 소유한다. 학교 시스템 연동과 데이터 정합성은 `ssuMCP`,
+자연어 라우팅과 대화 checkpoint는 `ssuAgent`의 책임이다.
 
-- **홈** — AI 오늘의 브리핑 히어로(연동 데이터 기반 요약) · 우선순위 카드 3 · 위젯 14종 커스터마이즈 그리드(순서/크기/표시/밀도, localStorage 영속)
-- **챗봇** — SSE 스트리밍 + HITL 승인 카드(예약 등 실행 액션은 승인 후 실행)
-- **학사** — 주간 시간표 그리드 · 졸업요건 · 성적 · 채플 · 장학 · LMS 과제 (u-SAINT 로그인)
-- **도서관** — 실시간 좌석 3-뷰(도넛 오버뷰/공간/전체) · 좌석 추천→예약 · 대기 등록 · 대출 · 도서 검색
-- **캠퍼스** — 학식(오늘/주간)·기숙사 식단 · 공지(카테고리 필터) · 시설 검색 · AI 근거 검색 진입
+## 제품 흐름
 
-아래 캡처는 2026-07-17 기준 홈·학사·도서관·캠퍼스·서비스 연결과 챗봇의 실제 동작을 보여준다.
-실명과 개인 학사·재정·대출·좌석의 값 글자만 강한 픽셀 모자이크로 비식별화했다.
+| 사용자 경로 | 제공 기능 | 신뢰 경계 |
+| --- | --- | --- |
+| 공개 조회 | 학식, 공지, 시설, 학사일정, 도서 검색, 실시간 좌석 현황 | credential 없는 GET/SSE만 backend origin으로 직접 호출 가능 |
+| 연결된 대시보드 | 시간표, 성적, 졸업요건, 채플, 장학, LMS 과제, 대출 | access token은 메모리, refresh와 provider session은 same-origin 경로 |
+| AI 챗봇 | 도메인 handoff, 도구 진행 상태, 스트리밍 답변 | 서버 route가 agent key와 검증된 principal을 주입 |
+| 상태 변경 | 좌석 예약·반납, LMS 자료 내보내기 | `prepare` 결과를 보여준 뒤 사용자 승인으로만 `resume/confirm` |
 
-![홈 — AI 오늘의 브리핑 히어로와 커스터마이즈 위젯 그리드](docs/assets/dashboard.png)
+홈, 학사, 도서관, 캠퍼스, 챗봇은 데스크톱 사이드바와 모바일 하단 탐색을 공유한다. 디자인 결정과
+접근성 기준은 [UI redesign ADR](docs/adr/0010-ui-redesign.md)에 기록했다.
 
-| 도서관 좌석 실시간 현황 (도넛 그리드) | 학사 — 졸업요건 · 누적성적 · 채플 |
-|---|---|
-| ![도서관 좌석 실시간 현황과 도서 검색](docs/assets/dashboard-library.png) | ![졸업요건 진행률 · 누적성적 · 채플 현황](docs/assets/dashboard-academic.png) |
+<details>
+<summary>화면 더 보기</summary>
 
-| 캠퍼스 — 학식 · 공지 · 학사일정 · 시설 검색 | 서비스 연결 — u-SAINT · LMS · 도서관 |
-|---|---|
-| ![오늘의 학식, 기숙사 식단, 공지, 학사일정과 시설 검색](docs/assets/dashboard-campus.png) | ![u-SAINT, LMS와 도서관의 연결 상태와 제공 기능](docs/assets/service-connections.png) |
+실명과 개인 학사·재정·대출·좌석 값은 공개 이미지에서 비식별화했다.
 
-### 챗봇 — 인증 조회와 승인 기반 실행
+| 도서관 실시간 좌석 | 학사 대시보드 |
+| --- | --- |
+| ![도서관 좌석 현황과 도서 검색 화면](docs/assets/dashboard-library.png) | ![졸업요건, 성적과 채플 현황 화면](docs/assets/dashboard-academic.png) |
 
-연결된 세션에서 챗봇이 학사·도서관 도메인으로 전환하고 도구 진행 상태를 스트리밍한 실제 화면이다.
-졸업요건은 인증된 학사 데이터를 읽어 남은 조건을 정리하고, 좌석 예약은 준비 단계에서 멈춰
-HITL 카드로 사용자 승인을 받은 뒤 실행한다.
+| 캠퍼스 정보 | 서비스 연결 상태 |
+| --- | --- |
+| ![학식, 공지, 학사일정과 시설 검색 화면](docs/assets/dashboard-campus.png) | ![u-SAINT, LMS와 도서관 연결 화면](docs/assets/service-connections.png) |
 
-![연결된 u-SAINT 학사 데이터를 조회해 남은 졸업요건을 정리한 ssuAI 챗봇](docs/assets/chat-graduation-requirements.png)
+| 좌석 예약 승인 요청 | 승인 후 완료 |
+| --- | --- |
+| ![챗봇이 좌석 예약 실행 전 사용자 승인을 요청하는 화면](docs/assets/chat-seat-approval.png) | ![사용자 승인 후 좌석 예약을 완료한 화면](docs/assets/chat-seat-reserved.png) |
 
-| 도서관 좌석 예약 — 사용자 승인 요청 | 승인 후 예약 완료 |
-|---|---|
-| ![도서관 좌석 후보를 준비하고 실행 전 사용자 승인을 요청하는 챗봇 카드](docs/assets/chat-seat-approval.png) | ![사용자 승인 후 좌석 예약을 실행하고 완료 상태를 확인한 챗봇](docs/assets/chat-seat-reserved.png) |
-
-> 이 캡처는 한 번 성공한 실제 연동 세션의 근거이며, 외부 학교 시스템의 모든 시점 가용성을 일반화하지 않는다.
-
----
-
-## 왜 만들었나
-
-[ssuMCP](https://github.com/ghdtjdwn/ssuMCP)가 MCP 서버로 학교 데이터를 제공하지만, Claude Desktop이 없는 사람도 쓸 수 있어야 했다. 브라우저에서 바로 접근할 수 있는 챗봇과 대시보드를 만들어 ssuMCP의 웹 클라이언트로 만든 게 ssuAI다.
-
----
+</details>
 
 ## 아키텍처
 
 ![ssuAI 프론트엔드 아키텍처 — 공개 직접 호출과 same-origin 인증·에이전트 프록시 경계](docs/assets/architecture.svg)
 
-운영 public-origin 설정에서 브라우저는 로그인 없는 공개 조회(학식·기숙사 식단, 공지, 시설, 학사일정, 도서관 좌석 상태/도서 검색)와 공개 좌석 SSE만 backend origin으로 직접 호출한다(ADR 0087). 환경 변수가 없으면 기존 same-origin 경로로 폴백한다. SmartID/LMS Bearer, refresh cookie, library session, 예약/대출, MCP web session, `/api/agent/*` 챗봇 stream은 항상 same-origin 프록시를 탄다. Backend CORS는 공개 GET/SSE에만 열리고 credentials는 꺼져 있어, API 키·에이전트 키·세션이 브라우저 cross-origin 호출로 확장되지 않는다.
+공개 GET/SSE는 선택적으로 backend origin을 직접 호출해 Vercel 함수 hop을 줄인다. 쿠키·Bearer·API
+key가 필요한 요청과 `/api/agent/*`는 항상 same-origin 서버 경로를 통과한다. 이 분리는 public CORS를
+인증 surface로 확장하지 않으면서도 공개 데이터의 지연을 줄인다. 상세 흐름은
+[프론트엔드 아키텍처](docs/architecture.md)에 있다.
 
-런타임 경계와 배포 흐름은 [프론트엔드 아키텍처 문서](docs/architecture.md)에 정리했다. 이미지의 [PNG 버전](docs/assets/architecture.png)도 함께 제공한다.
+## 엔지니어링 근거
 
----
+| 문제 | 구현과 검증 근거 |
+| --- | --- |
+| 공개 성능 최적화가 인증 경계를 넓힐 위험 | 공개 GET/SSE allow-list와 server-only proxy 분리 — [ADR 0087](docs/adr/0087-public-direct-origin-sse.md) · [boundary tests](lib/api/public-origin.test.ts) |
+| SSO redirect에서 브라우저 쿠키가 유실되는 문제 | 1회용 code를 200 응답에서 교환 — [ADR 0089](docs/adr/0089-sso-code-exchange.md) · [return-page tests](app/auth/return/page.test.tsx) |
+| UI 연결 표시와 실제 MCP 권한의 불일치 | backend grant를 단일 근거로 사용하고 session 발급을 single-flight 처리 — [ADR 0099](docs/adr/0099-authoritative-web-session-grants.md) |
+| 스트림 중단 뒤 HITL 상태 또는 최종 링크 유실 | thread-stable SSE, resume endpoint, 제한된 안전 링크 렌더링 — [chat tests](components/chat/ChatPanel.test.tsx) · [message tests](components/chat/MessageBubble.test.tsx) |
+| 브라우저가 agent key나 principal을 조작할 위험 | server route가 bearer를 검증하고 신뢰 값만 전달 — [agent proxy](lib/server/agentProxy.ts) · [proxy tests](lib/server/agentProxy.test.ts) |
+| 변경이 UI에서만 우연히 동작하는 문제 | lint, TypeScript, Vitest, production build를 모두 요구 — [CI workflow](.github/workflows/ci.yml) |
 
-## 기능
+주요 스택은 Next.js 16, React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
+Vitest, Testing Library와 Vercel이다.
 
-### 공개 조회 (로그인 불필요)
+## 로컬 실행과 검증
 
-- 학생식당·기숙사 식단 (오늘/날짜별/주간)
-- 교내 시설 검색
-- 중앙도서관 소장 도서 검색
-- 학교·학과 공지사항 (목록, 검색, 상세, 진행 중 공지)
-
-### 연동 후 개인 조회
-
-| 연동 | 기능 |
-|------|------|
-| SAINT (SmartID SSO) | 시간표, 성적, 채플 출석, 졸업 요건, 장학금 |
-| LMS (Canvas SSO) | 과제·퀴즈 목록 |
-| 도서관 | 층별 좌석 현황, 본인 대출 현황 |
-
-### 챗봇
-
-대시보드와 동일한 데이터 범위에 대해 자연어로 질문할 수 있다. 공개 질문은 즉시 응답하고, 개인 데이터 질문은 연동 세션이 있는 경우에만 응답한다.
-
-`/chat`은 LangGraph 기반 멀티 에이전트(ssuAgent)와 SSE 스트리밍으로 연결된다. 에이전트 전환(Handoff)·도구 실행·텍스트가 실시간 표시되고, 도서관 예약처럼 학교 상태를 바꾸는 액션은 HITL 승인 카드(HitlCard)로 멈춰 사용자 승인 후 `/agent/resume`으로 재개한다.
-
-### 도서관 좌석 예약 (플래그십)
-
-좌석 예약·이석·반납은 backend MCP의 `prepare_* → confirm_action` 2단계 확인을 그대로 화면에 옮긴 UX로 제공한다:
-
-- `SeatRecommendationPanel` — 선택한 층의 추천 좌석 5개 + 좌석별 예약 버튼
-- `ReservationConfirmModal` — `prepare` 요약·만료 시간을 보여주고 사용자가 한 번 더 확정해야 `confirm` 호출. confirm 결과는 `SUCCESS`(예약 완료) / `PROCESSING`(동기 confirm이 타임아웃됐지만 백엔드 워커가 백그라운드에서 예약을 이어 처리 — "백그라운드에서 처리 중" 안내, 실패로 보지 않음) / 그 외 실패(`FAILED_RACE`·`TIMEOUT`·`FAILED_AUTH`·`FAILED_UPSTREAM` → "예약 실패" 안내)로 분기한다
-- `WaitStatusCard` — 활성 대기(`wait_for_library_seat`) intent의 상태·시도 횟수·만료·취소 버튼
-
-민감한 write action을 "사용자 명시 승인 후에만 실행"하는 설계를 코드와 화면으로 동시에 증명한다.
-
----
-
-## 인증 흐름
-
-```
-SAINT (SmartID SSO)
-  로그인 버튼 → /api/auth/saint/sso → SmartID 리다이렉트
-  → 콜백 → JWT 발급 (access: 메모리, refresh: HttpOnly 쿠키 14일)
-
-LMS (Canvas SSO)
-  로그인 버튼 → /api/auth/lms/sso → Canvas 리다이렉트
-  → 콜백 → LMS 세션 연결
-
-도서관
-  /mcp/auth/library → 자격증명 입력
-  → ssuMCP가 도서관 API 토큰 확보 → 세션 연결
-```
-
-Access token은 메모리(`AuthContext`)에만 보관한다. localStorage/sessionStorage에 쓰지 않는다. 새로고침 시 `/api/auth/refresh`로 HttpOnly 쿠키의 refresh token을 써서 자동 재발급한다.
-
----
-
-## 엔지니어링 노트
-
-### SSO 콜백 쿠키 유실 — 4개 레이어에 분산된 문제
-
-SmartID 로그인 후 세션 쿠키가 계속 누락되는 증상이 있었다. 원인이 한 곳이 아니라 4개 레이어에 걸쳐 있었다.
-
-1. **Cross-origin 쿠키**: 브라우저가 `ssuai.vercel.app`의 응답으로 `ssumcp.duckdns.org` 쿠키를 저장하지 않음 → Next.js `rewrites`로 same-origin proxy 구축
-2. **302 redirect Set-Cookie 누락**: SSO callback이 302를 반환할 때 프록시가 중간 Set-Cookie를 버림 → callback을 200 + HTML로 변경
-3. **App Router route intercept 순서**: `afterFiles` rewrite가 App Router route handler보다 먼저 실행돼 쿠키를 재발급할 수 없었음 → Next.js 16 middleware(`proxy.ts`)로 이전
-4. **Next.js 16 Set-Cookie silent strip**: `response.headers.set('Set-Cookie', ...)` 방식을 Next.js 16이 조용히 제거 → `response.cookies.set()` API로 교체
-
-각 단계를 커밋 단위로 격리해서 수정했다. 레이어마다 고치면 다음 레이어가 드러나는 구조였다.
-
-### Same-origin Proxy
-
-브라우저가 직접 ssuMCP를 호출하면 CORS 설정이 복잡해지고, API 키·세션 토큰이 Network 탭에 노출된다. `next.config.ts`의 `rewrites`로 `/api/*`를 ssuMCP로 투명하게 전달해 이 문제를 원천 차단했다.
-
-### TanStack Query
-
-서버 상태 캐싱, 리트라이, 백그라운드 재검증을 TanStack Query에 위임했다. 컴포넌트는 `useQuery`·`useMutation` 훅만 호출하고, 캐시 관리 코드를 직접 작성하지 않는다. `staleTime`으로 학교 서버 부하를 줄이고, 네트워크 불안정 시 자동 리트라이로 UX를 보호한다.
-
----
-
-## 기술 스택
-
-| 분류 | 기술 |
-|------|------|
-| 프레임워크 | Next.js 16 (App Router) + TypeScript 6 |
-| 서버 상태 | TanStack Query v5 |
-| UI | Tailwind CSS 3, shadcn/ui, Radix UI |
-| 테스트 | Vitest 4, Testing Library |
-| 패키지 매니저 | pnpm |
-| 배포 | Vercel |
-
----
-
-## 프로젝트 구조
-
-```
-app/
-  auth/         # SSO 콜백, 로그인 페이지
-  chat/         # 챗봇 UI
-  mcp/auth/     # 도서관 세션 UI
-components/     # 기능별·공통 UI 컴포넌트
-contexts/       # 도서관 인증 컨텍스트 (LibraryAuthContext)
-hooks/          # TanStack Query 훅 + u-SAINT 인증(useSaintAuth·프로바이더) · 세션 가드
-lib/
-  api/          # 타입 안전 API 클라이언트
-  api/client.ts # fetch 래퍼 — envelope 파싱, ApiError
-docs/           # 제품 문서, 아키텍처, ADR
-```
-
----
-
-## 로컬 개발
+Node.js 20과 pnpm 9를 사용한다. 로컬 backend 없이 공개 ssuMCP를 대상으로 실행할 수도 있다.
 
 ```bash
+git clone https://github.com/ghdtjdwn/ssuAI.git
+cd ssuAI
 cp .env.example .env.local
-# NEXT_PUBLIC_SSUAI_API_BASE=https://ssumcp.duckdns.org
-pnpm install
-pnpm dev        # http://localhost:3000
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-로컬 ssuMCP 없이도 프로덕션 서버(`https://ssumcp.duckdns.org`)를 가리키면 바로 동작한다.
+로컬 ssuMCP 없이 공개 backend를 사용할 때는 `.env.local`의 active localhost 값을 다음처럼 바꾼다.
 
-### 검증
+```dotenv
+NEXT_PUBLIC_SSUAI_API_BASE=https://ssumcp.duckdns.org
+NEXT_PUBLIC_BACKEND_ORIGIN=https://ssumcp.duckdns.org
+```
 
 ```bash
 pnpm lint
@@ -203,36 +105,24 @@ pnpm test
 pnpm build
 ```
 
----
-
-## 환경 변수
-
-| 변수 | 설명 |
-|------|------|
-| `NEXT_PUBLIC_BACKEND_ORIGIN` | 공개 REST 조회와 도서관 좌석 SSE의 직접 호출 대상. 미설정 시 `NEXT_PUBLIC_SSUAI_API_BASE` → same-origin 순으로 폴백 |
-| `NEXT_PUBLIC_SSUAI_API_BASE` | ssuMCP 서버 URL. `/api/*` rewrite 대상의 legacy public env이며, `NEXT_PUBLIC_BACKEND_ORIGIN` 미설정 시 공개 직접 호출 fallback |
-| `SSUAI_API_PROXY_TARGET` | (서버 전용) `/api/*` 프록시 대상 오버라이드. 설정 시 `NEXT_PUBLIC_SSUAI_API_BASE`보다 우선 |
-| `SSUAGENT_BASE_URL` | (서버 전용) `/api/agent` 프록시가 전달하는 ssuAgent 서버 URL. 미설정 시 `NEXT_PUBLIC_SSUAGENT_BASE_URL` → `https://ssuagent.duckdns.org` 순으로 폴백 |
-| `NEXT_PUBLIC_SSUAGENT_BASE_URL` | (공개·레거시) ssuAgent 서버 URL 폴백값. 주로 로컬 개발용 |
-| `AGENT_API_KEY` | (서버 전용·운영 필수) `/api/agent` 프록시가 ssuAgent 호출 시 주입하는 `X-Agent-Key` 자격증명. ssuAgent의 값과 일치해야 하며 브라우저에는 노출되지 않음. 로컬에서 양쪽 게이트를 끈 경우에만 생략 가능 |
-
----
+환경 변수와 server-only/public 구분은 [`.env.example`](.env.example)에 있다. 운영 proxy target과
+secret 변경은 Vercel 설정과 함께 검증해야 하며, localhost 기본값으로 운영 구성을 추정하지 않는다.
 
 ## 문서
 
-- [제품 현황 및 범위](docs/product.md)
-- [장기 비전과 로드맵](docs/vision.md)
-- [보안 정책 (ssuMCP)](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/security.md)
+- [문서 지도](docs/README.md)
+- [제품 범위](docs/product.md)
+- [프론트엔드 아키텍처](docs/architecture.md)
+- [보안 경계](docs/security.md)
+- [ADR 목록](docs/adr/)
+- [ssuMCP의 MCP 도구 계약](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md)
 
----
+## 범위와 제약
 
-## MCP 서버
-
-이 앱이 소비하는 MCP 서버:  
-**[ghdtjdwn/ssuMCP](https://github.com/ghdtjdwn/ssuMCP)** · `https://ssumcp.duckdns.org/mcp`
-
----
+- 숭실대학교 공식 서비스가 아니며, 외부 학교 시스템의 가용성을 보장하지 않는다.
+- 개인 화면과 상태 변경은 유효한 학교 계정 및 provider 연결이 필요하다.
+- CI는 코드의 빌드·테스트를 검증하며 Vercel 환경 변수나 외부 서비스의 종단 동작까지 증명하지 않는다.
 
 ## 라이선스
 
-MIT — [LICENSE](LICENSE)
+[MIT](LICENSE)
