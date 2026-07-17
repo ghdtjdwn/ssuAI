@@ -127,3 +127,29 @@ ssuAgent는 이 힌트를 사전 안내용 short-circuit에만 사용합니다. 
 현재는 identity-tier 발급: SAINT JWT 또는 도서관 연결(`libraryConnected`) 중 가능한 신원으로 발급하고, 더 강한 신원이 생기면 재발급한다. JWT 없는 호출은 `Authorization` 생략 + `credentials:"include"`.
 
 상세와 대안 검토는 [ADR 0088](0088-library-only-mcp-session.md).
+
+---
+
+## 2026-07-17 보강 — LMS 다운로드 capability 링크 action
+
+LMS 전체 강의자료 내보내기 응답에는 짧게 유효한 capability URL이 포함된다. 기존 `MessageBubble`은
+assistant 본문을 `<p>`의 일반 문자열로만 렌더링해 `[강의 파일 다운로드](https://...)`가 클릭되지
+않았고, 사용자는 긴 token URL을 직접 복사해야 했다.
+
+assistant 응답에 한해 Markdown 링크와 bare HTTP(S) URL을 anchor로 변환한다. 설정된 ssuMCP origin,
+LMS export path(`/api/lms/exports/{jobId}/download`), 비어 있지 않은 `token` query가 모두 일치할 때만
+URL 대신 `강의 파일 다운로드` action을 표시한다. 클릭하면 ssuMCP가 이미 제공하는 polling 페이지를
+새 탭으로 열고, `rel="noopener noreferrer"`로 opener 접근을 차단한다. 새 탭 동작은 스크린리더용
+링크 이름에도 포함한다. 신뢰하지 않는 origin의 일반 링크에는 hostname을 표시해 Markdown label로
+목적지를 숨길 수 없게 한다.
+
+사용자 메시지는 링크로 변환하지 않고, HTTP(S) 외 scheme과 userinfo가 있는 URL도 활성화하지 않는다.
+raw HTML과 전체 Markdown renderer는 도입하지 않았다. 현재 요구 범위가 다운로드 action으로 좁고,
+지원 문법을 제한하면 번들 의존성과 해석 공격 표면을 늘리지 않으면서 capability token을 화면
+텍스트에서 숨길 수 있기 때문이다. 실제 URL은 브라우저 이동을 위해 anchor의 `href`에는 존재하므로,
+DOM 접근 권한이 있는 스크립트에 대한 기존 XSS 방어와 짧은 TTL은 계속 필요하다.
+
+컴포넌트 테스트는 Markdown·bare URL의 action 렌더링, 신뢰 origin, `target`·`rel`, 새 탭 접근성 안내,
+unsafe scheme과 사용자 입력의 비활성화를 검증한다. ChatPanel 테스트는 SSE text chunk가 최종
+메시지로 정착된 뒤에도 같은 action이 유지되는지 검증한다. agent 측 결정과 timeout 분석은 ssuAgent
+ADR 0022가 소유한다.
