@@ -212,6 +212,17 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
   }, [identityKey, jwtToken, libraryConnected, ensureSession]);
 
   useEffect(() => {
+    // Keep the listener mounted independently of session-scoped timers so a
+    // focus event cannot be lost between a session render and its passive effect.
+    const handleFocus = () => {
+      if (!cachedRef.current) return;
+      void refreshSession().catch(() => undefined);
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [refreshSession]);
+
+  useEffect(() => {
     if (!session) return;
     const refreshIn = Date.parse(session.expiresAt) - Date.now() - REFRESH_SKEW_MS;
     const expiryTimer = window.setTimeout(() => {
@@ -223,14 +234,9 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
     const statusTimer = window.setInterval(() => {
       void refreshSession().catch(() => undefined);
     }, STATUS_REFRESH_MS);
-    const handleFocus = () => {
-      void refreshSession().catch(() => undefined);
-    };
-    window.addEventListener("focus", handleFocus);
     return () => {
       window.clearTimeout(expiryTimer);
       window.clearInterval(statusTimer);
-      window.removeEventListener("focus", handleFocus);
     };
   }, [session, ensureSession, refreshSession]);
 

@@ -386,7 +386,7 @@ describe("ChatPanel", () => {
       renderChat();
       expect(await screen.findByText("개인 서비스 재연결 필요")).toBeInTheDocument();
 
-      window.dispatchEvent(new Event("focus"));
+      fireEvent.focus(window);
 
       await waitFor(() => {
         expect(getMcpWebSessionStatus).toHaveBeenCalledWith(
@@ -422,7 +422,7 @@ describe("ChatPanel", () => {
       renderChat();
       expect(await screen.findByText("MCP 연결됨")).toBeInTheDocument();
 
-      window.dispatchEvent(new Event("focus"));
+      fireEvent.focus(window);
       await waitFor(() => expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(1));
       submit("졸업요건 알려줘");
 
