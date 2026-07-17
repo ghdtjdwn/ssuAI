@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1480 860" role="img" aria-labelledby="title desc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif">
+  <title id="title">ssuAI frontend architecture</title>
+  <desc id="desc">When a public backend origin is configured, the browser uses a credential-free direct path to ssuMCP for public reads and seat events; otherwise it falls back to the same-origin API path. Authenticated API and agent traffic crosses trusted server-side routes on Vercel.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1f2328"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#15803d"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7c3aed"/>
+    </marker>
+  </defs>
+
+  <rect width="1480" height="860" fill="#ffffff"/>
+  <text x="42" y="46" font-size="24" font-weight="750" fill="#0f172a">ssuAI · Frontend architecture</text>
+  <text x="42" y="72" font-size="13" fill="#64748b">Configured public-origin traffic bypasses serverless functions; credentials and trusted identity stay behind same-origin server routes.</text>
+
+  <!-- Browser -->
+  <g>
+    <rect x="42" y="145" width="275" height="575" rx="12" fill="#ffffff" stroke="#1e3a5f" stroke-width="2"/>
+    <path d="M42 157 a12 12 0 0 1 12 -12 h251 a12 12 0 0 1 12 12 v55 H42 z" fill="#0f4c81"/>
+    <rect x="67" y="164" width="49" height="31" rx="3" fill="none" stroke="#ffffff" stroke-width="2.6"/>
+    <path d="M61 202 h61 l-6 8 H67 z" fill="#ffffff"/>
+    <text x="137" y="177" font-size="15" font-weight="700" fill="#ffffff">Browser</text>
+    <text x="137" y="196" font-size="12" fill="#dbeafe">Next.js UI · TanStack Query</text>
+
+    <rect x="66" y="237" width="227" height="92" rx="9" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="84" y="264" font-size="13" font-weight="700" fill="#1e3a8a">App Router UI</text>
+    <text x="84" y="286" font-size="12" fill="#334155">Home · Chat · Academics</text>
+    <text x="84" y="305" font-size="12" fill="#334155">Library · Campus</text>
+
+    <rect x="66" y="354" width="227" height="94" rx="9" fill="#f0fdf4" stroke="#86efac"/>
+    <circle cx="90" cy="381" r="11" fill="#22c55e"/>
+    <path d="M84 381 l4 4 8 -9" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="109" y="385" font-size="13" font-weight="700" fill="#166534">Public data client</text>
+    <text x="84" y="406" font-size="11.3" fill="#475569">GET + library-seat SSE</text>
+    <text x="84" y="423" font-size="11.3" fill="#475569">direct origin when configured</text>
+    <text x="84" y="440" font-size="11.3" fill="#475569">credentials: omit</text>
+
+    <rect x="66" y="473" width="227" height="94" rx="9" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="80" y="491" width="21" height="17" rx="3" fill="#2563eb"/>
+    <path d="M85 491 v-5 a6 6 0 0 1 12 0 v5" fill="none" stroke="#2563eb" stroke-width="2.2"/>
+    <text x="109" y="506" font-size="13" font-weight="700" fill="#1e40af">Authenticated API</text>
+    <text x="84" y="531" font-size="11.7" fill="#475569">cookies · bearer · web session</text>
+    <text x="84" y="549" font-size="11.7" fill="#475569">same-origin /api/*</text>
+
+    <rect x="66" y="592" width="227" height="100" rx="9" fill="#faf5ff" stroke="#c4b5fd"/>
+    <circle cx="91" cy="619" r="12" fill="#7c3aed"/>
+    <path d="M84 619 h14 M91 612 v14" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+    <text x="110" y="623" font-size="13" font-weight="700" fill="#5b21b6">Agent stream client</text>
+    <text x="84" y="647" font-size="11.7" fill="#475569">SSE stream · HITL resume</text>
+    <text x="84" y="666" font-size="11.7" fill="#475569">same-origin /api/agent/*</text>
+  </g>
+
+  <!-- Vercel trust boundary -->
+  <g>
+    <rect x="390" y="145" width="405" height="575" rx="12" fill="#ffffff" stroke="#111827" stroke-width="2.2"/>
+    <rect x="390" y="145" width="405" height="65" rx="12" fill="#111827"/>
+    <rect x="390" y="192" width="405" height="18" fill="#111827"/>
+    <path d="M426 164 l18 31 h-36 z" fill="#ffffff"/>
+    <text x="461" y="173" font-size="16" font-weight="700" fill="#ffffff">Vercel</text>
+    <text x="461" y="193" font-size="12" fill="#d1d5db">Next.js 16 server boundary</text>
+
+    <rect x="421" y="237" width="343" height="88" rx="9" fill="#f8fafc" stroke="#cbd5e1"/>
+    <circle cx="458" cy="281" r="22" fill="#111827"/>
+    <text x="458" y="287" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">N</text>
+    <text x="493" y="273" font-size="13.5" font-weight="700" fill="#0f172a">App Router delivery</text>
+    <text x="493" y="294" font-size="11.7" fill="#475569">SSR · static assets · responsive UI</text>
+
+    <rect x="421" y="356" width="343" height="113" rx="9" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.5"/>
+    <rect x="442" y="380" width="42" height="42" rx="8" fill="#2563eb"/>
+    <path d="M452 401 h22 M466 394 l8 7 -8 7" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="501" y="390" font-size="13.5" font-weight="700" fill="#1e3a8a">/api/* rewrite</text>
+    <text x="501" y="412" font-size="11.7" fill="#475569">SSO · refresh cookie · private REST</text>
+    <text x="501" y="431" font-size="11.7" fill="#475569">MCP web-session and library actions</text>
+    <text x="501" y="451" font-size="11.2" fill="#2563eb">credentials remain same-origin</text>
+
+    <rect x="421" y="500" width="343" height="151" rx="9" fill="#faf5ff" stroke="#a78bfa" stroke-width="1.5"/>
+    <rect x="442" y="523" width="42" height="42" rx="8" fill="#7c3aed"/>
+    <path d="M452 544 h22 M463 533 v22" fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round"/>
+    <text x="501" y="535" font-size="13.5" font-weight="700" fill="#5b21b6">/api/agent/{stream,resume}</text>
+    <text x="501" y="557" font-size="11.7" fill="#475569">verify bearer with ssuMCP /auth/me</text>
+    <text x="501" y="577" font-size="11.7" fill="#475569">strip client principal · inject verified subject</text>
+    <text x="501" y="597" font-size="11.7" fill="#475569">inject server-only X-Agent-Key</text>
+    <text x="501" y="622" font-size="11.2" fill="#7c3aed">upstream body streams back as SSE</text>
+
+    <rect x="421" y="674" width="343" height="24" rx="12" fill="#111827"/>
+    <text x="592" y="691" text-anchor="middle" font-size="11.5" font-weight="650" fill="#ffffff">server secrets never enter the browser bundle</text>
+  </g>
+
+  <!-- Backend context -->
+  <g>
+    <rect x="875" y="115" width="555" height="625" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2"/>
+    <rect x="875" y="115" width="36" height="36" fill="#334155"/>
+    <path d="M884 132 h18 M893 123 v18" stroke="#ffffff" stroke-width="2"/>
+    <text x="922" y="139" font-size="15.5" font-weight="700" fill="#1e293b">Backend services</text>
+
+    <rect x="921" y="188" width="463" height="190" rx="11" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+    <circle cx="972" cy="244" r="31" fill="#6db33f"/>
+    <path d="M972 226 v16 M960 236 a17 17 0 1 0 24 0" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+    <text x="1020" y="227" font-size="16" font-weight="750" fill="#0f172a">ssuMCP</text>
+    <text x="1020" y="248" font-size="12" fill="#475569">Spring Boot · REST + Streamable HTTP MCP</text>
+    <rect x="954" y="294" width="176" height="52" rx="7" fill="#ecfdf5" stroke="#6ee7b7"/>
+    <text x="1042" y="316" text-anchor="middle" font-size="12.3" font-weight="700" fill="#065f46">Public /api GET + SSE</text>
+    <text x="1042" y="334" text-anchor="middle" font-size="11" fill="#475569">CORS · no credentials</text>
+    <rect x="1152" y="294" width="198" height="52" rx="7" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="1251" y="316" text-anchor="middle" font-size="12.3" font-weight="700" fill="#1e40af">Authenticated /api/*</text>
+    <text x="1251" y="334" text-anchor="middle" font-size="11" fill="#475569">JWT · cookie · session</text>
+
+    <rect x="921" y="427" width="463" height="169" rx="11" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
+    <circle cx="972" cy="482" r="31" fill="#7c3aed"/>
+    <circle cx="960" cy="482" r="4" fill="#ffffff"/>
+    <circle cx="984" cy="470" r="4" fill="#ffffff"/>
+    <circle cx="984" cy="494" r="4" fill="#ffffff"/>
+    <path d="M964 480 l16 -8 M964 484 l16 8" stroke="#ffffff" stroke-width="2.4"/>
+    <text x="1020" y="469" font-size="16" font-weight="750" fill="#0f172a">ssuAgent</text>
+    <text x="1020" y="491" font-size="12" fill="#475569">FastAPI · LangGraph · SSE · HITL</text>
+    <rect x="954" y="527" width="396" height="44" rx="7" fill="#faf5ff" stroke="#c4b5fd"/>
+    <text x="1152" y="546" text-anchor="middle" font-size="12.2" font-weight="700" fill="#5b21b6">trusted principal + X-Agent-Key</text>
+    <text x="1152" y="563" text-anchor="middle" font-size="10.8" fill="#475569">MCP tool calls use the browser-owned MCP session</text>
+
+    <rect x="921" y="642" width="463" height="65" rx="9" fill="#fff7ed" stroke="#fdba74" stroke-dasharray="6 4"/>
+    <text x="943" y="667" font-size="12.5" font-weight="700" fill="#9a3412">School systems</text>
+    <text x="943" y="689" font-size="11.5" fill="#475569">u-SAINT · LMS · Pyxis library · meals · notices</text>
+  </g>
+
+  <!-- Runtime paths -->
+  <path d="M293 397 C342 397 340 101 520 101 H1138 C1190 101 1190 180 1190 188" fill="none" stroke="#15803d" stroke-width="3" marker-end="url(#arrowGreen)"/>
+  <text x="692" y="94" text-anchor="middle" font-size="12" font-weight="700" fill="#15803d">public GET + seat SSE · configured direct origin · credentials omitted</text>
+
+  <path d="M293 520 H413" fill="none" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowBlue)"/>
+  <path d="M764 412 C830 412 848 321 946 321" fill="none" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowBlue)"/>
+  <text x="815" y="391" text-anchor="middle" font-size="11.5" font-weight="650" fill="#2563eb">private REST</text>
+
+  <path d="M293 639 H413" fill="none" stroke="#7c3aed" stroke-width="3" marker-end="url(#arrowPurple)"/>
+  <path d="M764 574 C835 574 853 513 946 513" fill="none" stroke="#7c3aed" stroke-width="3" marker-end="url(#arrowPurple)"/>
+  <text x="838" y="554" text-anchor="middle" font-size="11.5" font-weight="650" fill="#7c3aed">SSE + HITL</text>
+
+  <path d="M1114 427 C1114 407 1114 397 1114 378" fill="none" stroke="#7c3aed" stroke-width="3" marker-end="url(#arrowPurple)"/>
+  <text x="1130" y="408" font-size="11" font-weight="650" fill="#7c3aed">MCP</text>
+
+  <path d="M1384 329 H1406 V674 H1384" fill="none" stroke="#1f2328" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#arrow)"/>
+  <text x="1418" y="517" text-anchor="middle" font-size="10.8" fill="#475569" transform="rotate(90 1418 517)">connectors</text>
+
+  <!-- CI / delivery footer -->
+  <g>
+    <rect x="390" y="776" width="1040" height="54" rx="9" fill="#f8fafc" stroke="#cbd5e1"/>
+    <rect x="412" y="789" width="30" height="30" rx="7" fill="#24292f"/>
+    <circle cx="427" cy="804" r="8" fill="none" stroke="#ffffff" stroke-width="1.7"/>
+    <path d="M422 808 c2 3 8 3 10 0 M423 799 l-3 -2 M431 799 l3 -2" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="456" y="801" font-size="12.5" font-weight="700" fill="#0f172a">Git push / PR</text>
+    <text x="456" y="819" font-size="11" fill="#475569">repository event</text>
+    <path d="M573 795 H665" fill="none" stroke="#2088ff" stroke-width="2" marker-end="url(#arrowBlue)"/>
+    <text x="684" y="799" font-size="12.2" font-weight="700" fill="#0f172a">GitHub Actions</text>
+    <text x="684" y="817" font-size="10.7" fill="#475569">Node 20 · lint · typecheck · Vitest · build</text>
+    <path d="M573 815 C760 844 900 823 992 805" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M1022 788 l13 23 h-26 z" fill="#111827"/>
+    <text x="1050" y="804" font-size="12.2" font-weight="700" fill="#0f172a">Vercel preview / production</text>
+    <text x="1050" y="821" font-size="10.7" fill="#64748b">server-only env → proxy targets + agent credential</text>
+  </g>
+</svg>

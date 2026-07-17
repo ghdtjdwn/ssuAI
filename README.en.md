@@ -65,25 +65,11 @@ pauses after preparation and runs only after the user approves the HITL card.
 
 ## Architecture
 
-```
-Browser
-   ├─ public GET/SSE ────────────────┐
-   │                                  ▼
-   │               ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
-   │                                  │ REST API
-   │                                  ▼
-   │               University systems (cafeteria · library · LMS · u-SAINT)
-   │                                  ▲
-   └─ auth/session /api/* · /api/agent/* (same-origin)
-       ▼
-      Next.js server (Vercel)
-       ├─ /api/*        → rewrites ─────────────────┘
-       └─ /api/agent/*  → proxy (injects X-Agent-Key) → ssuAgent
-                                                       │ MCP
-                                                       └──────────→ ssuMCP
-```
+![ssuAI frontend architecture showing the public direct path and same-origin authenticated and agent proxy boundaries](docs/assets/architecture.svg)
 
-The browser calls the backend origin directly only for anonymous public reads (meals, dorm meals, notices, facilities, academic calendar, library seat status/book search) and public seat SSE (ADR 0087). SmartID/LMS Bearer, refresh cookies, library session, reservations/loans, MCP web session, and `/api/agent/*` chatbot streams stay on the same-origin proxy path. Backend CORS is open only on public GET/SSE endpoints with credentials disabled, so API keys, agent keys, and sessions do not move to cross-origin browser calls.
+With the production public-origin setting, the browser calls the backend origin directly only for anonymous public reads (meals, dorm meals, notices, facilities, academic calendar, library seat status/book search) and public seat SSE (ADR 0087). If the public variables are absent, those calls fall back to the existing same-origin path. SmartID/LMS Bearer, refresh cookies, library session, reservations/loans, MCP web session, and `/api/agent/*` chatbot streams always stay on the same-origin proxy path. Backend CORS is open only on public GET/SSE endpoints with credentials disabled, so API keys, agent keys, and sessions do not move to cross-origin browser calls.
+
+See the [frontend architecture document](docs/architecture.md) for the runtime boundaries and deployment flow. A [PNG version](docs/assets/architecture.png) is also available.
 
 ---
 
