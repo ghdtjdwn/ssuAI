@@ -29,7 +29,7 @@ On top of a single design system (Soongsil blue + mint tokens, Pretendard/JetBra
 - **Library** — real-time seats in 3 views (donut overview / rooms / full map) · seat recommendation → reservation · waitlist registration · loans · book search
 - **Campus** — cafeteria menu (today/weekly) · dormitory menu · notices (category filter) · facility search · entry point to AI evidence search
 
-The captures below show the Home, Academics, Library, Campus, and service-connections screens as of 2026-07-16.
+The captures below show the Home, Academics, Library, Campus, service-connections, and live chatbot flows as of 2026-07-17.
 
 ![Home — AI daily-briefing hero and customizable widget grid](docs/assets/dashboard.png)
 
@@ -41,7 +41,19 @@ The captures below show the Home, Academics, Library, Campus, and service-connec
 |---|---|
 | ![Today's dining, weekly dormitory meals, notices, academic dates, and facility search](docs/assets/dashboard-campus.png) | ![Connection status and available features for u-SAINT, LMS, and the library](docs/assets/service-connections.png) |
 
-> In the chatbot, actions that change university state — e.g. *"Reserve a library seat for me"* — require login and one more confirmation through an HITL approval card before they run.
+### Chatbot — authenticated reads and approval-gated actions
+
+These are real sessions in which the chatbot hands off to the academic or library domain and streams tool
+progress. Graduation requirements are summarized from authenticated academic data, while a seat reservation
+pauses after preparation and runs only after the user approves the HITL card.
+
+![The ssuAI chatbot summarizes remaining graduation requirements from linked u-SAINT academic data](docs/assets/chat-graduation-requirements.png)
+
+| Library seat reservation — approval requested | Reservation completed after approval |
+|---|---|
+| ![The chatbot prepares a library seat candidate and requests user approval before execution](docs/assets/chat-seat-approval.png) | ![The chatbot executes the seat reservation after approval and confirms completion](docs/assets/chat-seat-reserved.png) |
+
+> These captures document one successful integration session; they do not imply uninterrupted availability of every external university system.
 
 ---
 
