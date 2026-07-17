@@ -647,6 +647,29 @@ describe("ChatPanel", () => {
       );
     });
 
+    it("settles an LMS export link as a clickable download action", async () => {
+      setAuthedUser();
+      const downloadUrl =
+        "https://ssumcp.duckdns.org/api/lms/exports/job-1/download?token=test-token";
+      await mockStream([
+        {
+          type: "text",
+          content: `[LMS 에이전트] 준비됐어요.\n\n[강의 파일 다운로드](${downloadUrl})`,
+        },
+        { type: "done" },
+      ]);
+
+      renderChat();
+      await screen.findByText("MCP 연결됨");
+      submit("수강 중인 모든 강의 파일을 받아줘");
+
+      const link = await screen.findByRole("link", {
+        name: "강의 파일 다운로드 (새 탭에서 열림)",
+      });
+      expect(link).toHaveAttribute("href", downloadUrl);
+      expect(link).toHaveAttribute("data-download-action", "lms-export");
+    });
+
     it("renders handoff and tool steps as status lines while streaming", async () => {
       setAuthedUser();
       await mockStream([
