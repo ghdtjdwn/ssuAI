@@ -1,200 +1,105 @@
-# ssuAI — Soongsil University AI Web Client
+# ssuAI
 
 [![CI](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml)
+[![Security](https://github.com/ghdtjdwn/ssuAI/actions/workflows/security.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/security.yml)
 
-**한국어** [README.md](README.md) · **English** (this document)
+[한국어](README.md) · **English**
 
-> 🧩 **Soongsil Campus AI Platform** (1 of 4 services) · [ssuMCP](https://github.com/ghdtjdwn/ssuMCP) · **ssuAI** · [ssuAgent](https://github.com/ghdtjdwn/ssuAgent) · [ssu-ai-service](https://github.com/ghdtjdwn/ssu-ai-service) · 🟢 [Live](https://ssuai.vercel.app)
+A Next.js application that brings public campus information, private academic/LMS/library data,
+and approval-gated AI actions into one web experience. It provides dashboards and an SSE chat UI
+without exposing server credentials to the browser.
 
-A Next.js web client for [ssuMCP](https://github.com/ghdtjdwn/ssuMCP), the Soongsil University MCP server.
-Five screens (Home · Chatbot · Academics · Library · Campus) plus a natural-language chatbot for browsing public campus information and personal academic records.
+[Live app](https://ssuai.vercel.app) · [Chat](https://ssuai.vercel.app/chat) ·
+[Platform case study](https://seongju.vercel.app/en/projects/ssu-platform/) · [Documentation map](docs/README.md)
 
-| | URL |
-|--|-----|
-| Home (AI briefing + customizable widgets) | <https://ssuai.vercel.app/> |
-| Chatbot | <https://ssuai.vercel.app/chat> |
-| Academics | <https://ssuai.vercel.app/academics> |
-| Library | <https://ssuai.vercel.app/library> |
-| Campus | <https://ssuai.vercel.app/campus> |
+![ssuAI home with a daily briefing and user-configurable dashboard widgets](docs/assets/dashboard.png)
 
----
+## Role in the platform
 
-## Screens (full redesign on 2026-07-02 — [ADR 0010](docs/adr/0010-ui-redesign.md) (Korean))
+| Service | Responsibility | Repository |
+| --- | --- | --- |
+| **ssuAI** | **User interface, same-origin BFF, authentication state, and SSE/HITL UX** | This repository |
+| ssuAgent | LangGraph routing, conversation state, and HITL orchestration | [ghdtjdwn/ssuAgent](https://github.com/ghdtjdwn/ssuAgent) |
+| ssuMCP | Campus domain logic, MCP/REST contracts, authentication, and state changes | [ghdtjdwn/ssuMCP](https://github.com/ghdtjdwn/ssuMCP) |
+| ssu-ai-service | Isolated embedding-request gateway | [ghdtjdwn/ssu-ai-service](https://github.com/ghdtjdwn/ssu-ai-service) |
 
-On top of a single design system (Soongsil blue + mint tokens, Pretendard/JetBrains Mono, system-following dark mode), only the layout branches: sidebar + multi-column on desktop, bottom tab bar + single column on mobile.
+This repository owns only the frontend and BFF boundary. `ssuMCP` owns university integrations and
+data consistency; `ssuAgent` owns natural-language routing and conversation checkpoints.
 
-- **Home** — AI daily-briefing hero (a summary built from linked data) · 3 priority cards · customizable grid of 14 widgets (order/size/visibility/density, persisted in localStorage)
-- **Chatbot** — SSE streaming + HITL approval cards (state-changing actions such as reservations run only after approval)
-- **Academics** — weekly timetable grid · graduation requirements · grades · chapel · scholarships · LMS assignments (u-SAINT login)
-- **Library** — real-time seats in 3 views (donut overview / rooms / full map) · seat recommendation → reservation · waitlist registration · loans · book search
-- **Campus** — cafeteria menu (today/weekly) · dormitory menu · notices (category filter) · facility search · entry point to AI evidence search
+## Product flows
 
-The captures below show the Home, Academics, Library, Campus, service-connections, and live chatbot flows as of 2026-07-17.
-Only personal value strings—such as names, academic or financial values, loan status, seat identifiers, and usage times—are strongly pixelated.
+| User path | Capability | Trust boundary |
+| --- | --- | --- |
+| Public lookups | Meals, notices, facilities, calendar, books, and live seat status | Only credential-free GET/SSE may call the backend origin directly |
+| Connected dashboard | Schedule, grades, graduation, chapel, scholarships, LMS, and loans | Access token stays in memory; refresh and provider sessions remain same-origin |
+| AI chat | Domain handoff, tool progress, and streamed answers | A server route injects the agent key and verified principal |
+| State changes | Seat actions and LMS exports | A `prepare` result is shown before user approval triggers `resume/confirm` |
 
-![Home — AI daily-briefing hero and customizable widget grid](docs/assets/dashboard.png)
+Home, academics, library, campus, and chat share a desktop sidebar and mobile bottom navigation.
+The design and accessibility decisions are recorded in the [UI redesign ADR](docs/adr/0010-ui-redesign.md)
+(Korean).
 
-| Real-time library seat status (donut grid) | Academics — graduation requirements · cumulative grades · chapel |
-|---|---|
-| ![Real-time library seat availability and book search](docs/assets/dashboard-library.png) | ![Graduation requirement progress · cumulative grades · chapel status](docs/assets/dashboard-academic.png) |
+<details>
+<summary>More product screens</summary>
 
-| Campus — dining · notices · academic dates · facility search | Service connections — u-SAINT · LMS · Library |
-|---|---|
-| ![Today's dining, weekly dormitory meals, notices, academic dates, and facility search](docs/assets/dashboard-campus.png) | ![Connection status and available features for u-SAINT, LMS, and the library](docs/assets/service-connections.png) |
+Names and personal academic, financial, loan, and seat values are de-identified in public images.
 
-### Chatbot — authenticated reads and approval-gated actions
+| Live library seats | Academic dashboard |
+| --- | --- |
+| ![Live library-seat status and book search](docs/assets/dashboard-library.png) | ![Graduation, grades, and chapel status](docs/assets/dashboard-academic.png) |
 
-These are real sessions in which the chatbot hands off to the academic or library domain and streams tool
-progress. Graduation requirements are summarized from authenticated academic data, while a seat reservation
-pauses after preparation and runs only after the user approves the HITL card.
+| Campus information | Connected services |
+| --- | --- |
+| ![Meals, notices, calendar, and facility search](docs/assets/dashboard-campus.png) | ![u-SAINT, LMS, and library connection status](docs/assets/service-connections.png) |
 
-![The ssuAI chatbot summarizes remaining graduation requirements from linked u-SAINT academic data](docs/assets/chat-graduation-requirements.png)
+| Seat reservation approval | Completed after approval |
+| --- | --- |
+| ![The chat asks for approval before reserving a seat](docs/assets/chat-seat-approval.png) | ![The reservation completes after explicit approval](docs/assets/chat-seat-reserved.png) |
 
-| Library seat reservation — approval requested | Reservation completed after approval |
-|---|---|
-| ![The chatbot prepares a library seat candidate and requests user approval before execution](docs/assets/chat-seat-approval.png) | ![The chatbot executes the seat reservation after approval and confirms completion](docs/assets/chat-seat-reserved.png) |
-
-> These captures document one successful integration session; they do not imply uninterrupted availability of every external university system.
-
----
-
-## Why I Built It
-
-[ssuMCP](https://github.com/ghdtjdwn/ssuMCP) already serves university data as an MCP server, but it had to be usable by people without Claude Desktop. ssuAI is the answer: a chatbot and dashboard reachable straight from the browser, turning ssuMCP into something anyone can use as its web client.
-
----
+</details>
 
 ## Architecture
 
-![ssuAI frontend architecture showing the public direct path and same-origin authenticated and agent proxy boundaries](docs/assets/architecture.svg)
+![ssuAI frontend architecture showing the public direct path and same-origin authentication and agent proxy boundary](docs/assets/architecture.svg)
 
-With the production public-origin setting, the browser calls the backend origin directly only for anonymous public reads (meals, dorm meals, notices, facilities, academic calendar, library seat status/book search) and public seat SSE (ADR 0087). If the public variables are absent, those calls fall back to the existing same-origin path. SmartID/LMS Bearer, refresh cookies, library session, reservations/loans, MCP web session, and `/api/agent/*` chatbot streams always stay on the same-origin proxy path. Backend CORS is open only on public GET/SSE endpoints with credentials disabled, so API keys, agent keys, and sessions do not move to cross-origin browser calls.
+Public GET/SSE requests may call the backend origin directly to avoid an unnecessary Vercel function
+hop. Requests carrying cookies, bearer tokens, API keys, or `/api/agent/*` traffic always stay on
+same-origin server paths. This keeps public CORS from expanding into authenticated surfaces while
+reducing latency for public data. See the [frontend architecture](docs/architecture.md) for details.
 
-See the [frontend architecture document](docs/architecture.md) for the runtime boundaries and deployment flow. A [PNG version](docs/assets/architecture.png) is also available.
+## Engineering evidence
 
----
+| Problem | Implementation and verification |
+| --- | --- |
+| Public-read optimization expanding the authentication boundary | Separate public GET/SSE allow-list and server-only proxy — [ADR 0087](docs/adr/0087-public-direct-origin-sse.md) · [boundary tests](lib/api/public-origin.test.ts) |
+| Browser cookies disappearing during an SSO redirect | Exchange a single-use code in a 200 response — [ADR 0089](docs/adr/0089-sso-code-exchange.md) · [return-page tests](app/auth/return/page.test.tsx) |
+| UI connection state disagreeing with real MCP grants | Treat backend grants as authoritative and issue sessions through single-flight — [ADR 0099](docs/adr/0099-authoritative-web-session-grants.md) |
+| HITL state or final links disappearing after a stream settles | Stable-thread SSE, resume endpoint, and restricted safe-link rendering — [chat tests](components/chat/ChatPanel.test.tsx) · [message tests](components/chat/MessageBubble.test.tsx) |
+| Browser control of the agent key or trusted principal | Server route verifies the bearer and forwards only trusted values — [agent proxy](lib/server/agentProxy.ts) · [proxy tests](lib/server/agentProxy.test.ts) |
+| UI behavior that only works by accident locally | Lint, TypeScript, Vitest, and production build are all required — [CI workflow](.github/workflows/ci.yml) |
 
-## Features
+The main stack is Next.js 16, React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
+Vitest, Testing Library, and Vercel.
 
-### Public lookups (no login required)
+## Local development and verification
 
-- Student cafeteria and dormitory menus (today / by date / weekly)
-- Campus facility search
-- Central library book search
-- University and department notices (list, search, detail, ongoing notices)
-
-### Personal lookups after linking
-
-| Link | Features |
-|------|------|
-| SAINT (SmartID SSO) | timetable, grades, chapel attendance, graduation requirements, scholarships |
-| LMS (Canvas SSO) | assignment and quiz list |
-| Library | per-floor seat availability, my current loans |
-
-### Chatbot
-
-Ask natural-language questions over the same data the dashboard covers. Public questions are answered immediately; personal-data questions are answered only when a linked session exists.
-
-`/chat` connects to the LangGraph-based multi-agent (ssuAgent) over SSE streaming. Agent handoffs, tool executions, and text appear in real time, and actions that change university state — like library reservations — pause at an HITL approval card (HitlCard) and resume through `/agent/resume` after the user approves.
-
-### Library seat reservation (flagship)
-
-Seat reservation, seat swap, and return bring the backend MCP's two-step `prepare_* → confirm_action` confirmation directly into the UI:
-
-- `SeatRecommendationPanel` — the 5 recommended seats for the selected floor, with a reserve button per seat
-- `ReservationConfirmModal` — shows the `prepare` summary and expiry time; the user must confirm once more before `confirm` is called. The confirm result branches into `SUCCESS` (reservation complete) / `PROCESSING` (the synchronous confirm timed out but a backend worker keeps processing the reservation in the background — shown as "processing in the background", not treated as a failure) / other failures (`FAILED_RACE` · `TIMEOUT` · `FAILED_AUTH` · `FAILED_UPSTREAM` → "reservation failed")
-- `WaitStatusCard` — status, attempt count, expiry, and a cancel button for the active waitlist (`wait_for_library_seat`) intent
-
-The design principle — sensitive write actions run only after explicit user approval — is proven in both the code and the UI.
-
----
-
-## Authentication Flow
-
-```
-SAINT (SmartID SSO)
-  Login button → /api/auth/saint/sso → SmartID redirect
-  → callback → JWT issued (access: in memory, refresh: HttpOnly cookie, 14 days)
-
-LMS (Canvas SSO)
-  Login button → /api/auth/lms/sso → Canvas redirect
-  → callback → LMS session linked
-
-Library
-  /mcp/auth/library → enter credentials
-  → ssuMCP obtains a library API token → session linked
-```
-
-The access token is kept in memory only (`AuthContext`) — it is never written to localStorage/sessionStorage. On page refresh, `/api/auth/refresh` uses the refresh token from the HttpOnly cookie to reissue it automatically.
-
----
-
-## Engineering Notes
-
-### SSO callback cookie loss — one problem spread across 4 layers
-
-After SmartID login, the session cookie kept going missing. The cause was not in one place — it spanned four layers.
-
-1. **Cross-origin cookies**: the browser would not store `ssumcp.duckdns.org` cookies from a `ssuai.vercel.app` response → built a same-origin proxy with Next.js `rewrites`
-2. **Set-Cookie dropped on 302 redirects**: when the SSO callback returned a 302, the proxy discarded the intermediate Set-Cookie → changed the callback to 200 + HTML
-3. **App Router route interception order**: the `afterFiles` rewrite ran before the App Router route handler, so cookies could not be reissued → moved to Next.js 16 middleware (`proxy.ts`)
-4. **Next.js 16 silently strips Set-Cookie**: Next.js 16 quietly removes headers set via `response.headers.set('Set-Cookie', ...)` → replaced with the `response.cookies.set()` API
-
-Each step was isolated and fixed in its own commit. It was the kind of structure where fixing one layer exposed the next.
-
-### Same-origin Proxy
-
-If the browser called ssuMCP directly, CORS configuration would get complicated and API keys and session tokens would be visible in the Network tab. Forwarding `/api/*` transparently to ssuMCP via `rewrites` in `next.config.ts` eliminates the problem at the source.
-
-### TanStack Query
-
-Server-state caching, retries, and background revalidation are delegated to TanStack Query. Components only call the `useQuery`/`useMutation` hooks and never hand-write cache-management code. `staleTime` reduces load on the university servers, and automatic retries protect the UX on unstable networks.
-
----
-
-## Tech Stack
-
-| Category | Technology |
-|------|------|
-| Framework | Next.js 16 (App Router) + TypeScript 6 |
-| Server state | TanStack Query v5 |
-| UI | Tailwind CSS 3, shadcn/ui, Radix UI |
-| Testing | Vitest 4, Testing Library |
-| Package manager | pnpm |
-| Deployment | Vercel |
-
----
-
-## Project Structure
-
-```
-app/
-  auth/         # SSO callbacks, login pages
-  chat/         # chatbot UI
-  mcp/auth/     # library session UI
-components/     # feature-specific and shared UI components
-contexts/       # AuthContext (client-side auth state)
-hooks/          # TanStack Query hooks
-lib/
-  api/          # type-safe API client
-  api/client.ts # fetch wrapper — envelope parsing, ApiError
-docs/           # product docs, architecture, ADRs
-```
-
----
-
-## Local Development
+Use Node.js 20 and pnpm 9. The app can target the public ssuMCP deployment without a local backend.
 
 ```bash
+git clone https://github.com/ghdtjdwn/ssuAI.git
+cd ssuAI
 cp .env.example .env.local
-# NEXT_PUBLIC_SSUAI_API_BASE=https://ssumcp.duckdns.org
-pnpm install
-pnpm dev        # http://localhost:3000
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-It works without a local ssuMCP — just point it at the production server (`https://ssumcp.duckdns.org`).
+To run without a local ssuMCP, replace the active localhost value in `.env.local` with the public
+backend:
 
-### Verification
+```dotenv
+NEXT_PUBLIC_SSUAI_API_BASE=https://ssumcp.duckdns.org
+NEXT_PUBLIC_BACKEND_ORIGIN=https://ssumcp.duckdns.org
+```
 
 ```bash
 pnpm lint
@@ -203,36 +108,24 @@ pnpm test
 pnpm build
 ```
 
----
-
-## Environment Variables
-
-| Variable | Description |
-|------|------|
-| `NEXT_PUBLIC_BACKEND_ORIGIN` | Direct target for public REST reads and library seat SSE. Falls back to `NEXT_PUBLIC_SSUAI_API_BASE`, then same-origin when unset |
-| `NEXT_PUBLIC_SSUAI_API_BASE` | ssuMCP server URL. Legacy public env for the `/api/*` rewrite target and public direct-origin fallback when `NEXT_PUBLIC_BACKEND_ORIGIN` is unset |
-| `SSUAI_API_PROXY_TARGET` | (server-only) override for the `/api/*` proxy target. Takes precedence over `NEXT_PUBLIC_SSUAI_API_BASE` when set |
-| `SSUAGENT_BASE_URL` | (server-only) ssuAgent server URL the `/api/agent` proxy forwards to. If unset, falls back to `NEXT_PUBLIC_SSUAGENT_BASE_URL`, then `https://ssuagent.duckdns.org` |
-| `NEXT_PUBLIC_SSUAGENT_BASE_URL` | (public, legacy) fallback ssuAgent server URL, mainly for local development |
-| `AGENT_API_KEY` | (server-only, required in production) `X-Agent-Key` credential the `/api/agent` proxy injects when calling ssuAgent. It must match ssuAgent and is never exposed to the browser. It may be omitted only for local development with both gates disabled |
-
----
+See [`.env.example`](.env.example) for public versus server-only variables. Production proxy targets
+and secrets must be verified with Vercel configuration; localhost defaults do not describe production.
 
 ## Documentation
 
-- [Product status and scope](docs/product.md) (Korean)
-- [Long-term vision and roadmap](docs/vision.md) (Korean)
-- [Security policy (ssuMCP)](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/security.md) (Korean)
+- [Documentation map](docs/README.md)
+- [Product scope](docs/product.md) (Korean)
+- [Frontend architecture](docs/architecture.md) (Korean)
+- [Security boundary](docs/security.md) (Korean)
+- [Architecture decision records](docs/adr/) (Korean)
+- [ssuMCP tool contract](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md) (Korean)
 
----
+## Scope and limitations
 
-## MCP Server
-
-The MCP server this app consumes:
-**[ghdtjdwn/ssuMCP](https://github.com/ghdtjdwn/ssuMCP)** · `https://ssumcp.duckdns.org/mcp`
-
----
+- This is not an official Soongsil University service and cannot guarantee upstream availability.
+- Private views and state changes require a valid university account and provider connection.
+- CI verifies the code build and tests, not Vercel environment wiring or external end-to-end health.
 
 ## License
 
-MIT — [LICENSE](LICENSE)
+[MIT](LICENSE)

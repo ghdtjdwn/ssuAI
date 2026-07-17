@@ -1,7 +1,7 @@
 # ssuAI Vision
 
-> 장기 제품 방향 문서. 현재 배포된 기능은 [product.md](product.md)에,
-> MCP/보안 구현 계약은
+> 2026-07-02에 작성한 장기 제품 방향의 역사 기록이다. 남은 항목을 현재 backlog로 해석하지 않는다.
+> 현재 배포된 기능은 [product.md](product.md)에, MCP/보안 구현 계약은
 > [ssuMCP 문서](https://github.com/ghdtjdwn/ssuMCP/tree/main/docs)에 기록한다.
 > 기준일: 2026-07-02.
 
@@ -18,7 +18,7 @@ ssuAI는 학생이 여러 학교 사이트를 찾아다니지 않고, 필요한 
 | 1. Public data | 식단, 시설, 공지, 도서 검색 | 제공 중 |
 | 2. Linked personal data | 좌석/대출, SAINT, LMS 연동 조회 | 제공 중 |
 | 3. Conversational use | 웹 챗봇과 MCP 클라이언트에서 같은 데이터 활용 | 제공 중 |
-| 4. Confirmed actions | 예약/취소처럼 학교 상태를 바꾸는 안전한 실행 | backend MCP 배포, 제품 UX 검증 필요 |
+| 4. Confirmed actions | 예약/취소처럼 학교 상태를 바꾸는 안전한 실행 | 제공 중 — prepare/confirm과 HITL 승인 UX |
 
 ## 2. 현재 아키텍처
 
