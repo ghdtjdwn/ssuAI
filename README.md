@@ -65,25 +65,11 @@ HITL 카드로 사용자 승인을 받은 뒤 실행한다.
 
 ## 아키텍처
 
-```
-브라우저
-   ├─ 공개 GET/SSE ────────────────┐
-   │                                ▼
-   │             ssuMCP (Spring Boot, https://ssumcp.duckdns.org)
-   │                                │ REST API
-   │                                ▼
-   │             학교 시스템 (학식 · 도서관 · LMS · u-SAINT)
-   │                                ▲
-   └─ 인증/세션 /api/* · /api/agent/* (same-origin)
-       ▼
-      Next.js 서버 (Vercel)
-       ├─ /api/*        → rewrites ───────────────┘
-       └─ /api/agent/*  → proxy (X-Agent-Key 주입) → ssuAgent
-                                                     │ MCP
-                                                     └──────────→ ssuMCP
-```
+![ssuAI 프론트엔드 아키텍처 — 공개 직접 호출과 same-origin 인증·에이전트 프록시 경계](docs/assets/architecture.svg)
 
-브라우저는 로그인 없는 공개 조회(학식·기숙사 식단, 공지, 시설, 학사일정, 도서관 좌석 상태/도서 검색)와 공개 좌석 SSE만 backend origin으로 직접 호출한다(ADR 0087). SmartID/LMS Bearer, refresh cookie, library session, 예약/대출, MCP web session, `/api/agent/*` 챗봇 stream은 계속 same-origin 프록시를 탄다. Backend CORS는 공개 GET/SSE에만 열리고 credentials는 꺼져 있어, API 키·에이전트 키·세션이 브라우저 cross-origin 호출로 확장되지 않는다.
+운영 public-origin 설정에서 브라우저는 로그인 없는 공개 조회(학식·기숙사 식단, 공지, 시설, 학사일정, 도서관 좌석 상태/도서 검색)와 공개 좌석 SSE만 backend origin으로 직접 호출한다(ADR 0087). 환경 변수가 없으면 기존 same-origin 경로로 폴백한다. SmartID/LMS Bearer, refresh cookie, library session, 예약/대출, MCP web session, `/api/agent/*` 챗봇 stream은 항상 same-origin 프록시를 탄다. Backend CORS는 공개 GET/SSE에만 열리고 credentials는 꺼져 있어, API 키·에이전트 키·세션이 브라우저 cross-origin 호출로 확장되지 않는다.
+
+런타임 경계와 배포 흐름은 [프론트엔드 아키텍처 문서](docs/architecture.md)에 정리했다. 이미지의 [PNG 버전](docs/assets/architecture.png)도 함께 제공한다.
 
 ---
 
