@@ -193,17 +193,17 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-950 p-4 text-slate-100 sm:p-8">
+      <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
 
-        <header className="flex justify-between items-center border-b border-slate-800 pb-6">
+        <header className="flex flex-col items-start gap-4 border-b border-slate-800 pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-teal-400 to-indigo-500 bg-clip-text text-transparent">
+            <h1 className="bg-gradient-to-r from-teal-400 to-indigo-500 bg-clip-text text-2xl font-extrabold tracking-tight text-transparent sm:text-3xl">
               ssuAI 어드민 대시보드
             </h1>
             <p className="text-slate-400 mt-1">시스템 런타임 상태 모니터링</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:justify-end">
             {lastRefreshed && (
               <span className="text-xs text-slate-500">
                 {lastRefreshed.toLocaleTimeString("ko-KR")} 갱신
@@ -212,14 +212,14 @@ export default function AdminDashboardPage() {
             <button
               onClick={handleRefresh}
               disabled={loading}
-              className="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition disabled:opacity-50"
+              className="min-h-10 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
             >
               {loading ? "로딩 중..." : "새로고침"}
             </button>
           </div>
         </header>
 
-        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-2xl sm:p-6">
           <h2 className="text-xl font-bold text-slate-100 mb-4">
             Resilience4j Circuit Breaker 상태
           </h2>
@@ -241,8 +241,8 @@ export default function AdminDashboardPage() {
           )}
 
           {data && (
-            <div className="overflow-hidden rounded-lg border border-slate-800">
-              <table className="min-w-full divide-y divide-slate-800">
+            <div className="overflow-x-auto rounded-lg border border-slate-800">
+              <table className="w-full min-w-[640px] divide-y divide-slate-800">
                 <thead className="bg-slate-950">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">

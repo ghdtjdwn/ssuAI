@@ -79,7 +79,7 @@ export function ConnectionBadge() {
         <span key={`${badgeCount}-${badgeLabel}`} className="inline-block animate-springPop font-mono">
           {badgeCount}
         </span>
-        <span className="opacity-70">/3</span>
+        <span>/3</span>
         <span className="hidden sm:inline">{badgeLabel}</span>
       </button>
       <ConnectionsPanel open={open} onClose={() => setOpen(false)} />
@@ -277,7 +277,10 @@ export function ConnectionsPanel({ open, onClose }: { open: boolean; onClose: ()
             name="도서관"
             desc="좌석 예약 · 대출 현황"
             state={conns.library}
-            onConnect={() => setShowLibraryModal(true)}
+            onConnect={() => {
+              onClose();
+              setShowLibraryModal(true);
+            }}
             onDisconnect={() => {
               void libraryLogout().then(() => toast("info", "도서관 연결이 해제되었습니다"));
             }}

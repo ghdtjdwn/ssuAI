@@ -33,3 +33,18 @@ jobs:
         run: pnpm build
         env:
           NEXT_PUBLIC_SSUAI_API_BASE: http://localhost:8080
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser journeys, accessibility, and Web Vitals budgets
+        run: pnpm test:e2e
+        env:
+          NEXT_PUBLIC_SSUAI_API_BASE: ''
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: playwright-evidence
+          path: |
+            playwright-report/
+            test-results/playwright/
+          if-no-files-found: ignore

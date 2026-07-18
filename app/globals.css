@@ -14,7 +14,8 @@
     --hairline: #eceff3;
     --ink: #12181f;
     --text-2: #566173;
-    --text-3: #8a94a2;
+    /* WCAG AA on both --surface and --bg at the small label sizes used by the UI. */
+    --text-3: #5f6b7a;
 
     --primary: #0b4da2;
     --primary-soft: #eaf1fb;
@@ -42,7 +43,7 @@
     --hairline: #232c39;
     --ink: #eaeef3;
     --text-2: #9faab8;
-    --text-3: #6b7684;
+    --text-3: #aab4c2;
 
     --primary: #4c8df0;
     --primary-soft: #16233a;

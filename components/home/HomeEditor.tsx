@@ -61,9 +61,9 @@ function ArrowButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="press flex h-4 w-[22px] items-center justify-center rounded-[5px] bg-muted text-subtle hover:text-foreground disabled:opacity-35 disabled:hover:text-subtle"
+      className="press flex h-7 w-7 items-center justify-center rounded-[7px] bg-muted text-subtle hover:text-foreground disabled:opacity-35 disabled:hover:text-subtle"
     >
-      <Icon size={13} aria-hidden />
+      <Icon size={14} aria-hidden />
     </button>
   );
 }

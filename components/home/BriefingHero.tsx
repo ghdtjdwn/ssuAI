@@ -148,6 +148,7 @@ export function BriefingHero() {
         </div>
         <button
           type="button"
+          aria-label="오늘의 브리핑 새로고침"
           onClick={() => void handleRefresh()}
           disabled={refreshing}
           className="press inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-control border border-white/25 bg-white/10 px-3 text-[12.5px] font-semibold text-white hover:bg-white/15 disabled:opacity-60"

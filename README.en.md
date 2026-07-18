@@ -103,11 +103,11 @@ reducing latency for public data. See the [frontend architecture](docs/architect
 | UI behavior that only works by accident locally | Lint, TypeScript, Vitest, and production build are all required — [CI workflow](.github/workflows/ci.yml) |
 
 The main stack is Next.js 16, React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
-Vitest, Testing Library, and Vercel.
+Vitest, Testing Library, Playwright, axe-core, and Vercel.
 
 ## Local development and verification
 
-Use Node.js 20 and pnpm 9. The app can target the public ssuMCP deployment without a local backend.
+Use Node.js 20 and pnpm 10. The app can target the public ssuMCP deployment without a local backend.
 
 ```bash
 git clone https://github.com/ghdtjdwn/ssuAI.git
@@ -130,7 +130,22 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm exec playwright install chromium
+pnpm test:e2e
 ```
+
+`test:e2e` checks the five core routes in desktop and mobile Chromium. It rejects critical or
+serious WCAG 2.0/2.1 A/AA axe violations and applies laboratory LCP ≤2.5 s and CLS ≤0.1 budgets to
+the home page. School API calls are blocked by an explicit 503 fixture, so the suite does not touch
+student data or real upstream state. It starts a fresh verification server by default; set
+`E2E_REUSE_SERVER=true` only when intentionally testing an already running ssuAI server. Failures
+retain traces, screenshots, and Web Vitals JSON as test artifacts.
+
+These checks are regression evidence for a local production build, not field RUM, authenticated-
+journey, or school-system availability evidence. Service-specific conditions and claim boundaries
+are recorded in [`docs/portfolio-verification-boundary.md`](docs/portfolio-verification-boundary.md).
+The zero-finding `pnpm audit` recorded on 2026-07-18 after pinning patched transitive versions is a
+point-in-time registry advisory result, not a runtime penetration test.
 
 See [`.env.example`](.env.example) for public versus server-only variables. Production proxy targets
 and secrets must be verified with Vercel configuration; localhost defaults do not describe production.
@@ -141,6 +156,7 @@ and secrets must be verified with Vercel configuration; localhost defaults do no
 - [Product scope](docs/product.md) (Korean)
 - [Frontend architecture](docs/architecture.md) (Korean)
 - [Security boundary](docs/security.md) (Korean)
+- [Verification scope and claim boundaries](docs/portfolio-verification-boundary.md)
 - [Architecture decision records](docs/adr/) (Korean)
 - [ssuMCP tool contract](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md) (Korean)
 
