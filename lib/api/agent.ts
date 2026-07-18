@@ -157,12 +157,17 @@ export async function resumeAgentStream(
 }
 
 export type McpProvider = "SAINT" | "LMS" | "LIBRARY";
+export type McpProviderHealth = "VALID" | "UNKNOWN" | "ERROR" | "EXPIRED";
 
 export interface McpWebSessionResponse {
   mcpSessionId: string;
   expiresAt: string;
-  /** Optional only during the backend-first rolling deployment; absence fails closed. */
+  /** Provider grants; retained as the legacy compatibility source during rollout. */
   linkedProviders?: McpProvider[];
+  /** Providers currently usable for tool calls. Preferred when present. */
+  availableProviders?: McpProvider[];
+  /** Optional during rollout. Missing entries keep linkedProviders as the compatibility source. */
+  providerHealth?: Partial<Record<McpProvider, McpProviderHealth>>;
 }
 
 /** Exchange optional JWT or library cookie session for an isolated MCP provider-grant session. */

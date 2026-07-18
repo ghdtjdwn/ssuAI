@@ -13,7 +13,8 @@ import {
 import { HitlCard, HitlDoneCard, formatHitlSummary } from "@/components/chat/HitlCard";
 import { MessageBubble, type ChatMessageRole } from "@/components/chat/MessageBubble";
 import { Button } from "@/components/ui/button";
-import { useMcpSession } from "@/contexts/McpSessionContext";
+import { useConnections } from "@/components/shell/useConnections";
+import { useMcpSession, type McpSession } from "@/contexts/McpSessionContext";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import {
   AgentStreamError,
@@ -26,6 +27,7 @@ import {
   clearAgentThread,
   getOrCreateAgentThreadId,
 } from "@/lib/agentThread";
+import { isProviderUsable } from "@/lib/mcpConnections";
 import { cn, safeRandomId } from "@/lib/utils";
 
 const MAX_MESSAGE_LENGTH = 1000;
@@ -49,7 +51,13 @@ interface ChatMessage {
 
 export function ChatPanel() {
   const { accessToken, isAuthenticated } = useSaintAuth();
-  const { session: mcpSession, status: mcpStatus, ensureSession } = useMcpSession();
+  const {
+    session: mcpSession,
+    status: mcpStatus,
+    ensureSession,
+    refreshSession,
+  } = useMcpSession();
+  const connections = useConnections();
   const mcpSessionId = mcpSession?.mcpSessionId ?? null;
 
   const [threadId, setThreadId] = useState<string>(getOrCreateAgentThreadId);
@@ -63,6 +71,7 @@ export function ChatPanel() {
   const [isResumingHitl, setIsResumingHitl] = useState(false);
 
   const streamingContentRef = useRef<string>("");
+  const pendingMcpSessionRef = useRef<McpSession | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const previousIsAuthenticatedRef = useRef(isAuthenticated);
 
@@ -82,6 +91,7 @@ export function ChatPanel() {
     setInput("");
     setIsStreaming(false);
     setPendingInterrupt(null);
+    pendingMcpSessionRef.current = null;
     setError(null);
     setIsResumingHitl(false);
   }, [isAuthenticated]);
@@ -110,36 +120,49 @@ export function ChatPanel() {
   }
 
   const consumeStream = useCallback(
-    async (response: Response) => {
-      for await (const event of readAgentStream(response)) {
-        if (event.type === "text") {
-          streamingContentRef.current += event.content;
-          setStreamingContent(streamingContentRef.current);
-        } else if (event.type === "handoff") {
-          appendStatus(`[${event.agent}] ${event.message}`);
-        } else if (event.type === "tool") {
-          appendStatus(event.label ?? `도구 실행: ${event.name}`);
-        } else if (event.type === "interrupt") {
-          finalizeAssistantMessage();
-          setPendingInterrupt(event.data);
-          setIsStreaming(false);
-          return; // stream ends after interrupt
-        } else if (event.type === "error") {
-          finalizeAssistantMessage();
-          setIsStreaming(false);
-          setError(event.message);
-          return;
-        } else if (event.type === "done") {
-          finalizeAssistantMessage();
-          setIsStreaming(false);
-          return;
+    async (response: Response, streamSession: McpSession | null) => {
+      let interrupted = false;
+      try {
+        for await (const event of readAgentStream(response)) {
+          if (event.type === "text") {
+            streamingContentRef.current += event.content;
+            setStreamingContent(streamingContentRef.current);
+          } else if (event.type === "handoff") {
+            appendStatus(`[${event.agent}] ${event.message}`);
+          } else if (event.type === "tool") {
+            appendStatus(event.label ?? `도구 실행: ${event.name}`);
+          } else if (event.type === "interrupt") {
+            finalizeAssistantMessage();
+            interrupted = true;
+            pendingMcpSessionRef.current = streamSession;
+            setPendingInterrupt(event.data);
+            setIsStreaming(false);
+            return; // stream ends after interrupt
+          } else if (event.type === "error") {
+            finalizeAssistantMessage();
+            setIsStreaming(false);
+            setError(event.message);
+            return;
+          } else if (event.type === "done") {
+            finalizeAssistantMessage();
+            setIsStreaming(false);
+            return;
+          }
+        }
+        // Stream ended without explicit done (e.g. network drop)
+        finalizeAssistantMessage();
+        setIsStreaming(false);
+      } finally {
+        if (!interrupted) {
+          pendingMcpSessionRef.current = null;
+          // A tool can invalidate provider credentials between periodic polls.
+          // An interrupted action remains owned by its original MCP session;
+          // refresh only after the resumed stream has settled.
+          void refreshSession().catch(() => undefined);
         }
       }
-      // Stream ended without explicit done (e.g. network drop)
-      finalizeAssistantMessage();
-      setIsStreaming(false);
     },
-    [],
+    [refreshSession],
   );
 
   async function sendMessage(messageText: string, appendUserMsg = true) {
@@ -161,8 +184,7 @@ export function ChatPanel() {
     try {
       const activeSession = await ensureSession();
       const activeMcpSessionId = activeSession?.mcpSessionId ?? null;
-      const activeLibraryConnected =
-        activeSession?.linkedProviders.includes("LIBRARY") ?? false;
+      const activeLibraryConnected = isProviderUsable(activeSession, "LIBRARY");
       let activeThread = threadId;
       let response: Response;
       try {
@@ -193,7 +215,7 @@ export function ChatPanel() {
           throw err;
         }
       }
-      await consumeStream(response);
+      await consumeStream(response, activeSession);
     } catch (err) {
       finalizeAssistantMessage();
       setIsStreaming(false);
@@ -217,21 +239,27 @@ export function ChatPanel() {
     streamingContentRef.current = "";
     setStreamingContent("");
 
+    const actionSession = pendingMcpSessionRef.current;
+    let responseStarted = false;
     try {
-      const activeSession = await ensureSession();
       const response = await resumeAgentStream(
         threadId,
         approved,
         pendingInterrupt.action_id ?? null,
-        activeSession?.mcpSessionId ?? null,
-        activeSession?.linkedProviders.includes("LIBRARY") ?? false,
+        actionSession?.mcpSessionId ?? null,
+        isProviderUsable(actionSession, "LIBRARY"),
         accessToken,
       );
-      await consumeStream(response);
+      responseStarted = true;
+      await consumeStream(response, actionSession);
     } catch (err) {
       finalizeAssistantMessage();
       setIsStreaming(false);
       setError(err instanceof Error ? err.message : "에이전트 재개에 실패했습니다.");
+      if (!responseStarted) {
+        pendingMcpSessionRef.current = null;
+        void refreshSession().catch(() => undefined);
+      }
     } finally {
       setIsResumingHitl(false);
     }
@@ -254,6 +282,37 @@ export function ChatPanel() {
   }
 
   const isIdle = !isStreaming && !pendingInterrupt;
+  const providerStates = [connections.saint, connections.lms, connections.library];
+  const hasDegradedProvider = providerStates.includes("degraded");
+  const hasUnverifiedProvider = providerStates.includes("unverified");
+  const connectionLabel =
+    mcpStatus === "connecting"
+      ? "연결 확인 중"
+      : mcpStatus === "error"
+        ? "연결 세션 오류"
+        : mcpStatus === "stale"
+          ? "연결 상태 확인 불가"
+          : mcpSessionId
+            ? connections.count === 0
+              ? hasDegradedProvider
+                ? "개인 서비스 0/3 · 확인 필요"
+                : "개인 서비스 0/3 · 연결 필요"
+              : hasDegradedProvider
+                ? `개인 서비스 ${connections.count}/3 · 일부 확인 필요`
+                : hasUnverifiedProvider
+                  ? `개인 서비스 ${connections.count}/3 연결 · 상태 미확인`
+                  : `개인 서비스 ${connections.count}/3 연결`
+            : "공개 도구 모드";
+  const connectionTone =
+    mcpStatus === "error"
+      ? "bg-danger"
+      : mcpStatus === "stale" || hasDegradedProvider || (mcpSessionId && connections.count < 3)
+        ? "bg-warning"
+        : hasUnverifiedProvider
+          ? "bg-mint"
+          : mcpStatus === "connected"
+            ? "bg-success"
+            : "bg-mint";
 
   return (
     <section aria-label="ssuAI 챗봇" className="mx-auto flex min-h-0 w-full max-w-[820px] flex-1 flex-col">
@@ -272,27 +331,20 @@ export function ChatPanel() {
             </p>
           </div>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-muted px-3 py-1.5 text-[11.5px] font-semibold text-muted-foreground">
+        <span
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-muted px-3 py-1.5 text-[11.5px] font-semibold text-muted-foreground"
+        >
           <span
             className={cn(
               "h-[7px] w-[7px] rounded-full",
-              mcpStatus === "error"
-                ? "bg-danger"
-                : mcpStatus === "connected"
-                  ? "bg-success"
-                  : "bg-mint",
+              connectionTone,
             )}
             aria-hidden="true"
           />
-          {mcpStatus === "connecting"
-            ? "연결 확인 중"
-            : mcpStatus === "error"
-              ? "연결 세션 오류"
-              : mcpSessionId && mcpSession?.linkedProviders.length
-                ? "MCP 연결됨"
-                : mcpSessionId
-                  ? "개인 서비스 재연결 필요"
-                  : "공개 도구 모드"}
+          {connectionLabel}
         </span>
       </header>
 

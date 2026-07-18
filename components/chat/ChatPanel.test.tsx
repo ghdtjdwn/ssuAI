@@ -13,6 +13,7 @@ import {
   readAgentStream,
   resumeAgentStream,
   startAgentStream,
+  type McpWebSessionResponse,
 } from "@/lib/api/agent";
 import { ApiError } from "@/lib/api/types";
 
@@ -130,7 +131,7 @@ describe("ChatPanel", () => {
     const { rerender } = renderChat();
 
     expect(sessionStorage.getItem(THREAD_ID_KEY)).toBe("thread-before-logout");
-    expect(await screen.findByText("MCP 연결됨")).toBeInTheDocument();
+    expect(await screen.findByText("개인 서비스 2/3 연결")).toBeInTheDocument();
 
     setAuthState({
       accessToken: null,
@@ -176,7 +177,7 @@ describe("ChatPanel", () => {
       .mockResolvedValueOnce({} as Response);
 
     renderChat();
-    await screen.findByText("MCP 연결됨");
+    await screen.findByText("개인 서비스 3/3 연결");
 
     fireEvent.change(screen.getByPlaceholderText("메시지를 입력하세요"), {
       target: { value: "졸업까지 어떤 조건들이 남았어?" },
@@ -238,7 +239,7 @@ describe("ChatPanel", () => {
       renderChat();
 
       await waitFor(() => expect(createMcpWebSession).toHaveBeenCalledWith(null));
-      await screen.findByText("MCP 연결됨");
+      await screen.findByText("개인 서비스 1/3 연결");
       submit("도서관 자리 있어?");
 
       await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
@@ -263,6 +264,7 @@ describe("ChatPanel", () => {
         },
       });
       vi.mocked(createMcpWebSession).mockResolvedValue({
+        availableProviders: ["SAINT", "LMS"],
         expiresAt: "2099-06-30T01:00:00Z",
         linkedProviders: ["SAINT", "LMS"],
         mcpSessionId: "saint-mcp-session",
@@ -272,7 +274,7 @@ describe("ChatPanel", () => {
       renderChat();
 
       await waitFor(() => expect(createMcpWebSession).toHaveBeenCalledWith("access-token"));
-      await screen.findByText("MCP 연결됨");
+      await screen.findByText("개인 서비스 2/3 연결");
       submit("졸업까지 어떤 조건들이 남았어?");
 
       await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
@@ -283,6 +285,41 @@ describe("ChatPanel", () => {
         false,
         "access-token",
       );
+    });
+
+    it("shows a degraded provider as partial instead of connected", async () => {
+      setAuthState({
+        accessToken: "access-token",
+        isAuthenticated: true,
+        user: {
+          enrollmentStatus: "재학",
+          major: "컴퓨터학부",
+          name: "홍길동",
+          studentId: "20231234",
+        },
+      });
+      setLibraryAuthState({ isConnected: true });
+      vi.mocked(createMcpWebSession).mockResolvedValue({
+        availableProviders: ["SAINT", "LMS"],
+        expiresAt: "2099-06-30T01:00:00Z",
+        linkedProviders: ["SAINT", "LMS", "LIBRARY"],
+        mcpSessionId: "degraded-library-session",
+        providerHealth: {
+          SAINT: "VALID",
+          LMS: "UNKNOWN",
+          LIBRARY: "ERROR",
+        },
+      });
+      mockDoneStream();
+
+      renderChat();
+
+      expect(
+        await screen.findByText("개인 서비스 2/3 · 일부 확인 필요"),
+      ).toBeInTheDocument();
+      submit("도서관 자리 있어?");
+      await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(startAgentStream).mock.calls[0][3]).toBe(false);
     });
 
     it("re-mints when the library identity becomes available after a SAINT session", async () => {
@@ -384,7 +421,7 @@ describe("ChatPanel", () => {
       });
 
       renderChat();
-      expect(await screen.findByText("개인 서비스 재연결 필요")).toBeInTheDocument();
+      expect(await screen.findByText("개인 서비스 0/3 · 연결 필요")).toBeInTheDocument();
 
       fireEvent.focus(window);
 
@@ -394,7 +431,7 @@ describe("ChatPanel", () => {
           "access-token",
         );
       });
-      expect(await screen.findByText("MCP 연결됨")).toBeInTheDocument();
+      expect(await screen.findByText("개인 서비스 2/3 연결")).toBeInTheDocument();
       expect(createMcpWebSession).toHaveBeenCalledTimes(1);
     });
 
@@ -420,10 +457,12 @@ describe("ChatPanel", () => {
       mockDoneStream();
 
       renderChat();
-      expect(await screen.findByText("MCP 연결됨")).toBeInTheDocument();
+      expect(await screen.findByText("개인 서비스 2/3 연결")).toBeInTheDocument();
 
       fireEvent.focus(window);
       await waitFor(() => expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(1));
+      expect(await screen.findByText("연결 상태 확인 불가")).toBeInTheDocument();
+      expect(screen.queryByText("개인 서비스 2/3 연결")).not.toBeInTheDocument();
       submit("졸업요건 알려줘");
 
       await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
@@ -435,6 +474,207 @@ describe("ChatPanel", () => {
         false,
         "access-token",
       );
+    });
+
+    it("recovers from a stale status check without rotating the session", async () => {
+      setAuthState({
+        accessToken: "access-token",
+        isAuthenticated: true,
+        user: {
+          enrollmentStatus: "재학",
+          major: "컴퓨터학부",
+          name: "홍길동",
+          studentId: "20231234",
+        },
+      });
+      const healthySession: McpWebSessionResponse = {
+        availableProviders: ["SAINT", "LMS"],
+        expiresAt: "2099-06-30T01:00:00Z",
+        linkedProviders: ["SAINT", "LMS"],
+        mcpSessionId: "recoverable-session",
+        providerHealth: {
+          SAINT: "VALID",
+          LMS: "VALID",
+        },
+      };
+      vi.mocked(createMcpWebSession).mockResolvedValue(healthySession);
+      vi.mocked(getMcpWebSessionStatus)
+        .mockRejectedValueOnce(
+          new ApiError("UPSTREAM_UNAVAILABLE", "temporary", "trace-stale", 503),
+        )
+        .mockResolvedValueOnce(healthySession);
+
+      renderChat();
+      expect(await screen.findByText("개인 서비스 2/3 연결")).toBeInTheDocument();
+
+      fireEvent.focus(window);
+      expect(await screen.findByText("연결 상태 확인 불가")).toBeInTheDocument();
+
+      fireEvent.focus(window);
+      expect(await screen.findByText("개인 서비스 2/3 연결")).toBeInTheDocument();
+      expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(2);
+      expect(createMcpWebSession).toHaveBeenCalledTimes(1);
+    });
+
+    it("queues one forced refresh behind an in-flight check and coalesces duplicates", async () => {
+      setAuthState({
+        accessToken: "access-token",
+        isAuthenticated: true,
+        user: {
+          enrollmentStatus: "재학",
+          major: "컴퓨터학부",
+          name: "홍길동",
+          studentId: "20231234",
+        },
+      });
+      setLibraryAuthState({ isConnected: true });
+      const initialSession: McpWebSessionResponse = {
+        availableProviders: ["SAINT", "LMS", "LIBRARY"],
+        expiresAt: "2099-06-30T01:00:00Z",
+        linkedProviders: ["SAINT", "LMS", "LIBRARY"],
+        mcpSessionId: "queued-refresh-session",
+        providerHealth: {
+          SAINT: "VALID",
+          LMS: "VALID",
+          LIBRARY: "VALID",
+        },
+      };
+      const firstStatus = deferred<Awaited<ReturnType<typeof getMcpWebSessionStatus>>>();
+      const streamSettlement = deferred<void>();
+      vi.mocked(createMcpWebSession).mockResolvedValue(initialSession);
+      vi.mocked(getMcpWebSessionStatus)
+        .mockReturnValueOnce(firstStatus.promise)
+        .mockResolvedValueOnce({
+          ...initialSession,
+          availableProviders: ["SAINT", "LIBRARY"],
+          providerHealth: {
+            SAINT: "VALID",
+            LMS: "ERROR",
+            LIBRARY: "VALID",
+          },
+        });
+      vi.mocked(startAgentStream).mockResolvedValue({} as Response);
+      vi.mocked(readAgentStream).mockImplementation(async function* () {
+        await streamSettlement.promise;
+        yield { type: "done" } as never;
+      });
+
+      renderChat();
+      expect(await screen.findByText("개인 서비스 3/3 연결")).toBeInTheDocument();
+      submit("이번 주 과제를 확인해줘");
+      await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
+
+      fireEvent.focus(window);
+      await waitFor(() => expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(1));
+
+      streamSettlement.resolve();
+      await waitFor(() =>
+        expect(screen.getByPlaceholderText("메시지를 입력하세요")).not.toBeDisabled(),
+      );
+      fireEvent.focus(window);
+      fireEvent.focus(window);
+      expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(1);
+
+      firstStatus.resolve(initialSession);
+      await waitFor(() => expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(2));
+      expect(
+        await screen.findByText("개인 서비스 2/3 · 일부 확인 필요"),
+      ).toBeInTheDocument();
+      expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it("drops a queued forced refresh when the web identity changes", async () => {
+      setAuthState({
+        accessToken: "access-token",
+        isAuthenticated: true,
+        user: {
+          enrollmentStatus: "재학",
+          major: "컴퓨터학부",
+          name: "홍길동",
+          studentId: "20231234",
+        },
+      });
+      const initialSession: McpWebSessionResponse = {
+        availableProviders: ["SAINT", "LMS"],
+        expiresAt: "2099-06-30T01:00:00Z",
+        linkedProviders: ["SAINT", "LMS"],
+        mcpSessionId: "old-identity-session",
+      };
+      const firstStatus = deferred<Awaited<ReturnType<typeof getMcpWebSessionStatus>>>();
+      vi.mocked(createMcpWebSession).mockResolvedValue(initialSession);
+      vi.mocked(getMcpWebSessionStatus).mockReturnValue(firstStatus.promise);
+
+      const { rerender } = renderChat();
+      expect(await screen.findByText("개인 서비스 2/3 연결")).toBeInTheDocument();
+
+      fireEvent.focus(window);
+      await waitFor(() => expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(1));
+      fireEvent.focus(window);
+
+      setAuthState({ accessToken: null, isAuthenticated: false, user: null });
+      rerender(<ChatPanel />);
+      expect(await screen.findByText("공개 도구 모드")).toBeInTheDocument();
+
+      firstStatus.resolve(initialSession);
+      await firstStatus.promise;
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(createMcpWebSession).toHaveBeenCalledTimes(1);
+      expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it("refreshes provider health immediately after an agent stream settles", async () => {
+      setAuthState({
+        accessToken: "access-token",
+        isAuthenticated: true,
+        user: {
+          enrollmentStatus: "재학",
+          major: "컴퓨터학부",
+          name: "홍길동",
+          studentId: "20231234",
+        },
+      });
+      setLibraryAuthState({ isConnected: true });
+      vi.mocked(createMcpWebSession).mockResolvedValue({
+        availableProviders: ["SAINT", "LMS", "LIBRARY"],
+        expiresAt: "2099-06-30T01:00:00Z",
+        linkedProviders: ["SAINT", "LMS", "LIBRARY"],
+        mcpSessionId: "health-refresh-session",
+        providerHealth: {
+          SAINT: "VALID",
+          LMS: "UNKNOWN",
+          LIBRARY: "UNKNOWN",
+        },
+      });
+      vi.mocked(getMcpWebSessionStatus).mockResolvedValue({
+        availableProviders: ["SAINT", "LIBRARY"],
+        expiresAt: "2099-06-30T01:00:00Z",
+        linkedProviders: ["SAINT", "LMS", "LIBRARY"],
+        mcpSessionId: "health-refresh-session",
+        providerHealth: {
+          SAINT: "VALID",
+          LMS: "ERROR",
+          LIBRARY: "UNKNOWN",
+        },
+      });
+      mockDoneStream();
+
+      renderChat();
+      expect(
+        await screen.findByText("개인 서비스 3/3 연결 · 상태 미확인"),
+      ).toBeInTheDocument();
+      submit("이번 주 마감인 과제 있어?");
+
+      await waitFor(() => {
+        expect(getMcpWebSessionStatus).toHaveBeenCalledWith(
+          "health-refresh-session",
+          "access-token",
+        );
+      });
+      expect(
+        await screen.findByText("개인 서비스 2/3 · 일부 확인 필요"),
+      ).toBeInTheDocument();
     });
 
     it("reissues the MCP session when library credentials are refreshed in place", async () => {
@@ -453,7 +693,7 @@ describe("ChatPanel", () => {
       mockDoneStream();
 
       const { rerender } = renderChat();
-      expect(await screen.findByText("MCP 연결됨")).toBeInTheDocument();
+      expect(await screen.findByText("개인 서비스 1/3 연결")).toBeInTheDocument();
 
       setLibraryAuthState({ credentialRevision: 2, isConnected: true });
       rerender(<ChatPanel />);
@@ -529,7 +769,7 @@ describe("ChatPanel", () => {
 
       renderChat();
 
-      expect(await screen.findByText("개인 서비스 재연결 필요")).toBeInTheDocument();
+      expect(await screen.findByText("개인 서비스 0/3 · 연결 필요")).toBeInTheDocument();
       submit("도서관 자리 있어?");
       await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
       expect(vi.mocked(startAgentStream).mock.calls[0][2]).toBe("providerless-session");
@@ -550,9 +790,15 @@ describe("ChatPanel", () => {
         },
       });
       vi.mocked(createMcpWebSession).mockResolvedValue({
+        availableProviders: ["SAINT", "LMS", "LIBRARY"],
         expiresAt: "2099-06-30T01:00:00Z",
         linkedProviders: ["SAINT", "LMS", "LIBRARY"],
         mcpSessionId: "mcp-session",
+        providerHealth: {
+          SAINT: "UNKNOWN",
+          LMS: "UNKNOWN",
+          LIBRARY: "UNKNOWN",
+        },
       });
       vi.mocked(startAgentStream).mockResolvedValue({} as Response);
     }
@@ -579,7 +825,12 @@ describe("ChatPanel", () => {
       await mockStream([{ type: "done" }]);
 
       renderChat();
-      await screen.findByText("MCP 연결됨");
+      const connectionStatus = await screen.findByRole("status");
+      expect(connectionStatus).toHaveTextContent(
+        "개인 서비스 3/3 연결 · 상태 미확인",
+      );
+      expect(connectionStatus).toHaveAttribute("aria-live", "polite");
+      expect(connectionStatus).toHaveAttribute("aria-atomic", "true");
       submit("도서관 자리 있어?");
 
       await waitFor(() => expect(startAgentStream).toHaveBeenCalledTimes(1));
@@ -592,9 +843,36 @@ describe("ChatPanel", () => {
       );
     });
 
-    it("passes the current library connection flag to resumeAgentStream", async () => {
+    it("pins an interrupted action to its MCP session and refreshes only after resume settles", async () => {
       setAuthedUser();
       setLibraryAuthState({ isConnected: true });
+      vi.mocked(createMcpWebSession)
+        .mockReset()
+        .mockResolvedValueOnce({
+          availableProviders: ["SAINT", "LMS", "LIBRARY"],
+          expiresAt: "2099-06-30T01:00:00Z",
+          linkedProviders: ["SAINT", "LMS", "LIBRARY"],
+          mcpSessionId: "interrupt-owner-session",
+          providerHealth: {
+            SAINT: "VALID",
+            LMS: "UNKNOWN",
+            LIBRARY: "UNKNOWN",
+          },
+        })
+        .mockResolvedValueOnce({
+          availableProviders: ["SAINT", "LMS", "LIBRARY"],
+          expiresAt: "2099-06-30T01:00:00Z",
+          linkedProviders: ["SAINT", "LMS", "LIBRARY"],
+          mcpSessionId: "rotated-after-resume-session",
+          providerHealth: {
+            SAINT: "VALID",
+            LMS: "VALID",
+            LIBRARY: "VALID",
+          },
+        });
+      vi.mocked(getMcpWebSessionStatus).mockRejectedValue(
+        new ApiError("SESSION_NOT_FOUND", "expired", "trace-hitl", 401),
+      );
       vi.mocked(resumeAgentStream).mockResolvedValue({} as Response);
       vi.mocked(readAgentStream)
         .mockImplementationOnce(async function* () {
@@ -612,19 +890,25 @@ describe("ChatPanel", () => {
         });
 
       renderChat();
-      await screen.findByText("MCP 연결됨");
+      await screen.findByText("개인 서비스 3/3 연결 · 상태 미확인");
       submit("자리 예약해줘");
-      fireEvent.click(await screen.findByRole("button", { name: "승인" }));
+      const approveButton = await screen.findByRole("button", { name: "승인" });
+
+      expect(getMcpWebSessionStatus).not.toHaveBeenCalled();
+      expect(createMcpWebSession).toHaveBeenCalledTimes(1);
+      fireEvent.click(approveButton);
 
       await waitFor(() => expect(resumeAgentStream).toHaveBeenCalledTimes(1));
       expect(resumeAgentStream).toHaveBeenCalledWith(
         expect.any(String),
         true,
         7,
-        "mcp-session",
+        "interrupt-owner-session",
         true,
         "access-token",
       );
+      await waitFor(() => expect(getMcpWebSessionStatus).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(createMcpWebSession).toHaveBeenCalledTimes(2));
     });
 
     it("streams assistant text and settles the bubble when the stream is done", async () => {
@@ -636,7 +920,7 @@ describe("ChatPanel", () => {
       ]);
 
       renderChat();
-      await screen.findByText("MCP 연결됨");
+      await screen.findByText("개인 서비스 3/3 연결 · 상태 미확인");
       submit("내 졸업 요건 알려줘");
 
       // Chunks concatenate into a single settled assistant bubble.
@@ -660,7 +944,7 @@ describe("ChatPanel", () => {
       ]);
 
       renderChat();
-      await screen.findByText("MCP 연결됨");
+      await screen.findByText("개인 서비스 3/3 연결 · 상태 미확인");
       submit("수강 중인 모든 강의 파일을 받아줘");
 
       const link = await screen.findByRole("link", {
@@ -680,7 +964,7 @@ describe("ChatPanel", () => {
       ]);
 
       renderChat();
-      await screen.findByText("MCP 연결됨");
+      await screen.findByText("개인 서비스 3/3 연결 · 상태 미확인");
       submit("도서관 자리 있어?");
 
       expect(
@@ -704,7 +988,7 @@ describe("ChatPanel", () => {
       ]);
 
       renderChat();
-      await screen.findByText("MCP 연결됨");
+      await screen.findByText("개인 서비스 3/3 연결 · 상태 미확인");
       submit("자리 예약해줘");
 
       expect(await screen.findByText("승인이 필요한 작업이에요")).toBeInTheDocument();
@@ -723,7 +1007,7 @@ describe("ChatPanel", () => {
       ]);
 
       renderChat();
-      await screen.findByText("MCP 연결됨");
+      await screen.findByText("개인 서비스 3/3 연결 · 상태 미확인");
       submit("뭔가 물어봄");
 
       const alert = await screen.findByRole("alert");
