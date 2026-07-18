@@ -108,4 +108,9 @@ MCP 세션을 다시 만든다.
 
 ## 2026-07-16 후속 결정
 
-위의 "발급 실패를 공개 도구 모드로 조용히 강등"하는 정책과 요청한 identity를 grant로 간주하는 설명은 [ADR 0099](0099-authoritative-web-session-grants.md)로 대체한다. 현재는 server-confirmed `linkedProviders`만 연결 상태로 사용하고, 웹 identity가 있는 채팅은 발급 완료를 기다리며 실패를 사용자에게 표시한다. identity가 전혀 없는 실제 익명 사용자의 공개 도구 모드는 유지한다.
+위의 "발급 실패를 공개 도구 모드로 조용히 강등"하는 정책과 요청한 identity를 grant로 간주하는
+설명은 [ADR 0099](0099-authoritative-web-session-grants.md)로 대체한다. 현재 연결 상태는
+server-confirmed `availableProviders`를 우선하고, 필드가 없는 rolling deployment에서만
+`providerHealth`로 필터링한 `linkedProviders`, legacy `linkedProviders` 순서로 폴백한다. 웹
+identity가 있는 채팅은 발급 완료를 기다리며 실패를 사용자에게 표시한다. identity가 전혀 없는
+실제 익명 사용자의 공개 도구 모드는 유지한다.

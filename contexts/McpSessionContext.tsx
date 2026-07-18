@@ -16,6 +16,7 @@ import {
   createMcpWebSession,
   getMcpWebSessionStatus,
   type McpProvider,
+  type McpProviderHealth,
   type McpWebSessionResponse,
 } from "@/lib/api/agent";
 import { ApiError } from "@/lib/api/types";
@@ -25,13 +26,22 @@ const STATUS_REFRESH_MS = 60_000;
 const MAX_TIMER_MS = 2_147_000_000;
 const SESSION_ERROR_MESSAGE =
   "개인 서비스 연결 세션을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.";
+const STATUS_UNAVAILABLE_MESSAGE =
+  "개인 서비스 연결 상태를 확인하지 못했습니다. 기존 세션으로 계속 시도하며 자동으로 다시 확인합니다.";
 
-export type McpSessionStatus = "idle" | "connecting" | "connected" | "error";
+export type McpSessionStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "stale"
+  | "error";
 
 export interface McpSession {
   mcpSessionId: string;
   expiresAt: string;
   linkedProviders: McpProvider[];
+  availableProviders?: McpProvider[];
+  providerHealth?: Partial<Record<McpProvider, McpProviderHealth>>;
 }
 
 interface McpSessionContextValue {
@@ -39,6 +49,7 @@ interface McpSessionContextValue {
   status: McpSessionStatus;
   error: string | null;
   ensureSession: () => Promise<McpSession | null>;
+  refreshSession: () => Promise<McpSession | null>;
 }
 
 interface WebIdentity {
@@ -63,10 +74,17 @@ function normalizeSession(response: McpWebSessionResponse): McpSession {
   const linkedProviders = Array.from(
     new Set((response.linkedProviders ?? []).filter((provider) => allowed.has(provider))),
   );
+  const availableProviders = response.availableProviders
+    ? Array.from(
+        new Set(response.availableProviders.filter((provider) => allowed.has(provider))),
+      )
+    : undefined;
   return {
     mcpSessionId: response.mcpSessionId,
     expiresAt: response.expiresAt,
     linkedProviders,
+    availableProviders,
+    providerHealth: response.providerHealth,
   };
 }
 
@@ -100,6 +118,12 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
     key: string;
     promise: Promise<McpSession | null>;
   } | null>(null);
+  const queuedForceRef = useRef<{
+    key: string;
+    after: Promise<McpSession | null>;
+    token: object;
+    promise: Promise<McpSession | null>;
+  } | null>(null);
   const [session, setSession] = useState<McpSession | null>(null);
   const [status, setStatus] = useState<McpSessionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +140,44 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
         return cached.session;
       }
       if (inFlightRef.current?.key === identity.key) {
-        return inFlightRef.current.promise;
+        const inFlight = inFlightRef.current.promise;
+        if (!forceStatus) {
+          return inFlight;
+        }
+
+        const queuedForce = queuedForceRef.current;
+        if (queuedForce?.key === identity.key && queuedForce.after === inFlight) {
+          return queuedForce.promise;
+        }
+
+        const queuedIdentityKey = identity.key;
+        const queueToken = {};
+        const queuedPromise = inFlight
+          .catch(() => null)
+          .then(() => {
+            if (queuedForceRef.current?.token === queueToken) {
+              queuedForceRef.current = null;
+            }
+            if (
+              identityRef.current.key !== queuedIdentityKey ||
+              !identityRef.current.available
+            ) {
+              return null;
+            }
+            return acquireCurrent();
+          })
+          .finally(() => {
+            if (queuedForceRef.current?.token === queueToken) {
+              queuedForceRef.current = null;
+            }
+          });
+        queuedForceRef.current = {
+          key: queuedIdentityKey,
+          after: inFlight,
+          token: queueToken,
+          promise: queuedPromise,
+        };
+        return queuedPromise;
       }
 
       if (!cached || cached.key !== identity.key) {
@@ -125,24 +186,33 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
       setError(null);
       const hasRefreshableSession =
         cached?.key === identity.key && isFresh(cached.session);
-      const responsePromise = hasRefreshableSession
-        ? getMcpWebSessionStatus(cached.session.mcpSessionId, identity.accessToken).catch(
-            (cause: unknown) => {
+      const responsePromise: Promise<{
+        response: McpWebSessionResponse;
+        verified: boolean;
+      }> = hasRefreshableSession
+        ? getMcpWebSessionStatus(cached.session.mcpSessionId, identity.accessToken)
+            .then((response) => ({ response, verified: true }))
+            .catch((cause: unknown) => {
               if (identityRef.current.key !== identity.key) {
-                return acquireCurrent();
+                throw cause;
               }
               if (cause instanceof ApiError && [401, 404].includes(cause.httpStatus)) {
-                return createMcpWebSession(identityRef.current.accessToken);
+                return createMcpWebSession(identityRef.current.accessToken).then((response) => ({
+                  response,
+                  verified: true,
+                }));
               }
               if (isRetryableStatusFailure(cause)) {
-                return cached.session;
+                return { response: cached.session, verified: false };
               }
               throw cause;
-            },
-          )
-        : createMcpWebSession(identity.accessToken);
+            })
+        : createMcpWebSession(identity.accessToken).then((response) => ({
+            response,
+            verified: true,
+          }));
       const request: Promise<McpSession | null> = responsePromise
-        .then((response) => {
+        .then(({ response, verified }) => {
           if (response === null) {
             return null;
           }
@@ -152,7 +222,8 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
           const normalized = normalizeSession(response);
           cachedRef.current = { key: identity.key, session: normalized };
           setSession(normalized);
-          setStatus("connected");
+          setStatus(verified ? "connected" : "stale");
+          setError(verified ? null : STATUS_UNAVAILABLE_MESSAGE);
           return normalized;
         })
         .catch((cause: unknown) => {
@@ -203,6 +274,7 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
       return;
     }
     cachedRef.current = null;
+    queuedForceRef.current = null;
     setSession(null);
     setStatus("idle");
     setError(null);
@@ -241,8 +313,8 @@ export function McpSessionProvider({ children }: { children: React.ReactNode }) 
   }, [session, ensureSession, refreshSession]);
 
   const value = useMemo(
-    () => ({ session, status, error, ensureSession }),
-    [session, status, error, ensureSession],
+    () => ({ session, status, error, ensureSession, refreshSession }),
+    [session, status, error, ensureSession, refreshSession],
   );
 
   return <McpSessionContext.Provider value={value}>{children}</McpSessionContext.Provider>;
