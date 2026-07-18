@@ -55,7 +55,7 @@ function McpLibraryAuthContent() {
   const formDisabled = !isRetryable(pageState);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-6 px-4 py-12 sm:px-6">
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-4 py-12 sm:px-6">
       <header>
         <p className="text-sm font-medium text-muted-foreground">ssuAI MCP 도서관 인증</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
@@ -97,7 +97,7 @@ function McpLibraryAuthContent() {
               onChange={(e) => setLoginId(e.target.value)}
               placeholder="20221528"
               disabled={formDisabled}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              className="min-h-11 w-full rounded-md border border-input bg-background px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 sm:text-sm"
             />
           </div>
 
@@ -115,7 +115,7 @@ function McpLibraryAuthContent() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={formDisabled}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              className="min-h-11 w-full rounded-md border border-input bg-background px-3 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 sm:text-sm"
             />
           </div>
 
@@ -128,7 +128,7 @@ function McpLibraryAuthContent() {
           <button
             type="submit"
             disabled={formDisabled || !loginId.trim() || !password}
-            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+            className="min-h-11 w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
           >
             {pageState === "submitting" ? "로그인 중…" : "도서관 로그인"}
           </button>

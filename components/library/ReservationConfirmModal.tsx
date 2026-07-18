@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Portal } from "@/components/ui/portal";
 import { useToast } from "@/components/ui/toast";
 import { useConfirmReservation } from "@/hooks/useLibraryReservation";
 import type { LibraryReservationPrepareResponse } from "@/lib/api/library";
@@ -41,8 +42,11 @@ export function ReservationConfirmModal({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     return () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
+      document.body.style.overflow = previousOverflow;
     };
   }, []);
 
@@ -88,60 +92,62 @@ export function ReservationConfirmModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fadeIn"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-modal-title"
-    >
-      <div className="w-full max-w-sm rounded-card border border-hairline bg-surface p-6 shadow-e3 animate-fadeUp">
-        <h2 id="confirm-modal-title" className="text-[17px] font-extrabold text-foreground">
-          예약 확인
-        </h2>
+    <Portal>
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 pb-[env(safe-area-inset-bottom)] animate-fadeIn sm:items-center sm:p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+      >
+        <div className="max-h-[calc(100dvh-env(safe-area-inset-bottom))] w-full overflow-y-auto overscroll-contain rounded-t-card border border-hairline bg-surface p-5 shadow-e3 animate-sheetUp sm:max-w-sm sm:rounded-card sm:p-6 sm:animate-fadeUp">
+          <h2 id="confirm-modal-title" className="text-[17px] font-extrabold text-foreground">
+            예약 확인
+          </h2>
 
-        <div className="mt-4 space-y-2.5 rounded-control bg-muted/60 px-4 py-3.5">
-          <div className="flex items-start justify-between gap-3">
-            <span className="shrink-0 text-[12px] font-medium text-subtle">요청 내용</span>
-            <span className="text-right text-[13px] font-medium text-foreground">
-              {pendingAction.summary}
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="shrink-0 text-[12px] font-medium text-subtle">유효시간</span>
-            <span className="text-[13px] text-muted-foreground">
-              <span className="font-mono font-bold text-foreground">
-                {formatRemaining(remainingMs)}
-              </span>{" "}
-              남음
-            </span>
-          </div>
-        </div>
-
-        {successMessage ? (
-          <p className="mt-4 flex items-center gap-2 text-sm font-bold text-success animate-springPop">
-            <CheckCircle2 size={17} aria-hidden />
-            {successMessage}
-          </p>
-        ) : (
-          <>
-            {errorMessage ? (
-              <p className="mt-3 text-sm font-medium text-danger">{errorMessage}</p>
-            ) : null}
-            <div className="mt-6 flex gap-3">
-              <Button variant="secondary" onClick={handleCancel} className="flex-1">
-                취소
-              </Button>
-              <Button
-                onClick={() => void handleConfirm()}
-                disabled={confirm.isPending}
-                className="flex-1"
-              >
-                {confirm.isPending ? "처리 중..." : "예약 확정"}
-              </Button>
+          <div className="mt-4 space-y-2.5 rounded-control bg-muted/60 px-4 py-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <span className="shrink-0 text-[12px] font-medium text-subtle">요청 내용</span>
+              <span className="text-right text-[13px] font-medium text-foreground">
+                {pendingAction.summary}
+              </span>
             </div>
-          </>
-        )}
+            <div className="flex items-center justify-between gap-3">
+              <span className="shrink-0 text-[12px] font-medium text-subtle">유효시간</span>
+              <span className="text-[13px] text-muted-foreground">
+                <span className="font-mono font-bold text-foreground">
+                  {formatRemaining(remainingMs)}
+                </span>{" "}
+                남음
+              </span>
+            </div>
+          </div>
+
+          {successMessage ? (
+            <p className="mt-4 flex items-center gap-2 text-sm font-bold text-success animate-springPop">
+              <CheckCircle2 size={17} aria-hidden />
+              {successMessage}
+            </p>
+          ) : (
+            <>
+              {errorMessage ? (
+                <p className="mt-3 text-sm font-medium text-danger">{errorMessage}</p>
+              ) : null}
+              <div className="mt-6 flex gap-3">
+                <Button variant="secondary" onClick={handleCancel} className="flex-1">
+                  취소
+                </Button>
+                <Button
+                  onClick={() => void handleConfirm()}
+                  disabled={confirm.isPending}
+                  className="flex-1"
+                >
+                  {confirm.isPending ? "처리 중..." : "예약 확정"}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </Portal>
   );
 }

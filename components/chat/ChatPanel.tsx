@@ -72,7 +72,7 @@ export function ChatPanel() {
 
   const streamingContentRef = useRef<string>("");
   const pendingMcpSessionRef = useRef<McpSession | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const threadRef = useRef<HTMLDivElement | null>(null);
   const previousIsAuthenticatedRef = useRef(isAuthenticated);
 
   useEffect(() => {
@@ -97,7 +97,8 @@ export function ChatPanel() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const thread = threadRef.current;
+    if (thread) thread.scrollTop = thread.scrollHeight;
   }, [messages, streamingContent, isStreaming, pendingInterrupt, error]);
 
   function appendStatus(text: string) {
@@ -349,7 +350,10 @@ export function ChatPanel() {
       </header>
 
       {/* Thread (scrolls; composer stays pinned below) */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto py-4">
+      <div
+        ref={threadRef}
+        className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain py-4"
+      >
         {messages.length === 0 && !isStreaming ? (
           <div className="flex flex-1 animate-fadeIn flex-col items-center justify-center gap-5 py-8 text-center">
             <div className="flex flex-col items-center gap-2.5">
@@ -432,7 +436,7 @@ export function ChatPanel() {
           </div>
         ) : null}
 
-        <div ref={bottomRef} />
+        <div />
       </div>
 
       {/* Composer */}

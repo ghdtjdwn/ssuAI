@@ -57,46 +57,34 @@ const SEAT_STATUS_LABEL: Record<LibrarySeatItem["status"], string> = {
 function SeatDotGrid({
   zone,
   columns,
-  onPickAvailableSeat,
 }: {
   zone: LibrarySeatZone;
   columns: 10 | 20;
-  onPickAvailableSeat?: () => void;
 }) {
   return (
     <div
-      role="group"
-      aria-label={`${zone.label} 개별 좌석 현황`}
+      role="img"
+      aria-label={`${zone.label} 좌석 현황: 전체 ${zone.total}석 중 ${zone.available}석 이용 가능`}
       className={cn(
         "grid",
         columns === 10 ? "grid-cols-10 gap-1.5" : "grid-cols-[repeat(20,minmax(0,1fr))] gap-1",
       )}
     >
-      {zone.seats.map((seat) =>
-        seat.status === "available" && onPickAvailableSeat ? (
-          <button
-            key={seat.id}
-            type="button"
-            title={`${seat.label} (가능)`}
-            aria-label={`${seat.label} 좌석 예약하기`}
-            onClick={onPickAvailableSeat}
-            className="press aspect-square rounded-[5px] bg-success transition-transform hover:scale-110"
-          />
-        ) : (
-          <span
-            key={seat.id}
-            title={`${seat.label} (${SEAT_STATUS_LABEL[seat.status]})`}
-            className={cn(
-              "aspect-square rounded-[5px]",
-              seat.status === "available"
-                ? "bg-success"
-                : seat.status === "occupied"
-                  ? "bg-border"
-                  : "bg-muted",
-            )}
-          />
-        ),
-      )}
+      {zone.seats.map((seat) => (
+        <span
+          key={seat.id}
+          aria-hidden="true"
+          title={`${seat.label} (${SEAT_STATUS_LABEL[seat.status]})`}
+          className={cn(
+            "aspect-square rounded-[5px]",
+            seat.status === "available"
+              ? "bg-success"
+              : seat.status === "occupied"
+                ? "bg-border"
+                : "bg-muted",
+          )}
+        />
+      ))}
     </div>
   );
 }
@@ -347,7 +335,7 @@ export default function LibraryPage() {
                       {currentSpace.zone.available}
                     </span>
                     석
-                    {currentSpace.zone.seats.length > 0 ? " · 초록 좌석을 누르면 예약으로 이동해요" : null}
+                    {currentSpace.zone.seats.length > 0 ? " · 아래 추천 좌석에서 예약할 수 있어요" : null}
                   </span>
                   <span className="shrink-0 font-mono text-[12px]">
                     {currentSpace.zone.available} / {currentSpace.zone.total}
@@ -359,9 +347,12 @@ export default function LibraryPage() {
                     <SeatDotGrid
                       zone={currentSpace.zone}
                       columns={10}
-                      onPickAvailableSeat={scrollToRecommendations}
                     />
                     <SeatDotLegend />
+                    <Button variant="outline" className="w-full" onClick={scrollToRecommendations}>
+                      <Armchair size={16} aria-hidden />
+                      추천 좌석 보기
+                    </Button>
                   </>
                 ) : (
                   <>
@@ -416,7 +407,7 @@ export default function LibraryPage() {
                         <button
                           type="button"
                           onClick={() => openSpace(space.key)}
-                          className="press flex min-w-0 items-center gap-2 text-left"
+                          className="press flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left"
                         >
                           <span className="truncate text-[13px] font-bold text-foreground">
                             {name}
@@ -432,7 +423,6 @@ export default function LibraryPage() {
                         <SeatDotGrid
                           zone={space.zone}
                           columns={20}
-                          onPickAvailableSeat={() => openSpace(space.key)}
                         />
                       ) : (
                         <ProgressBar

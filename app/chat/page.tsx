@@ -5,11 +5,11 @@ export const dynamic = "force-dynamic";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 
 export default function ChatPage() {
-  // AppShell owns the chrome: 60px top bar + main padding (pt-5, pb-24 under
-  // the mobile tab bar, lg:pb-10). Pin the page to the remaining viewport so
-  // the thread scrolls internally and the composer stays at the bottom.
+  // AppShell owns the chrome around the mobile tab bar. Include the device
+  // safe area and let short keyboard viewports shrink below the desktop-only
+  // minimum height so the composer remains visible.
   return (
-    <div className="flex h-[calc(100dvh-176px)] min-h-[24rem] flex-col lg:h-[calc(100dvh-120px)]">
+    <div className="flex h-[calc(100dvh-176px-env(safe-area-inset-bottom))] min-h-0 flex-col lg:h-[calc(100dvh-120px)] lg:min-h-[24rem]">
       <ChatPanel />
     </div>
   );
