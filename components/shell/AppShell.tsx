@@ -15,6 +15,7 @@ import { usePathname } from "next/navigation";
 import { useSaintAuth } from "@/hooks/useSaintAuth";
 import { cn } from "@/lib/utils";
 
+import { AppLaunchSplash } from "./AppLaunchSplash";
 import { ConnectionBadge } from "./ConnectionsPanel";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -108,8 +109,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh">
+      <AppLaunchSplash />
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[246px] flex-col border-r border-hairline bg-surface lg:flex">
+      <aside
+        data-app-shell-region
+        className="fixed inset-y-0 left-0 z-30 hidden w-[246px] flex-col border-r border-hairline bg-surface lg:flex"
+      >
         <div className="flex items-center gap-3 px-5 py-5">
           <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-primary shadow-[0_2px_8px_rgba(11,77,162,.28)]">
             <Bot size={20} className="text-white" aria-hidden />
@@ -143,7 +148,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SidebarProfile />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-[246px]">
+      <div data-app-shell-region className="flex min-w-0 flex-1 flex-col lg:pl-[246px]">
         {/* Top bar */}
         <header className="sticky top-0 z-20 border-b border-hairline bg-background/85 backdrop-blur">
           <div className="flex h-[60px] items-center justify-between gap-3 px-4 sm:px-6">

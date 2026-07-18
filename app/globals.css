@@ -118,4 +118,68 @@
     background-size: 400% 100%;
     animation: shimmer 1.4s linear infinite;
   }
+
+  /* Mobile launch cover: soft reveal, then a barely perceptible idle drift. */
+  .launch-splash {
+    color-scheme: light;
+    isolation: isolate;
+    overscroll-behavior: none;
+    touch-action: none;
+    opacity: 1;
+    transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .launch-splash[data-phase="leaving"] {
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .launch-splash-image {
+    will-change: opacity, filter, transform;
+    animation:
+      launch-splash-reveal 700ms cubic-bezier(0.22, 1, 0.36, 1) both,
+      launch-splash-breathe 1.8s 700ms ease-in-out infinite alternate;
+  }
+
+  .launch-splash-glow {
+    position: absolute;
+    inset: 20% 5% 18%;
+    border-radius: 9999px;
+    pointer-events: none;
+    background: radial-gradient(circle, rgba(93, 183, 239, 0.14), transparent 68%);
+    mix-blend-mode: multiply;
+    will-change: opacity, transform;
+    animation: launch-splash-glow 1.8s 700ms ease-in-out infinite alternate;
+  }
+
+  @keyframes launch-splash-reveal {
+    from {
+      opacity: 0;
+      filter: blur(7px);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
+
+  @keyframes launch-splash-breathe {
+    from {
+      transform: scale(1);
+    }
+    to {
+      transform: scale(1.012);
+    }
+  }
+
+  @keyframes launch-splash-glow {
+    from {
+      opacity: 0.35;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 0.8;
+      transform: scale(1.04);
+    }
+  }
 }

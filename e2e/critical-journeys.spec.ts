@@ -71,6 +71,32 @@ for (const route of PUBLIC_ROUTES) {
   });
 }
 
+test("모바일 첫 진입 스플래시는 종료 후 화면 이동 때 다시 표시되지 않는다", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-mobile", "모바일 전용 시작 화면");
+
+  await isolateFromLiveServices(page);
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const splash = page.getByTestId("app-launch-splash");
+  const splashImage = page.getByTestId("app-launch-splash-image");
+  await expect(splash).toBeVisible();
+  await expect(splashImage).toHaveCSS(
+    "animation-name",
+    /launch-splash-reveal.*launch-splash-breathe/,
+  );
+
+  await expect(splash).toHaveCount(0, { timeout: 5_000 });
+
+  await page
+    .getByRole("navigation", { name: "하단 탭" })
+    .getByRole("link", { name: "챗봇" })
+    .click();
+  await expect(page).toHaveURL(/\/chat\/?$/);
+  await expect(splash).toHaveCount(0);
+});
+
 test("홈의 실험실 Web Vitals 예산을 기록하고 지킨다", async ({ page }, testInfo) => {
   await isolateFromLiveServices(page);
   await observeWebVitals(page);
