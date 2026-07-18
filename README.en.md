@@ -39,10 +39,34 @@ Home, academics, library, campus, and chat share a desktop sidebar and mobile bo
 The design and accessibility decisions are recorded in the [UI redesign ADR](docs/adr/0010-ui-redesign.md)
 (Korean).
 
+### One codebase for desktop and mobile
+
+ssuAI is one responsive Next.js web application rather than separate web and native-mobile codebases.
+At Tailwind's `lg` breakpoint, `AppShell` replaces the 246px fixed desktop sidebar with a mobile top bar
+and five bottom tabs; the mobile navigation also respects `safe-area-inset-bottom`. Data and state stay
+shared while the home widgets change from three columns to one and the weekly timetable changes from a
+five-day grid to a today-first list.
+
+Mobile browsers use a `device-width` viewport, `dvh`-based chat sizing, and 16px inputs. This avoids iOS
+focus zoom without disabling pinch zoom. Desktop and mobile therefore ship as one deployment and vary
+only in navigation and presentation for the available width.
+
+### Downloading all LMS course materials from chat
+
+After a natural-language request, `ssuAgent` hands off to the LMS domain, verifies authentication and the
+term list, and starts the asynchronous export through `ssuMCP`. The final restricted link is rendered as
+a download action only when its origin and path pass the allow-list; other links remain plain text.
+
+![The ssuAI chat prepares an export of all LMS course materials and returns a download button](docs/assets/chat-lms-export-download.png)
+
 <details>
 <summary>More product screens</summary>
 
 Names and personal academic, financial, loan, and seat values are de-identified in public images.
+
+| Mobile home | Mobile chat | Mobile academics |
+| --- | --- | --- |
+| ![Mobile home with the AI briefing and priority cards in one column](docs/assets/mobile-home.png) | ![Mobile chat with bottom navigation and suggested questions](docs/assets/mobile-chat.png) | ![Mobile academics with personal completion values de-identified](docs/assets/mobile-academics.png) |
 
 | Live library seats | Academic dashboard |
 | --- | --- |
