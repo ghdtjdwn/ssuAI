@@ -2,6 +2,65 @@
 
 실제로 발생한 CI·운영 문제만 기록한다. 재현 증거와 검증 결과가 없는 가상 사례는 포함하지 않는다.
 
+## 2026-07-18 — 로컬 접근성 게이트와 운영 색상 토큰의 release drift
+
+### 맥락과 영향
+
+동일한 5개 핵심 화면을 대상으로 로컬 production build의 브라우저 게이트는
+통과했지만 운영 `ssuai.vercel.app`에서는 12개 검사 중 10개 route-level axe
+검사가 실패했다. 페이지는 접근 가능했고 Web Vitals 예산도 통과했지만, 작은
+텍스트의 색상 대비가 serious 수준으로 기록됐다. 로컬 게이트 통과만으로 운영
+접근성을 주장할 수 없는 release parity 문제였다.
+
+### 기대 행동, 재현과 증거
+
+- 기대: 검토된 색상 토큰을 사용한 동일 release가 로컬과 운영의 axe
+  검사에서 critical·serious 위반 없이 통과한다.
+- 실제: 운영 CSS의 `text-subtle` 토큰은 `#8a94a2`였고 밝은 배경에서 관찰된
+  대비비는 2.86:1∼3.21:1이었다.
+- 재현: `E2E_BASE_URL=https://ssuai.vercel.app E2E_REUSE_SERVER=true pnpm test:e2e`로
+  운영 origin을 검사했다. 학교 API는 명시적 503 fixture로 차단해 실제 학생 데이터나
+  외부 시스템을 변경하지 않았다.
+
+Web Vitals 2개는 통과했고 desktop과 Pixel 7 profile의 5개 route에서 각각
+색상 대비 위반이 재현됐다. 로컬 분기의 CSS는 이미 보정된 `#5f6b7a`를
+사용하고 있어 두 환경의 release가 다른 것도 함께 확인했다.
+
+### 원인과 대안
+
+직접 원인은 밝은 배경에서 기준 대비비를 만족하지 못한 텍스트 토큰과 추가
+opacity였다. 로컬에서는 보정됐지만 운영 artifact가 보정 전 release였던 것이
+두 환경의 결과가 다른 원인이었다.
+
+- 해당 노드를 axe 검사에서 제외: 실제 사용자 문제를 숨기므로 제외했다.
+- 도달 가능한 임계값으로 검사 기준을 낮춤: WCAG 회귀 게이트의 의미를 약화해
+  제외했다.
+- 공유 토큰을 `#5f6b7a`로 보정하고 해당 텍스트의 중복 opacity를 제거:
+  모든 route에 동일한 의미를 유지하면서 원인을 제거해 채택했다.
+
+### 해결, 검증과 재발 방지
+
+보정과 로컬 게이트를 포함한 pull request
+[#256](https://github.com/ghdtjdwn/ssuAI/pull/256)을 `8af59ef`로 머지했다. 같은
+commit의 [main CI](https://github.com/ghdtjdwn/ssuAI/actions/runs/29646211137)에서 lint,
+typecheck, 190개 Vitest, production build, 12개 Playwright 검사가 모두 통과했다.
+Playwright 게이트는 desktop과 mobile profile의 axe와 LCP·CLS 예산을 매 PR과 main에서
+같이 검사한다. gitleaks 보안 check도 통과했다.
+
+Vercel은 정확히 `8af59ef`에 대한 Production 배포 성공을 GitHub에 기록했고,
+배포 후 `https://ssuai.vercel.app`의 읽기 전용 root probe는 HTTP 200을 반환했다.
+
+### 남은 위험과 면접 질문
+
+이 작업에서 배포 후 운영 origin을 대상으로 한 axe 전체 재실행 결과는 보존하지
+못했다. 따라서 정확한 commit의 배포와 도달 가능성은 확인했지만, 운영 WCAG
+준수를 확정하지 않는다. 후속 검증은 같은 브라우저 suite를 운영 origin에 대해
+실행하고 결과를 release SHA와 함께 보존해야 한다.
+
+- 로컬 e2e 게이트가 통과했는데 운영에서만 실패한 원인을 어떻게 분리했는가?
+- 색상 대비 경고를 예외 처리하지 않고 공유 토큰을 바꾼 이유는 무엇인가?
+- CI, Vercel 배포 성공, HTTP 200이 각각 무엇을 증명하고 무엇은 증명하지 못하는가?
+
 ## 2026-07-18 — 3/3 연결 표시와 실제 provider 사용 가능성 불일치
 
 ### Context and impact
