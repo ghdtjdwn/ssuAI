@@ -2,6 +2,62 @@
 
 실제로 발생한 CI·운영 문제만 기록한다. 재현 증거와 검증 결과가 없는 가상 사례는 포함하지 않는다.
 
+## 2026-07-28 — 메인 CI 상태 경쟁과 전이 개발 의존성 DoS 권고
+
+### 맥락과 영향
+
+채팅 보안 강화를 병합한 뒤 [main CI](https://github.com/ghdtjdwn/ssuAI/actions/runs/30288494699)는
+lint와 typecheck를 통과했지만 202개 Vitest 중 연결 상태 테스트 하나에서 실패했다. 같은 시점에
+GitHub와 `pnpm audit`이 ESLint 도구 체인의 `js-yaml`과 `brace-expansion`에 새 high-severity
+CPU·메모리 고갈 권고를 보고했다. 전자는 품질 게이트를 불안정하게 만들었고, 후자는 브라우저
+번들에는 포함되지 않는 개발 의존성이지만 CI가 신뢰하는 입력 처리 경로에 남아 있었다.
+
+### 기대 행동, 재현과 증거
+
+- 기대: 테스트는 MCP 세션 생성이 끝난 뒤 최종 연결 문구를 검증하고, 같은 SHA에서 결정적으로
+  통과한다.
+- 실제: `findByRole("status")`가 항상 존재하는 초기 `연결 확인 중` 요소를 즉시 반환해, 비동기
+  세션 생성이 끝나기 전에 최종 `개인 서비스 3/3 연결 · 상태 미확인` 문구를 비교했다.
+- 기대: lockfile 전체가 현재 registry 권고 기준으로 알려진 취약점 0건이어야 한다.
+- 실제: `js-yaml 4.2.0`과 `brace-expansion 1.1.14`가 2026년 7월에 공개된 DoS 권고에
+  해당했다. `brace-expansion 1.1.16`은 먼저 공개된 CPU 문제만 막고 뒤이은 메모리 고갈 문제에는
+  충분하지 않았다.
+
+### 원인과 대안
+
+테스트 실패는 기능 회귀가 아니라 async 상태 전환과 assertion의 동기화 누락이었다. 의존성 쪽은
+현재 Next.js ESLint 플러그인들이 callable CommonJS API를 제공하는 `minimatch 3`에 묶여 있는 반면,
+두 DoS를 모두 막는 `brace-expansion 5.0.8`은 named export를 제공하는 API 차이 때문에 단순 override가
+안전하지 않았다.
+
+- 실패 job만 재실행: 같은 경쟁 조건과 새 보안 권고를 남기므로 제외했다.
+- ESLint 10으로 강제 상승: `eslint-plugin-import`, `eslint-plugin-react`, `eslint-plugin-jsx-a11y`의
+  현재 peer 범위를 벗어나므로 제외했다.
+- `brace-expansion 1.1.16`만 고정: 메모리 고갈 권고가 남으므로 제외했다.
+- 안전한 5.0.8을 사용하고 `minimatch 3`의 import 형태만 호환: 제품 코드와 lint 규칙을 바꾸지
+  않으면서 취약 구현을 제거해 채택했다.
+
+### 해결과 재발 방지
+
+연결 상태 테스트는 status 요소가 존재하는지만 기다리지 않고 기대 최종 문구가 나타날 때까지
+`waitFor`로 기다린다. lockfile은 `js-yaml 4.3.0`과 `brace-expansion 5.0.8`을 강제하며,
+버전 관리되는 pnpm patch가 `minimatch 3`에서 callable export와 named `expand` export를 모두
+지원한다. 이 패치는 상위 ESLint 플러그인이 새 minimatch API를 공식 지원하면 제거할 수 있다.
+
+로컬에서 ESLint, TypeScript typecheck, 202개 Vitest, Next.js production build와 desktop/mobile
+Playwright 14개가 통과했다.
+ESLint가 실제로 사용하는 `minimatch`에 brace 패턴의 일치·불일치를 직접 검증했고,
+`pnpm audit`은 알려진 취약점 0건을 반환했다.
+
+### 남은 위험과 면접 질문
+
+버전 관리되는 전이 의존성 패치는 업스트림 호환 계층이므로 정기적인 제거 가능성 검토가 필요하다.
+또한 registry 권고 결과는 시점별 스냅샷이며 미래 권고가 없음을 보장하지 않는다.
+
+- 기능 회귀와 async 테스트 경쟁을 어떤 증거로 구분했는가?
+- 취약한 개발 의존성을 무시하거나 peer-incompatible 메이저 업그레이드를 강제하지 않은 이유는 무엇인가?
+- 전이 의존성 패치가 실제 lint 경로에서 작동함을 어떻게 검증했는가?
+
 ## 2026-07-27 — 정적 prerender 날짜가 만든 운영 hydration mismatch
 
 ### 맥락과 영향
