@@ -2,6 +2,59 @@
 
 실제로 발생한 CI·운영 문제만 기록한다. 재현 증거와 검증 결과가 없는 가상 사례는 포함하지 않는다.
 
+## 2026-07-27 — 정적 prerender 날짜가 만든 운영 hydration mismatch
+
+### 맥락과 영향
+
+운영 `ssuai.vercel.app`의 학사·도서관·캠퍼스 화면은 HTTP 200으로 열렸지만 Chromium에서
+React minified error `#418`이 발생했다. React가 해당 subtree를 클라이언트에서 다시 만들기 때문에
+초기 렌더 비용과 UI 안정성이 나빠지고, 단순 HTTP probe로는 발견할 수 없는 운영 회귀였다.
+
+### 기대 행동, 재현과 증거
+
+- 기대: 서버 HTML과 브라우저의 첫 렌더가 같고, 캐시된 정적 화면도 현재 서울 날짜로 수렴한다.
+- 실제: 2026-07-27 브라우저는 `7월 27일 월요일`을 렌더했지만 운영 `/academics` HTML에는
+  `7월 18일 토요일`이 포함돼 있었다.
+- 운영 응답은 `x-nextjs-prerender: 1`, `x-vercel-cache: HIT`, 약 8일의 `age`를 반환했다.
+- 새 익명 browser context에서 `/academics`, `/library`, `/campus` 모두 동일한 text hydration
+  오류를 재현했다. 인증 확인의 401은 별도 익명 정상 경로였고 오류 원인이 아니었다.
+
+### 원인과 대안
+
+공통 `AppShell` client component가 render 중 `new Date()`를 호출했다. 정적 prerender 시점의 날짜가
+HTML에 고정된 뒤 브라우저 날짜와 달라졌고, 저장된 도서관 연결 상태도 `sessionStorage`를 client
+initializer에서 바로 읽어 같은 유형의 잠재 mismatch를 만들 수 있었다.
+
+- 날짜 노드에 `suppressHydrationWarning`만 적용: 오류는 숨기지만 오래된 서버 HTML과 자정 갱신을
+  해결하지 않아 제외했다.
+- 모든 화면을 동적 렌더링: 날짜 한 줄 때문에 CDN prerender 이점을 버리므로 제외했다.
+- 첫 server/client snapshot을 결정적으로 맞추고 hydration 뒤 외부 상태를 복원: 정적 캐시를
+  유지하면서 원인을 제거해 채택했다.
+
+### 해결과 재발 방지
+
+헤더는 server와 첫 client pass에서 동일한 중립 문구를 렌더하고, hydration 뒤 서울 시간대 날짜를
+표시한다. 다음 서울 자정에 타이머로 다시 계산하므로 장시간 열린 탭도 갱신된다. 도서관 연결 힌트는
+`useSyncExternalStore`의 server snapshot을 사용해 hydration 뒤 tab-scoped `sessionStorage`와
+동기화한다. 핵심 5개 route의 Playwright gate에는 `pageerror`가 하나도 없어야 한다는 assertion을
+추가했다.
+
+서울 날짜/학기 경계와 저장 상태 복원에 대한 집중 테스트 12개, TypeScript typecheck, ESLint가
+통과했다. UTC에서 만든 production artifact는 기존 저장 상태 유무를 포함한 desktop/mobile 12개
+route 조합에서 HTTP 200과 `pageerror` 0건을 확인했다. 전체 Playwright gate도 13개 통과·desktop의
+mobile-only 1개 skip으로 끝났다. 배포 후에는 동일 운영 origin에서 `#418`이 사라졌는지 다시
+확인해야 한다.
+
+### 남은 위험과 면접 질문
+
+이 수정은 아직 운영에 배포되지 않았으므로 현재 운영의 오류는 남아 있다. 또한 날짜가 검색 의미를
+결정하는 핵심 데이터라면 별도의 server data freshness 정책이 필요하지만, 여기서는 장식적 헤더
+정보이므로 client hydration 뒤 갱신이 적절하다.
+
+- HTTP 200인데도 운영 오류라고 판단한 증거는 무엇인가?
+- 모든 route를 dynamic으로 바꾸지 않고 정적 캐시와 정확한 날짜를 함께 유지한 방법은 무엇인가?
+- `useSyncExternalStore`의 server snapshot이 저장소 기반 hydration 오류를 어떻게 막는가?
+
 ## 2026-07-18 — 로컬 접근성 게이트와 운영 색상 토큰의 release drift
 
 ### 맥락과 영향

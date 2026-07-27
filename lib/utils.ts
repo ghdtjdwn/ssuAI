@@ -34,6 +34,13 @@ const koreanShortDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   weekday: "short",
 });
 
+const koreanHeaderDateFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  month: "long",
+  day: "numeric",
+  weekday: "long",
+});
+
 export function millisecondsUntilNextSeoulMidnight(now = new Date()) {
   const parts = seoulDatePartsFormatter.formatToParts(now);
   const year = Number(parts.find((part) => part.type === "year")?.value);
@@ -54,6 +61,23 @@ export function formatShortKoreanDate(date: string) {
 
 export function getSeoulDateString(now = new Date()) {
   return seoulDatePartsFormatter.format(now);
+}
+
+/** Format the app-shell date using Seoul time, independent of server/browser timezone. */
+export function formatSeoulAcademicTermLabel(now = new Date()) {
+  const [yearPart, monthPart] = getSeoulDateString(now).split("-");
+  const year = Number(yearPart);
+  const month = Number(monthPart);
+  const term =
+    month >= 3 && month <= 6
+      ? "1학기"
+      : month >= 7 && month <= 8
+        ? "여름학기"
+        : month >= 9 && month <= 12
+          ? "2학기"
+          : "겨울학기";
+
+  return `${koreanHeaderDateFormatter.format(now)} · ${year} ${term}`;
 }
 
 export function normalizeSearchQuery(query: string) {

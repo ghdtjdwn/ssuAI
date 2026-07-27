@@ -156,6 +156,25 @@ export async function resumeAgentStream(
   return response;
 }
 
+/** Permanently delete one owned conversation and its pending HITL state. */
+export async function deleteAgentThread(
+  threadId: string,
+  mcpSessionId: string | null,
+  accessToken: string | null,
+): Promise<void> {
+  const response = await fetch(`${AGENT_PROXY_BASE}/threads/${encodeURIComponent(threadId)}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ mcp_session_id: mcpSessionId }),
+  });
+  if (!response.ok) {
+    throw new AgentStreamError(`/agent/threads/${threadId}`, response.status);
+  }
+}
+
 export type McpProvider = "SAINT" | "LMS" | "LIBRARY";
 export type McpProviderHealth = "VALID" | "UNKNOWN" | "ERROR" | "EXPIRED";
 

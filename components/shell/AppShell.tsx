@@ -11,9 +11,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { useSaintAuth } from "@/hooks/useSaintAuth";
-import { cn } from "@/lib/utils";
+import {
+  cn,
+  formatSeoulAcademicTermLabel,
+  millisecondsUntilNextSeoulMidnight,
+} from "@/lib/utils";
 
 import { AppLaunchSplash } from "./AppLaunchSplash";
 import { ConnectionBadge } from "./ConnectionsPanel";
@@ -42,18 +47,30 @@ const TITLES: Record<string, string> = {
   "/admin": "운영 대시보드",
 };
 
-/** "7월 2일 수요일 · 2026 여름학기" style subtitle for the top bar. */
-function todayLabel(): string {
-  const now = new Date();
-  const date = now.toLocaleDateString("ko-KR", {
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  });
-  const m = now.getMonth() + 1;
-  const term =
-    m >= 3 && m <= 6 ? "1학기" : m >= 7 && m <= 8 ? "여름학기" : m >= 9 && m <= 12 ? "2학기" : "겨울학기";
-  return `${date} · ${now.getFullYear()} ${term}`;
+/**
+ * Static routes may stay cached for days. Keep the server and first client
+ * render deterministic, then publish the live Seoul date after hydration and
+ * refresh it at the next Seoul midnight.
+ */
+function useTodayLabel(): string | null {
+  const [label, setLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    const refresh = () => {
+      const now = new Date();
+      setLabel(formatSeoulAcademicTermLabel(now));
+      timeout = setTimeout(refresh, millisecondsUntilNextSeoulMidnight(now) + 1_000);
+    };
+
+    refresh();
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, []);
+
+  return label;
 }
 
 function isActive(pathname: string, href: string): boolean {
@@ -99,6 +116,7 @@ function SidebarProfile() {
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const todayLabel = useTodayLabel();
 
   const bare = pathname.startsWith("/auth/") || pathname.startsWith("/mcp/auth/");
   if (bare) {
@@ -162,7 +180,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <span className="lg:hidden">ssuAI</span>
                   <span className="hidden lg:inline">{title}</span>
                 </h1>
-                <p className="truncate text-[11.5px] leading-tight text-subtle">{todayLabel()}</p>
+                <p className="truncate text-[11.5px] leading-tight text-subtle">
+                  {todayLabel ?? "오늘의 캠퍼스"}
+                </p>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">

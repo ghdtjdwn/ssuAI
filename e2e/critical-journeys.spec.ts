@@ -55,6 +55,8 @@ for (const route of PUBLIC_ROUTES) {
   test(`${route.name} 화면은 오프라인 상태에서도 탐색 가능하고 심각한 접근성 위반이 없다`, async ({
     page,
   }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
     await isolateFromLiveServices(page);
     await page.goto(route.path, { waitUntil: "networkidle" });
 
@@ -68,6 +70,7 @@ for (const route of PUBLIC_ROUTES) {
     const blocking = results.violations.filter(({ impact }) => impact === "critical" || impact === "serious");
 
     expect(blocking, JSON.stringify(blocking, null, 2)).toEqual([]);
+    expect(pageErrors, `React/browser errors on ${route.path}`).toEqual([]);
   });
 }
 

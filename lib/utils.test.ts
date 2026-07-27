@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { formatCount, formatFixed } from "@/lib/utils";
+import { formatCount, formatFixed, formatSeoulAcademicTermLabel } from "@/lib/utils";
+
+describe("formatSeoulAcademicTermLabel", () => {
+  it("uses Seoul time for the date and academic term", () => {
+    expect(formatSeoulAcademicTermLabel(new Date("2026-06-30T15:30:00Z"))).toBe(
+      "7월 1일 수요일 · 2026 여름학기",
+    );
+    expect(formatSeoulAcademicTermLabel(new Date("2026-12-31T15:30:00Z"))).toBe(
+      "1월 1일 금요일 · 2027 겨울학기",
+    );
+  });
+});
 
 describe("formatFixed", () => {
   it("formats a finite number to fixed digits", () => {
