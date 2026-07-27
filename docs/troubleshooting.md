@@ -2,6 +2,51 @@
 
 실제로 발생한 CI·운영 문제만 기록한다. 재현 증거와 검증 결과가 없는 가상 사례는 포함하지 않는다.
 
+## 2026-07-28 — 동적 Agent Route Handler가 API rewrite에 가려진 운영 404
+
+### 맥락과 영향
+
+운영 익명 채팅은 BFF에서 ssuAgent와 도구 호출까지 HTTP 200으로 완료됐지만, 같은 소유자의
+`DELETE /api/agent/threads/{threadId}`는 404를 반환했다. 사용자는 대화를 생성하고 사용할 수는
+있어도 새 대화 삭제 기능으로 보존 전 삭제를 완료할 수 없는 상태였다.
+
+### 기대 행동, 재현과 증거
+
+- 기대: 동적 Next.js Route Handler가 요청을 받아 server-side key와 소유자 서명을 붙이고,
+  ssuAgent가 checkpoint를 삭제한 뒤 204를 반환한다.
+- 실제: 응답은 ssuMCP의 `NOT_FOUND` envelope였고 요청 경로도 campus API로 기록됐다.
+- 같은 배포에서 정적 `/api/agent/stream` Route Handler는 200으로 완료돼 Agent·MCP·배포 자체의
+  장애는 배제했다.
+
+### 원인과 대안
+
+`next.config.ts`의 배열형 `/api/:path*` rewrite는 filesystem의 정적 route 뒤, 동적 route 앞에서
+실행된다. 그래서 정적 stream/resume handler는 우선했지만 `[threadId]` handler는 도달하기 전에
+ssuMCP로 rewrite됐다.
+
+- 삭제 endpoint를 정적 URL로 다시 설계: 한 경로만 우회하고 같은 유형의 미래 동적 API를 다시
+  가릴 수 있어 제외했다.
+- Agent 경로를 negative regex로 rewrite에서 제외: 가능하지만 로컬 API가 늘 때마다 예외를
+  관리해야 하므로 제외했다.
+- campus API proxy를 `fallback` phase로 이동: 모든 로컬 정적·동적 handler 뒤에만 실행되므로
+  채택했다.
+
+### 해결과 재발 방지
+
+API proxy를 명시적인 `fallback` rewrite로 변경했다. 설정 테스트는 배열형 또는 afterFiles rewrite로
+되돌아가는 회귀를 막고, production build와 로컬 production-server smoke는 동적 DELETE가 campus
+API가 아니라 Agent proxy에 도달하는지 검증한다. 운영 배포 뒤에는 실제 대화를 생성해 SSE `done`을
+확인하고 같은 소유자로 204 삭제한 뒤 checkpoint가 남지 않는지 확인한다.
+
+### 남은 위험과 면접 질문
+
+fallback proxy는 로컬 handler가 없는 `/api/**`만 backend로 보낸다. 새 로컬 route를 추가할 때는
+HTTP status뿐 아니라 어느 upstream이 응답했는지까지 검증해야 한다.
+
+- 정적 route는 성공하고 동적 route만 실패한 이유는 무엇인가?
+- negative regex보다 fallback phase가 장기적으로 안전한 이유는 무엇인가?
+- 204 응답과 실제 checkpoint 정리를 각각 어떻게 검증할 것인가?
+
 ## 2026-07-28 — 메인 CI 상태 경쟁과 전이 개발 의존성 DoS 권고
 
 ### 맥락과 영향
