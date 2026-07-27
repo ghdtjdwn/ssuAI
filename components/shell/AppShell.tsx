@@ -6,6 +6,7 @@ import {
   GraduationCap,
   Home,
   BookOpen,
+  FileCheck2,
   MessageCircle,
   Settings,
 } from "lucide-react";
@@ -36,7 +37,10 @@ const NAV: NavItem[] = [
   { href: "/academics", label: "학사", icon: GraduationCap },
   { href: "/library", label: "도서관", icon: BookOpen },
   { href: "/campus", label: "캠퍼스", icon: Building2 },
+  { href: "/copilot", label: "정책 Copilot", icon: FileCheck2 },
 ];
+
+const MOBILE_NAV = NAV.filter(({ href }) => href !== "/copilot");
 
 const TITLES: Record<string, string> = {
   "/": "홈",
@@ -45,6 +49,8 @@ const TITLES: Record<string, string> = {
   "/library": "도서관",
   "/campus": "캠퍼스",
   "/admin": "운영 대시보드",
+  "/copilot": "정책 Copilot",
+  "/reviewer/copilot": "정책 답변 검토",
 };
 
 /**
@@ -186,6 +192,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href="/copilot"
+                title="정책 Copilot"
+                aria-label="정책 Copilot"
+                aria-current={isActive(pathname, "/copilot") ? "page" : undefined}
+                className={cn(
+                  "press flex h-9 w-9 items-center justify-center rounded-control border lg:hidden",
+                  isActive(pathname, "/copilot")
+                    ? "border-primary/30 bg-primary-soft text-primary-soft-foreground"
+                    : "border-border bg-surface text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <FileCheck2 size={18} aria-hidden />
+              </Link>
               <ConnectionBadge />
               <ThemeToggle />
               <Link
@@ -212,7 +232,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           className="fixed inset-x-0 bottom-0 z-30 border-t border-hairline bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
         >
           <div className="grid grid-cols-5">
-            {NAV.map(({ href, label, icon: Icon }) => {
+            {MOBILE_NAV.map(({ href, label, icon: Icon }) => {
               const active = isActive(pathname, href);
               return (
                 <Link

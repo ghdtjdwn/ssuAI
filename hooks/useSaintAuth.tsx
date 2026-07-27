@@ -105,6 +105,7 @@ export function SaintAuthProvider({ children }: { children: ReactNode }) {
       queryClient.removeQueries({ queryKey: ["saint"] });
       queryClient.removeQueries({ queryKey: ["lms"] });
       queryClient.removeQueries({ queryKey: ["library"] });
+      queryClient.removeQueries({ queryKey: ["policy-review"] });
       // Drop the ssuAgent conversation thread id: the agent binds a thread to
       // the mcp_session_id that first used it, and that session rotates on
       // re-login — a surviving thread id would 403 the same user after they
