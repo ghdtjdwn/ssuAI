@@ -64,12 +64,6 @@ ssuAgent는 `AgentRequest`/`ResumeRequest`에 `principal: str | None` 필드를 
 - **얻는 것**: `/api/agent/*`의 client-sent principal을 제거하고 서버 검증 subject만 주입한다. 로그인 사용자의 thread ownership이 access-token 회전과 MCP session 교체에 흔들리지 않으며, 검증 실패 때 기존 thread를 잘못 session-only로 재해석하지 않는다.
 - **잃는 것 / 남는 리스크**: 로그인 요청마다 ssuMCP `/api/auth/me` 왕복이 한 번 추가된다. 3초 timeout과 명확한 503으로 장애 전파를 제한한다. 운영에서는 ssuAI와 ssuAgent 양쪽의 동일 `AGENT_API_KEY`가 필수이며, 이 경계가 꺼진 공개 ssuAgent에는 stable principal을 신뢰할 수 없다.
 
-## 예상 면접 질문
-
-1. "왜 bearer 검증 실패를 session owner로 폴백하지 않고 401/503으로 중단하나요?"
-2. "브라우저의 JWT를 왜 ssuAgent까지 전달하지 않고 ssuMCP `/api/auth/me`에서 subject로 축약하나요?"
-3. "`deriveServerPrincipal`이 요청 body를 읽지 않는다는 계약과 `AGENT_API_KEY` 강제가 함께 필요한 이유는 무엇인가요?"
-
 ## 2026-07-27 갱신 — strict proxy boundary와 signed limiter identity
 
 감사에서 Next proxy가 body 전체와 `thread_id`/`mcp_session_id`를 제한하지 않고, ssuAgent limiter가
