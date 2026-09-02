@@ -34,9 +34,15 @@ Next.js 애플리케이션이다. 브라우저에 비밀 값을 노출하지 않
 | 연결된 대시보드 | 시간표, 성적, 졸업요건, 채플, 장학, LMS 과제, 대출 | access token은 메모리, refresh와 provider session은 same-origin 경로 |
 | AI 챗봇 | 도메인 handoff, 도구 진행 상태, 스트리밍 답변 | 서버 route가 agent key와 검증된 principal을 주입 |
 | 상태 변경 | 좌석 예약·반납, LMS 자료 내보내기 | `prepare` 결과를 보여준 뒤 사용자 승인으로만 `resume/confirm` |
+| 정책 Copilot | 공개 학사정책 질문의 근거 기반 AI 초안과 지정 검토자 흐름(직원 검토 도입 목표) | Bearer 요청은 same-origin API로 전달, 지정 검토자 승인 전 자동 게시 금지 |
 
-홈, 학사, 도서관, 캠퍼스, 챗봇은 데스크톱 사이드바와 모바일 하단 탐색을 공유한다. 디자인 결정과
-접근성 기준은 [UI redesign ADR](docs/adr/0010-ui-redesign.md)에 기록했다.
+데스크톱은 정책 Copilot을 포함한 사이드바를 사용한다. 모바일은 기존 5개 하단 탭을 유지하고 상단의
+정책 Copilot 바로가기로 `/copilot`에 진입한다. 디자인 결정과 접근성 기준은
+[UI redesign ADR](docs/adr/0010-ui-redesign.md)에 기록했다.
+
+정책 Copilot의 프런트엔드 화면과 API 계약 구현은 완료됐다. 다만 이는 운영 활성화 완료를 뜻하지 않는다.
+ssuMCP의 운영 migration 적용, reviewer allowlist secret 주입, 지정 검토자와 직원 실계정의
+create→claim→decision 종단 검증은 아직 대기 중이다.
 
 ### 웹과 모바일을 한 코드베이스로 만드는 방식
 
@@ -99,6 +105,7 @@ key가 필요한 요청과 `/api/agent/*`는 항상 same-origin 서버 경로를
 | 스트림 중단 뒤 HITL 상태 또는 최종 링크 유실 | thread-stable SSE, resume endpoint, 제한된 안전 링크 렌더링 — [chat tests](components/chat/ChatPanel.test.tsx) · [message tests](components/chat/MessageBubble.test.tsx) |
 | 브라우저가 agent key, principal, limiter identity를 조작할 위험 | server route가 bearer를 검증하고 pseudonymous client identity를 서명 — [ADR 0086](docs/adr/0086-server-side-principal.md) · [proxy tests](lib/server/agentProxy.test.ts) |
 | 대화 capability의 장기 저장과 삭제 부재 | proxy가 strict body/ID 경계를 적용하고 owner 검증 DELETE API를 중계 — [agent client](lib/api/agent.ts) |
+| 정책 초안이 검토 없이 공식 답변처럼 보일 위험 | 공개 정책 전용 제출, 근거·개정 상태 표시, reviewer 승인 전 자동 게시 금지 — [ADR 0101](docs/adr/0101-policy-review-copilot.md) |
 | 변경이 UI에서만 우연히 동작하는 문제 | lint, TypeScript, Vitest, production build를 모두 요구 — [CI workflow](.github/workflows/ci.yml) |
 | 정적 보안 회귀와 stale dependency | CodeQL v4 JS/TS 분석, npm·GitHub Actions Dependabot — [CodeQL](.github/workflows/codeql.yml) · [Dependabot](.github/dependabot.yml) |
 

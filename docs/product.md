@@ -73,6 +73,19 @@ ssuAI는 숭실대학교 데이터를 한 화면과 챗봇에서 조회하는 �
 
 - 대시보드 카드에서 공개 데이터와 연동 데이터를 조회한다.
 - `/chat`에서 같은 데이터 범위에 대해 자연어로 질문한다.
+- `/copilot`은 공개 학사정책 질문의 AI 초안과 공식 근거·개정 검증 상태를 보여준다. 개인 성적,
+  학번, 개인별 자격 판정은 이 표면의 범위가 아니다. 초안은 자동 게시되지 않으며 `/reviewer/copilot`의
+  서버 권한을 받은 지정 검토자가 claim·편집·승인 또는 반려해야 한다. 현재 구현은 직원 검토 도입을
+  목표로 하지만 직원 신원을 프런트엔드가 단정하지 않는다. 로그인하면
+  `GET /api/copilot/policy-cases`로 현재 계정의 최신 요청 20건을 복원하며, 사용자는 목록에서 사례를
+  선택하고 `검토 상태 새로고침`으로 승인 최종본 또는 반려 사유를 확인한다.
+- 데스크톱은 sidebar에서, 모바일은 기존 5개 bottom tab을 유지한 채 top bar 바로가기에서
+  정책 Copilot에 진입한다. reviewer route는 공개 주 메뉴에 노출하지 않는다.
+- 정책 reviewer 화면은 시스템 관리자 화면과 별도 역할이다. 사례·승인/수정/근거 포함/안전 보류 측정값은
+  관측값만 표시하고, 0건을 성과나 ROI로 해석하지 않는다.
+- 정책 Copilot의 프런트엔드 UI와 API 계약 구현은 완료됐다. 운영 기능 활성화는 별도 단계이며,
+  ssuMCP 운영 migration, reviewer allowlist secret, 지정 검토자 및 직원 실계정의
+  create→claim→decision 검증은 아직 대기 중이다.
 - ssuMCP는 현재 52개 MCP 도구를 Streamable HTTP `/mcp`로 노출한다.
 - 외부 MCP 개인 도구는 `start_auth`로 발급받은 `mcp_session_id`와 provider
   연동이 있어야 한다.

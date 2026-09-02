@@ -10,6 +10,7 @@ interface ErrorStateProps {
   message: string;
   traceId: string;
   onRetry?: () => void;
+  retryLabel?: string;
   className?: string;
 }
 
@@ -36,11 +37,21 @@ function userMessage(code: string, message: string) {
   }
 }
 
-export function ErrorState({ code, message, traceId, onRetry, className }: ErrorStateProps) {
+export function ErrorState({
+  code,
+  message,
+  traceId,
+  onRetry,
+  retryLabel = "다시 시도",
+  className,
+}: ErrorStateProps) {
   const canRetry = code !== "VALIDATION_FAILED" && onRetry;
 
   return (
     <div
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
       className={cn(
         "flex flex-col gap-4 rounded-md border border-destructive/30 bg-destructive/5 p-4",
         className,
@@ -56,7 +67,7 @@ export function ErrorState({ code, message, traceId, onRetry, className }: Error
       {canRetry ? (
         <Button type="button" variant="outline" size="sm" className="w-fit" onClick={onRetry}>
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          다시 시도
+          {retryLabel}
         </Button>
       ) : null}
       {traceId ? <p className="text-xs font-mono text-muted-foreground">traceId: {traceId}</p> : null}
