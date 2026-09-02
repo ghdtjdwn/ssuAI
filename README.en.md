@@ -147,7 +147,7 @@ retain traces, screenshots, and Web Vitals JSON as test artifacts.
 
 These checks are regression evidence for a local production build, not field RUM, authenticated-
 journey, or school-system availability evidence. Service-specific conditions and claim boundaries
-are recorded in [`docs/portfolio-verification-boundary.md`](docs/portfolio-verification-boundary.md).
+are recorded in [`docs/verification-boundary.md`](docs/verification-boundary.md).
 The zero-finding `pnpm audit --prod` recorded on 2026-07-27 after updating Next.js 16.2.12 and patched
 transitive floors is a point-in-time registry advisory result, not a runtime penetration test.
 
@@ -161,7 +161,7 @@ and secrets must be verified with Vercel configuration; localhost defaults do no
 - [Frontend architecture](docs/architecture.md) (Korean)
 - [Security boundary](docs/security.md) (Korean)
 - [Production failures and regression prevention](docs/troubleshooting.md)
-- [Verification scope and claim boundaries](docs/portfolio-verification-boundary.md)
+- [Verification scope and claim boundaries](docs/verification-boundary.md)
 - [Architecture decision records](docs/adr/) (Korean)
 - [ssuMCP tool contract](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md) (Korean)
 
