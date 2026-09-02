@@ -38,14 +38,11 @@ API proxy를 명시적인 `fallback` rewrite로 변경했다. 설정 테스트�
 API가 아니라 Agent proxy에 도달하는지 검증한다. 운영 배포 뒤에는 실제 대화를 생성해 SSE `done`을
 확인하고 같은 소유자로 204 삭제한 뒤 checkpoint가 남지 않는지 확인한다.
 
-### 남은 위험과 면접 질문
+### 남은 위험
 
 fallback proxy는 로컬 handler가 없는 `/api/**`만 backend로 보낸다. 새 로컬 route를 추가할 때는
 HTTP status뿐 아니라 어느 upstream이 응답했는지까지 검증해야 한다.
 
-- 정적 route는 성공하고 동적 route만 실패한 이유는 무엇인가?
-- negative regex보다 fallback phase가 장기적으로 안전한 이유는 무엇인가?
-- 204 응답과 실제 checkpoint 정리를 각각 어떻게 검증할 것인가?
 
 ## 2026-07-28 — 메인 CI 상태 경쟁과 전이 개발 의존성 DoS 권고
 
@@ -94,14 +91,11 @@ Playwright 14개가 통과했다.
 ESLint가 실제로 사용하는 `minimatch`에 brace 패턴의 일치·불일치를 직접 검증했고,
 `pnpm audit`은 알려진 취약점 0건을 반환했다.
 
-### 남은 위험과 면접 질문
+### 남은 위험
 
 버전 관리되는 전이 의존성 패치는 업스트림 호환 계층이므로 정기적인 제거 가능성 검토가 필요하다.
 또한 registry 권고 결과는 시점별 스냅샷이며 미래 권고가 없음을 보장하지 않는다.
 
-- 기능 회귀와 async 테스트 경쟁을 어떤 증거로 구분했는가?
-- 취약한 개발 의존성을 무시하거나 peer-incompatible 메이저 업그레이드를 강제하지 않은 이유는 무엇인가?
-- 전이 의존성 패치가 실제 lint 경로에서 작동함을 어떻게 검증했는가?
 
 ## 2026-07-27 — 정적 prerender 날짜가 만든 운영 hydration mismatch
 
@@ -146,15 +140,12 @@ route 조합에서 HTTP 200과 `pageerror` 0건을 확인했다. 전체 Playwrig
 mobile-only 1개 skip으로 끝났다. 배포 후에는 동일 운영 origin에서 `#418`이 사라졌는지 다시
 확인해야 한다.
 
-### 남은 위험과 면접 질문
+### 남은 위험
 
 이 수정은 아직 운영에 배포되지 않았으므로 현재 운영의 오류는 남아 있다. 또한 날짜가 검색 의미를
 결정하는 핵심 데이터라면 별도의 server data freshness 정책이 필요하지만, 여기서는 장식적 헤더
 정보이므로 client hydration 뒤 갱신이 적절하다.
 
-- HTTP 200인데도 운영 오류라고 판단한 증거는 무엇인가?
-- 모든 route를 dynamic으로 바꾸지 않고 정적 캐시와 정확한 날짜를 함께 유지한 방법은 무엇인가?
-- `useSyncExternalStore`의 server snapshot이 저장소 기반 hydration 오류를 어떻게 막는가?
 
 ## 2026-07-18 — 로컬 접근성 게이트와 운영 색상 토큰의 release drift
 
@@ -204,16 +195,13 @@ Playwright 게이트는 desktop과 mobile profile의 axe와 LCP·CLS 예산을 �
 Vercel은 정확히 `8af59ef`에 대한 Production 배포 성공을 GitHub에 기록했고,
 배포 후 `https://ssuai.vercel.app`의 읽기 전용 root probe는 HTTP 200을 반환했다.
 
-### 남은 위험과 면접 질문
+### 남은 위험
 
 이 작업에서 배포 후 운영 origin을 대상으로 한 axe 전체 재실행 결과는 보존하지
 못했다. 따라서 정확한 commit의 배포와 도달 가능성은 확인했지만, 운영 WCAG
 준수를 확정하지 않는다. 후속 검증은 같은 브라우저 suite를 운영 origin에 대해
 실행하고 결과를 release SHA와 함께 보존해야 한다.
 
-- 로컬 e2e 게이트가 통과했는데 운영에서만 실패한 원인을 어떻게 분리했는가?
-- 색상 대비 경고를 예외 처리하지 않고 공유 토큰을 바꾼 이유는 무엇인가?
-- CI, Vercel 배포 성공, HTTP 200이 각각 무엇을 증명하고 무엇은 증명하지 못하는가?
 
 ## 2026-07-18 — 3/3 연결 표시와 실제 provider 사용 가능성 불일치
 
@@ -289,14 +277,11 @@ operational 목록인 `availableProviders`를 우선하고, `linkedProviders`는
 운영 배포 뒤에는 실제 provider failure에서 연결 개수와 카드 상태가 함께 낮아지는지, status API의
 일시 장애에서는 `stale` 표시가 다음 성공한 자동 갱신 뒤 해제되는지 별도로 확인해야 한다.
 
-### Remaining risk and interview prompts
+### Remaining risk
 
 provider health는 마지막 probe 시점과 실제 도구 호출 사이에 다시 바뀔 수 있다. 따라서 UI 상태는
 권한 부여 수단이 아니며 각 도구는 서버에서 credential을 재검증해야 한다.
 
-- credential 존재, health, status freshness를 왜 별도 상태로 모델링했는가?
-- 일시 장애 때 session ID를 유지하면서도 거짓 `연결됨` 표시를 막은 방법은 무엇인가?
-- rolling deployment 중 선택 필드가 없는 응답을 어떻게 호환했는가?
 
 ## 2026-07-17 — MCP 세션 focus 갱신 테스트의 간헐 실패
 
@@ -353,9 +338,3 @@ focus listener를 Provider 마운트 동안 한 번 유지하고, 유효한 cach
 listener는 cached session이 없으면 즉시 반환하므로 익명 사용자에게 불필요한 요청을 만들지 않는다.
 남은 위험은 jsdom의 focus·effect scheduling이 실제 브라우저와 완전히 같지 않다는 점이다. 이를 줄이기
 위해 테스트 재시도 설정에 의존하지 않고 lifecycle 자체에서 이벤트 유실 구간을 제거했다.
-
-### Interview prompts
-
-- 같은 SHA가 PR에서는 통과하고 main에서 실패했을 때 기능 회귀와 flake를 어떻게 구분했는가?
-- 테스트에 sleep을 넣는 대신 React effect lifecycle을 바꾼 이유는 무엇인가?
-- focus listener를 항상 유지하면서도 불필요한 API 호출을 어떻게 막았는가?

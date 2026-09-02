@@ -48,5 +48,5 @@ Spring `RestClient` 위에 커스텀 OpenAI 호환 프로바이더 레이어를 
 
 - **Spring AI ChatClient + Anthropic only** — API가 단순하지만, 하나의 키/할당량이 데모의 단일 장애점이 된다.
 - **OpenRouter only** — 쉬운 fallback 문법이지만, 계정 수준 무료 할당량과 프라이버시/ZDR 지원이 가용성을 여전히 제한한다.
-- **같은 JVM 내 MCP client dogfooding** — 더 강한 포트폴리오 스토리지만, MVP로는 너무 큰 변동 요소다. GitOps 이후 후속 작업으로 유지.
+- **같은 JVM 내 MCP client dogfooding** — 더 강한 기술 검증 기록지만, MVP로는 너무 큰 변동 요소다. GitOps 이후 후속 작업으로 유지.
 - **로컬 모델** — 호스팅 프로바이더 데이터 정책 우려를 피하지만, 현재 무료 티어 인프라와 리뷰어 경험에 비해 너무 무겁다.
