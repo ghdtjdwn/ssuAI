@@ -74,7 +74,7 @@ provider 정책으로 전송한다.
 현재 MCP 전송은 **Streamable HTTP** 단일 endpoint `/mcp`이다. 과거 SSE
 경로에 대한 내용은 ADR과 dev log에서 역사적 맥락으로만 남는다.
 
-## 5. Flagship: 도서관 좌석 예약 에이전트
+## 5. 도서관 좌석 예약 에이전트
 
 현재 backend MCP에는 좌석 추천, 예약 준비, 이석 준비, 반납 준비, 현재 좌석 조회,
 `confirm_action`이 배포되어 있다. 제품 전체 완성을 위한 목표 사용 흐름은 다음과 같다.
