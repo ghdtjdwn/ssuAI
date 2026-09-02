@@ -8,12 +8,6 @@
 .DS_Store
 Thumbs.db
 
-# Claude Code local settings
-.claude/
-
-# Codex local handoff scratch
-.codex/
-
 # Local env
 .env
 .env.*
@@ -57,12 +51,6 @@ secrets/
 /ssugrade/
 /.antigravitycli/
 
-# AI-assistant local config (not part of the project)
-AGENTS.md
-CLAUDE.md
-GEMINI.md
-.claude/
-.codex/
 # lefthook installs this locally (machine-specific path); managed via `pnpm lefthook install`
 .githooks/pre-commit
 .githooks/commit-msg
