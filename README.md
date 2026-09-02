@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml)
 [![Security](https://github.com/ghdtjdwn/ssuAI/actions/workflows/security.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/security.yml)
+[![CodeQL](https://github.com/ghdtjdwn/ssuAI/actions/workflows/codeql.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/codeql.yml)
 
 **한국어** · [English](README.en.md)
 
@@ -96,10 +97,12 @@ key가 필요한 요청과 `/api/agent/*`는 항상 same-origin 서버 경로를
 | SSO redirect에서 브라우저 쿠키가 유실되는 문제 | 1회용 code를 200 응답에서 교환 — [ADR 0089](docs/adr/0089-sso-code-exchange.md) · [return-page tests](app/auth/return/page.test.tsx) |
 | UI 연결 표시와 실제 MCP 권한의 불일치 | backend grant를 단일 근거로 사용하고 session 발급을 single-flight 처리 — [ADR 0099](docs/adr/0099-authoritative-web-session-grants.md) |
 | 스트림 중단 뒤 HITL 상태 또는 최종 링크 유실 | thread-stable SSE, resume endpoint, 제한된 안전 링크 렌더링 — [chat tests](components/chat/ChatPanel.test.tsx) · [message tests](components/chat/MessageBubble.test.tsx) |
-| 브라우저가 agent key나 principal을 조작할 위험 | server route가 bearer를 검증하고 신뢰 값만 전달 — [agent proxy](lib/server/agentProxy.ts) · [proxy tests](lib/server/agentProxy.test.ts) |
+| 브라우저가 agent key, principal, limiter identity를 조작할 위험 | server route가 bearer를 검증하고 pseudonymous client identity를 서명 — [ADR 0086](docs/adr/0086-server-side-principal.md) · [proxy tests](lib/server/agentProxy.test.ts) |
+| 대화 capability의 장기 저장과 삭제 부재 | proxy가 strict body/ID 경계를 적용하고 owner 검증 DELETE API를 중계 — [agent client](lib/api/agent.ts) |
 | 변경이 UI에서만 우연히 동작하는 문제 | lint, TypeScript, Vitest, production build를 모두 요구 — [CI workflow](.github/workflows/ci.yml) |
+| 정적 보안 회귀와 stale dependency | CodeQL v4 JS/TS 분석, npm·GitHub Actions Dependabot — [CodeQL](.github/workflows/codeql.yml) · [Dependabot](.github/dependabot.yml) |
 
-주요 스택은 Next.js 16, React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
+주요 스택은 Next.js 16.2.12, React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
 Vitest, Testing Library, Playwright, axe-core와 Vercel이다.
 
 ## 로컬 실행과 검증
@@ -130,16 +133,17 @@ pnpm exec playwright install chromium
 pnpm test:e2e
 ```
 
-`test:e2e`는 데스크톱과 모바일 Chromium에서 핵심 5개 화면의 탐색 가능성, WCAG 2.0/2.1 A·AA
-중 critical/serious axe 위반, 홈 화면의 실험실 LCP 2.5초·CLS 0.1 예산을 검사한다. 학교 API
+`test:e2e`는 데스크톱과 모바일 Chromium에서 핵심 5개 화면의 탐색 가능성, browser/React
+`pageerror` 0건, WCAG 2.0/2.1 A·AA 중 critical/serious axe 위반, 홈 화면의 실험실
+LCP 2.5초·CLS 0.1 예산을 검사한다. 학교 API
 요청은 503 fixture로 차단하므로 실제 학생 데이터나 외부 시스템 상태를 건드리지 않는다. 검증
 서버는 기본적으로 새로 기동하며, 의도적으로 실행 중인 ssuAI 서버를 검사할 때만
 `E2E_REUSE_SERVER=true`를 설정한다. 실패 시 trace·화면·Web Vitals JSON이 test artifact로 남는다.
 
 이 검증은 로컬 production build의 회귀 게이트이지 실사용자 네트워크의 현장 RUM, 인증 여정 또는
 학교 시스템 가용성의 증거가 아니다. 서비스별 실험 조건과 운영 주장 한계는
-[`docs/portfolio-verification-boundary.md`](docs/portfolio-verification-boundary.md)에 기록했다.
-2026-07-18에 전이 의존성 패치 버전을 고정하고 확인한 `pnpm audit` 0건도 당시 registry advisory
+[`docs/verification-boundary.md`](docs/verification-boundary.md)에 기록했다.
+2026-07-27에 Next.js 16.2.12와 전이 의존성 패치 버전을 고정하고 확인한 `pnpm audit --prod` 0건도 당시 registry advisory
 스냅샷이며 런타임 침투 테스트를 뜻하지 않는다.
 
 환경 변수와 server-only/public 구분은 [`.env.example`](.env.example)에 있다. 운영 proxy target과
@@ -151,7 +155,8 @@ secret 변경은 Vercel 설정과 함께 검증해야 하며, localhost 기본�
 - [제품 범위](docs/product.md)
 - [프론트엔드 아키텍처](docs/architecture.md)
 - [보안 경계](docs/security.md)
-- [검증 범위와 주장 한계](docs/portfolio-verification-boundary.md)
+- [실제 장애와 재발 방지 기록](docs/troubleshooting.md)
+- [검증 범위와 주장 한계](docs/verification-boundary.md)
 - [ADR 목록](docs/adr/)
 - [ssuMCP의 MCP 도구 계약](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md)
 

@@ -1,0 +1,10 @@
+diff --git a/minimatch.js b/minimatch.js
+index 2e4a058a130dceebf83a7bd435f5d22b765ac836..3fddecca79a1a0202f15a42d39300f7b08b3b954 100644
+--- a/minimatch.js
++++ b/minimatch.js
+@@ -10 +10,4 @@ var GLOBSTAR = minimatch.GLOBSTAR = Minimatch.GLOBSTAR = {}
+-var expand = require('brace-expansion')
++var braceExpansion = require('brace-expansion')
++// brace-expansion 5 exposes a named CommonJS export. Keep minimatch 3's
++// callable adapter while using the release that bounds total expansion size.
++var expand = typeof braceExpansion === 'function' ? braceExpansion : braceExpansion.expand

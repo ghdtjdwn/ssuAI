@@ -14,7 +14,7 @@ ssuAI는 요청의 자격증명 요구 여부에 따라 세 경로를 사용한�
 
 1. 공개 GET과 도서관 좌석 SSE는 `NEXT_PUBLIC_BACKEND_ORIGIN`(legacy fallback: `NEXT_PUBLIC_SSUAI_API_BASE`)이 설정된 배포에서 ssuMCP로 직접 전송한다. 쿠키와 Bearer token을 보내지 않아 공개 트래픽이 Vercel Function을 점유하지 않는다. 두 public 변수가 모두 없으면 base URL이 빈 문자열이 되어 same-origin `/api/*`로 폴백한다([ADR 0087](adr/0087-public-direct-origin-sse.md)).
 2. SSO, refresh cookie, 개인 학사·LMS·도서관 데이터, 예약, MCP web session은 same-origin `/api/*`로 호출한다. `next.config.ts`의 server-side rewrite가 ssuMCP로 전달한다.
-3. 챗봇의 `/api/agent/{stream,resume}`는 전용 Route Handler가 처리한다. 이 경로는 브라우저가 보낸 `principal`을 제거하고, Bearer token을 ssuMCP `/api/auth/me`로 검증한 결과만 다시 주입한다. 이어 서버 전용 `X-Agent-Key`를 추가해 ssuAgent를 호출하고 upstream SSE body를 그대로 스트리밍한다([ADR 0086](adr/0086-server-side-principal.md)).
+3. 챗봇의 `/api/agent/{stream,resume}`와 conversation DELETE는 전용 Route Handler가 처리한다. 이 경로는 JSON body를 32 KiB로 제한하고 `thread_id`/`mcp_session_id`의 128자 identifier 계약을 검사한 뒤, 브라우저가 보낸 `principal`을 제거하고 Bearer token을 ssuMCP `/api/auth/me`로 검증한 결과만 다시 주입한다. verified principal 또는 Vercel이 spoofing을 막는 client IP로 pseudonym을 만들고 `AGENT_API_KEY` HMAC 서명을 추가한다. 이어 server-only key와 서명 identity로 ssuAgent를 호출하며 SSE body는 그대로 스트리밍한다([ADR 0086](adr/0086-server-side-principal.md)).
 
 이 분리는 공개 읽기 성능과 인증 경계를 함께 유지한다. 브라우저 bundle에는 agent key나 server-only target이 포함되지 않는다.
 
@@ -27,6 +27,6 @@ ssuAI는 요청의 자격증명 요구 여부에 따라 세 경로를 사용한�
 
 ## 배포와 검증
 
-애플리케이션은 Vercel에 배포한다. GitHub Actions는 Node 20에서 `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`를 실행한다. 운영 프록시 대상과 `AGENT_API_KEY`는 Vercel의 server-only 환경 변수로 주입하며 브라우저 공개 변수로 복제하지 않는다.
+애플리케이션은 Vercel에 배포한다. GitHub Actions는 Node 20에서 `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`를 실행하고 CodeQL v4가 JavaScript/TypeScript를 분석한다. Dependabot은 npm과 GitHub Actions만 추적한다. 운영 프록시 대상과 `AGENT_API_KEY`는 Vercel의 server-only 환경 변수로 주입하며 브라우저 공개 변수로 복제하지 않는다.
 
 프론트엔드 CI는 코드 품질과 build를 검증한다. 실제 운영 배선은 Vercel 환경 변수, ssuMCP 공개 CORS, ssuAgent API key가 서로 일치해야 완성된다.

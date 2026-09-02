@@ -825,10 +825,12 @@ describe("ChatPanel", () => {
       await mockStream([{ type: "done" }]);
 
       renderChat();
-      const connectionStatus = await screen.findByRole("status");
-      expect(connectionStatus).toHaveTextContent(
-        "개인 서비스 3/3 연결 · 상태 미확인",
+      await waitFor(() =>
+        expect(screen.getByRole("status")).toHaveTextContent(
+          "개인 서비스 3/3 연결 · 상태 미확인",
+        ),
       );
+      const connectionStatus = screen.getByRole("status");
       expect(connectionStatus).toHaveAttribute("aria-live", "polite");
       expect(connectionStatus).toHaveAttribute("aria-atomic", "true");
       submit("도서관 자리 있어?");

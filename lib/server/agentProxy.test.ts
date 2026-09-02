@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { deriveServerPrincipal, proxyToAgent, stripAndInjectPrincipal } from "./agentProxy";
+import {
+  AGENT_MAX_REQUEST_BYTES,
+  deriveServerPrincipal,
+  proxyToAgent,
+  stripAndInjectPrincipal,
+  validateAgentPayload,
+} from "./agentProxy";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -219,5 +225,77 @@ describe("proxyToAgent", () => {
 
     expect(response.status).toBe(503);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized and malformed identifiers before any upstream call", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const badThread = await proxyToAgent("/agent/stream", new Request(
+      "https://ssuai.example/api/agent/stream",
+      { method: "POST", body: JSON.stringify({ message: "hi", thread_id: "bad/thread" }) },
+    ));
+    const badSession = await proxyToAgent("/agent/stream", new Request(
+      "https://ssuai.example/api/agent/stream",
+      { method: "POST", body: JSON.stringify({ message: "hi", mcp_session_id: "x".repeat(129) }) },
+    ));
+    const oversized = await proxyToAgent("/agent/stream", new Request(
+      "https://ssuai.example/api/agent/stream",
+      { method: "POST", body: JSON.stringify({ message: "x".repeat(AGENT_MAX_REQUEST_BYTES) }) },
+    ));
+
+    expect([badThread.status, badSession.status, oversized.status]).toEqual([422, 422, 413]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("signs a stable client identity without forwarding the raw IP", async () => {
+    vi.stubEnv("AGENT_API_KEY", "shared-agent-key");
+    const fetchMock = stubFetchOnce();
+    const makeRequest = () => new Request("https://ssuai.example/api/agent/stream", {
+      method: "POST",
+      headers: { "x-vercel-forwarded-for": "203.0.113.7" },
+      body: JSON.stringify({ message: "hi", thread_id: "t1" }),
+    });
+
+    await proxyToAgent("/agent/stream", makeRequest());
+    await proxyToAgent("/agent/stream", makeRequest());
+
+    const firstHeaders = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    const secondHeaders = fetchMock.mock.calls[1]?.[1]?.headers as Record<string, string>;
+    expect(firstHeaders["X-Agent-Client-Id"]).toMatch(/^[0-9a-f]{64}$/);
+    expect(firstHeaders["X-Agent-Client-Id"]).toBe(secondHeaders["X-Agent-Client-Id"]);
+    expect(firstHeaders["X-Agent-Client-Signature"]).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(firstHeaders)).not.toContain("203.0.113.7");
+  });
+
+  it("prefers the Vercel-owned IP when generic forwarding headers conflict", async () => {
+    vi.stubEnv("AGENT_API_KEY", "shared-agent-key");
+    const fetchMock = stubFetchOnce();
+    const makeRequest = (forwardedFor: string) => new Request(
+      "https://ssuai.example/api/agent/stream",
+      {
+        method: "POST",
+        headers: {
+          "x-vercel-forwarded-for": "203.0.113.7",
+          "x-forwarded-for": forwardedFor,
+        },
+        body: JSON.stringify({ message: "hi", thread_id: "t1" }),
+      },
+    );
+
+    await proxyToAgent("/agent/stream", makeRequest("198.51.100.1"));
+    await proxyToAgent("/agent/stream", makeRequest("198.51.100.250"));
+
+    const firstHeaders = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    const secondHeaders = fetchMock.mock.calls[1]?.[1]?.headers as Record<string, string>;
+    expect(firstHeaders["X-Agent-Client-Id"]).toBe(secondHeaders["X-Agent-Client-Id"]);
+  });
+});
+
+describe("validateAgentPayload", () => {
+  it("accepts the deployed identifier alphabet and rejects non-object JSON", () => {
+    expect(validateAgentPayload(JSON.stringify({ thread_id: "uuid-like_1:2.3", mcp_session_id: null }))).toBeNull();
+    expect(validateAgentPayload("[]")?.status).toBe(422);
+    expect(validateAgentPayload("{" )?.status).toBe(400);
   });
 });
