@@ -2,6 +2,40 @@
 
 실제로 발생한 CI·운영 문제만 기록한다. 재현 증거와 검증 결과가 없는 가상 사례는 포함하지 않는다.
 
+## 2026-09-02 — 개발 도구 전이 의존성 보안 권고 재발
+
+### 맥락과 영향
+
+GitHub Dependabot이 lockfile과 직접 `postcss` 선언에서 high 4건과 moderate 6건을 열었고,
+같은 시점의 `pnpm audit`은 아직 GitHub 화면에 반영되지 않은 권고까지 포함해 high 7건,
+moderate 5건, low 1건을 보고했다. 취약 버전은 브라우저 제품 코드보다 lint, test, build 도구
+체인에 집중돼 있었지만 CI가 신뢰하는 입력 처리 경로에 포함돼 있었다.
+
+### 원인과 대안
+
+이전에 고정한 `brace-expansion`, `js-yaml`, `postcss`, `undici` 버전 이후 새 권고가 공개됐고,
+`nanoid`, `browserslist`, `postcss-selector-parser`에도 추가 패치가 필요해졌다.
+
+- 상위 도구 전체를 올리는 방법은 기능 변경과 peer dependency 변동 범위가 커서 제외했다.
+- GitHub에 이미 열린 항목만 고치는 방법은 registry 감사에서 추가 high 권고가 남아 제외했다.
+- 취약 범위에만 패치 버전 override를 적용하고 직접 의존성 `postcss`만 올리는 방법을 채택했다.
+
+### 해결과 재발 방지
+
+취약 범위는 `brace-expansion 5.0.9`, `browserslist 4.28.7`, `js-yaml 4.3.1`,
+`nanoid 3.3.18`, `postcss 8.5.23`, `postcss-selector-parser 6.1.3`, `undici 7.29.0`으로
+해석되도록 고정했다. CI는 frozen install 직후 `pnpm audit --audit-level moderate`를 실행해
+같은 등급의 재발을 차단한다.
+
+Node 20과 pnpm 10.34.5에서 frozen install, dependency audit, ESLint, TypeScript typecheck,
+203개 Vitest, Next.js production build를 통과했다. Chromium desktop/mobile Playwright는
+14개 중 13개가 통과하고 조건부 1개가 skip됐다.
+
+### 남은 위험
+
+registry 결과는 실행 시점의 권고 스냅샷이다. 새 권고가 공개되면 CI가 실패하도록 했으며,
+그때는 무조건적인 상위 버전 상승보다 영향 경로와 호환성을 다시 검토해야 한다.
+
 ## 2026-07-28 — 동적 Agent Route Handler가 API rewrite에 가려진 운영 404
 
 ### 맥락과 영향
