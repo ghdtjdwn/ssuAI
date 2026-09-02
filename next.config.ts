@@ -12,6 +12,25 @@ const nextConfig: NextConfig = {
     // root keeps Next.js file tracing and cache keys scoped to this repository.
     root: process.cwd(),
   },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     return {
       // The campus backend is the legacy API fallback. Keeping this rewrite in
