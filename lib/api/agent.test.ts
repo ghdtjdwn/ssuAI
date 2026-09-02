@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { readAgentStream, resumeAgentStream, startAgentStream } from "./agent";
+import { deleteAgentThread, readAgentStream, resumeAgentStream, startAgentStream } from "./agent";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -43,6 +43,21 @@ describe("agent stream client", () => {
       action_id: 7,
       mcp_session_id: null,
       library_connected: false,
+    });
+  });
+
+  it("deletes an owned conversation through the same-origin proxy", async () => {
+    const fetchMock = stubFetch();
+
+    await deleteAgentThread("thread-1", "mcp-1", "access-token");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/agent/threads/thread-1", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer access-token",
+      },
+      body: JSON.stringify({ mcp_session_id: "mcp-1" }),
     });
   });
 

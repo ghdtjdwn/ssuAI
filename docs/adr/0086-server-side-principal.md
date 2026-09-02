@@ -64,8 +64,24 @@ ssuAgent는 `AgentRequest`/`ResumeRequest`에 `principal: str | None` 필드를 
 - **얻는 것**: `/api/agent/*`의 client-sent principal을 제거하고 서버 검증 subject만 주입한다. 로그인 사용자의 thread ownership이 access-token 회전과 MCP session 교체에 흔들리지 않으며, 검증 실패 때 기존 thread를 잘못 session-only로 재해석하지 않는다.
 - **잃는 것 / 남는 리스크**: 로그인 요청마다 ssuMCP `/api/auth/me` 왕복이 한 번 추가된다. 3초 timeout과 명확한 503으로 장애 전파를 제한한다. 운영에서는 ssuAI와 ssuAgent 양쪽의 동일 `AGENT_API_KEY`가 필수이며, 이 경계가 꺼진 공개 ssuAgent에는 stable principal을 신뢰할 수 없다.
 
-## 예상 면접 질문
+## 2026-07-27 갱신 — strict proxy boundary와 signed limiter identity
 
-1. "왜 bearer 검증 실패를 session owner로 폴백하지 않고 401/503으로 중단하나요?"
-2. "브라우저의 JWT를 왜 ssuAgent까지 전달하지 않고 ssuMCP `/api/auth/me`에서 subject로 축약하나요?"
-3. "`deriveServerPrincipal`이 요청 body를 읽지 않는다는 계약과 `AGENT_API_KEY` 강제가 함께 필요한 이유는 무엇인가요?"
+감사에서 Next proxy가 body 전체와 `thread_id`/`mcp_session_id`를 제한하지 않고, ssuAgent limiter가
+Vercel egress를 한 사용자로 보거나 임의 forwarding header를 신뢰할 수 있다는 후속 문제가 확인됐다.
+기존 principal·SSE 계약을 유지하면서 다음을 추가한다.
+
+1. `proxyToAgent`는 Content-Length와 실제 UTF-8 body를 32 KiB로 제한하고 malformed/non-object JSON,
+   128자를 넘거나 `[A-Za-z0-9._:-]` 밖의 identifier를 upstream 호출 전에 거부한다. FastAPI도 같은 계약을
+   독립적으로 검증한다.
+2. verified principal이 있으면 그것을, 익명 Vercel 요청이면 spoof 방지 `x-vercel-forwarded-for`를 원천으로
+   HMAC pseudonym을 만든다. raw principal/IP는 전달하지 않는다. client ID에는 다시 `v1:` domain을 붙여
+   `AGENT_API_KEY`로 서명하고 agent가 constant-time 검증한다.
+3. signature가 없거나 틀린 direct traffic은 agent가 `X-Forwarded-For`를 무시하고 socket bucket을 사용한다.
+   현재 counter는 process-local이라 이 결정은 단일 pod의 사용자 분리만 해결한다. multi-replica quota는
+   shared limiter 도입 전까지 보장하지 않는다.
+4. `DELETE /api/agent/threads/{threadId}`도 같은 principal strip/inject, API key, signed identity 경계를 거쳐
+   ssuAgent의 atomic owner-checked deletion을 호출한다.
+
+`AGENT_API_KEY` 회전은 identity signature도 함께 회전한다. 양쪽 서비스가 다른 키를 잠시 사용하면 agent는
+요청 인증 자체를 거부하거나 identity를 socket fallback으로 제한한다. rollback은 이전 양쪽 key/config 조합과
+application revision을 함께 복구해야 하며, 이미 정상 삭제된 conversation은 복구하지 않는다.

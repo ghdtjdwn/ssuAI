@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/ci.yml)
 [![Security](https://github.com/ghdtjdwn/ssuAI/actions/workflows/security.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/security.yml)
+[![CodeQL](https://github.com/ghdtjdwn/ssuAI/actions/workflows/codeql.yml/badge.svg)](https://github.com/ghdtjdwn/ssuAI/actions/workflows/codeql.yml)
 
 [한국어](README.md) · **English**
 
@@ -99,10 +100,12 @@ reducing latency for public data. See the [frontend architecture](docs/architect
 | Browser cookies disappearing during an SSO redirect | Exchange a single-use code in a 200 response — [ADR 0089](docs/adr/0089-sso-code-exchange.md) · [return-page tests](app/auth/return/page.test.tsx) |
 | UI connection state disagreeing with real MCP grants | Treat backend grants as authoritative and issue sessions through single-flight — [ADR 0099](docs/adr/0099-authoritative-web-session-grants.md) |
 | HITL state or final links disappearing after a stream settles | Stable-thread SSE, resume endpoint, and restricted safe-link rendering — [chat tests](components/chat/ChatPanel.test.tsx) · [message tests](components/chat/MessageBubble.test.tsx) |
-| Browser control of the agent key or trusted principal | Server route verifies the bearer and forwards only trusted values — [agent proxy](lib/server/agentProxy.ts) · [proxy tests](lib/server/agentProxy.test.ts) |
+| Browser control of the agent key, principal, or limiter identity | Server route verifies the bearer and signs a pseudonymous client identity — [ADR 0086](docs/adr/0086-server-side-principal.md) · [proxy tests](lib/server/agentProxy.test.ts) |
+| Long-lived conversation capabilities with no deletion path | Strict proxy body/ID boundaries and an ownership-checked delete relay — [agent client](lib/api/agent.ts) |
 | UI behavior that only works by accident locally | Lint, TypeScript, Vitest, and production build are all required — [CI workflow](.github/workflows/ci.yml) |
+| Static security regressions and stale dependencies | CodeQL v4 JS/TS analysis plus npm and GitHub Actions Dependabot — [CodeQL](.github/workflows/codeql.yml) · [Dependabot](.github/dependabot.yml) |
 
-The main stack is Next.js 16, React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
+The main stack is Next.js 16.2.12, React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
 Vitest, Testing Library, Playwright, axe-core, and Vercel.
 
 ## Local development and verification
@@ -134,18 +137,19 @@ pnpm exec playwright install chromium
 pnpm test:e2e
 ```
 
-`test:e2e` checks the five core routes in desktop and mobile Chromium. It rejects critical or
-serious WCAG 2.0/2.1 A/AA axe violations and applies laboratory LCP ≤2.5 s and CLS ≤0.1 budgets to
-the home page. School API calls are blocked by an explicit 503 fixture, so the suite does not touch
+`test:e2e` checks the five core routes in desktop and mobile Chromium. It requires zero browser/React
+`pageerror` events, rejects critical or serious WCAG 2.0/2.1 A/AA axe violations, and applies
+laboratory LCP ≤2.5 s and CLS ≤0.1 budgets to the home page. School API calls are blocked by an
+explicit 503 fixture, so the suite does not touch
 student data or real upstream state. It starts a fresh verification server by default; set
 `E2E_REUSE_SERVER=true` only when intentionally testing an already running ssuAI server. Failures
 retain traces, screenshots, and Web Vitals JSON as test artifacts.
 
 These checks are regression evidence for a local production build, not field RUM, authenticated-
 journey, or school-system availability evidence. Service-specific conditions and claim boundaries
-are recorded in [`docs/portfolio-verification-boundary.md`](docs/portfolio-verification-boundary.md).
-The zero-finding `pnpm audit` recorded on 2026-07-18 after pinning patched transitive versions is a
-point-in-time registry advisory result, not a runtime penetration test.
+are recorded in [`docs/verification-boundary.md`](docs/verification-boundary.md).
+The zero-finding `pnpm audit --prod` recorded on 2026-07-27 after updating Next.js 16.2.12 and patched
+transitive floors is a point-in-time registry advisory result, not a runtime penetration test.
 
 See [`.env.example`](.env.example) for public versus server-only variables. Production proxy targets
 and secrets must be verified with Vercel configuration; localhost defaults do not describe production.
@@ -156,7 +160,8 @@ and secrets must be verified with Vercel configuration; localhost defaults do no
 - [Product scope](docs/product.md) (Korean)
 - [Frontend architecture](docs/architecture.md) (Korean)
 - [Security boundary](docs/security.md) (Korean)
-- [Verification scope and claim boundaries](docs/portfolio-verification-boundary.md)
+- [Production failures and regression prevention](docs/troubleshooting.md)
+- [Verification scope and claim boundaries](docs/verification-boundary.md)
 - [Architecture decision records](docs/adr/) (Korean)
 - [ssuMCP tool contract](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md) (Korean)
 

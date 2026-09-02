@@ -2,7 +2,7 @@
 <!-- The Goal and the core implementation changes in 1-2 lines. -->
 
 ## Why
-<!-- The background, reason, or portfolio context that explains why this change matters. -->
+<!-- The background, reason, or project context that explains why this change matters. -->
 
 ## Notable decisions
 <!-- Stop-and-flag decisions, scope deviations, or one non-obvious choice beyond the acceptance criteria. -->

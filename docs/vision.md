@@ -156,7 +156,7 @@ provider 정책으로 전송한다.
 
 ### 목표
 
-"동작하는 시스템"을 "대규모 트래픽에서도 버티는 시스템"으로 검증하고, 그 과정을 포트폴리오 스토리로 만든다.
+"동작하는 시스템"을 "대규모 트래픽에서도 버티는 시스템"으로 검증하고, 그 과정을 기술 검증 기록로 만든다.
 
 ---
 
@@ -264,7 +264,7 @@ ssuMCP는 `WeeklyMealCache`, `LibraryBookCache`, `SaintScheduleCache`, `LibraryS
 | 에러율 (500/504) | - | - |
 | 캐시 미스 시 외부 호출 수 | - | 1회 (single-flight 검증) |
 
-Grafana 대시보드 스크린샷 + k6 HTML 리포트를 함께 기록해 포트폴리오에 첨부한다.
+Grafana 대시보드 스크린샷 + k6 HTML 리포트를 함께 기록해 프로젝트에 첨부한다.
 
 ---
 
@@ -298,7 +298,7 @@ Phase 9 부하 테스트 전에 먼저 수행한다. 외부 학교 시스템에 
 
 `build.gradle`에 `spring-boot-starter-resilience4j` 추가 후 각 Real 커넥터에 `@CircuitBreaker` 어노테이션을 붙인다. Circuit이 열리면 Mock 커넥터 응답이나 캐시된 마지막 데이터를 반환하고, MCP 도구 응답에 "현재 학교 서버 연결이 불안정합니다" 메시지를 포함시킨다.
 
-**포트폴리오 포인트**: "외부 의존 시스템 장애가 전체 서비스 장애로 전파되지 않도록 Circuit Breaker 패턴을 적용했다"는 설명이 가능해진다.
+**설계 효과**: "외부 의존 시스템 장애가 전체 서비스 장애로 전파되지 않도록 Circuit Breaker 패턴을 적용했다"는 설명이 가능해진다.
 
 ### 2. Rate Limiting (Token Bucket) 구현 확인
 

@@ -13,12 +13,17 @@ const nextConfig: NextConfig = {
     root: process.cwd(),
   },
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${apiProxyTarget}/api/:path*`,
-      },
-    ];
+    return {
+      // The campus backend is the legacy API fallback. Keeping this rewrite in
+      // the fallback phase lets every local App Router handler—including
+      // dynamic `/api/agent/threads/[threadId]`—win first.
+      fallback: [
+        {
+          source: "/api/:path*",
+          destination: `${apiProxyTarget}/api/:path*`,
+        },
+      ],
+    };
   },
 };
 

@@ -88,11 +88,22 @@ describe("LibraryAuthProvider", () => {
     expect(sessionStorage.getItem(STORAGE_KEY)).toBe("true");
   });
 
-  it("advances the credential revision even when a fresh login stays connected", () => {
+  it("restores the browser connection hint after hydration", async () => {
     sessionStorage.setItem(STORAGE_KEY, "true");
     setup();
 
-    expect(screen.getByTestId("connected").textContent).toBe("true");
+    await waitFor(() => {
+      expect(screen.getByTestId("connected").textContent).toBe("true");
+    });
+  });
+
+  it("advances the credential revision even when a fresh login stays connected", async () => {
+    sessionStorage.setItem(STORAGE_KEY, "true");
+    setup();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("connected").textContent).toBe("true");
+    });
     expect(screen.getByTestId("revision").textContent).toBe("0");
 
     act(() => screen.getByRole("button", { name: "refresh credentials" }).click());
@@ -104,7 +115,9 @@ describe("LibraryAuthProvider", () => {
   it("marks disconnected when the loans query fails with LIBRARY_SESSION_REQUIRED", async () => {
     sessionStorage.setItem(STORAGE_KEY, "true");
     const queryClient = setup();
-    expect(screen.getByTestId("connected").textContent).toBe("true");
+    await waitFor(() => {
+      expect(screen.getByTestId("connected").textContent).toBe("true");
+    });
 
     await act(async () => {
       await fetchLoans(queryClient, async () => {
@@ -136,6 +149,10 @@ describe("LibraryAuthProvider", () => {
   it("keeps the connected state on transient loans failures (e.g. 500)", async () => {
     sessionStorage.setItem(STORAGE_KEY, "true");
     const queryClient = setup();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("connected").textContent).toBe("true");
+    });
 
     await act(async () => {
       await fetchLoans(queryClient, async () => {

@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { ReactNode } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,6 +16,7 @@ import { logoutLibrary } from "@/lib/api/library";
 import { ApiError } from "@/lib/api/types";
 
 const STORAGE_KEY = "library_connected";
+const STORAGE_EVENT = "ssuai:library-connected";
 
 function readStorage(): boolean {
   if (typeof window === "undefined") return false;
@@ -22,6 +30,21 @@ function writeStorage(v: boolean) {
   } else {
     sessionStorage.removeItem(STORAGE_KEY);
   }
+  window.dispatchEvent(new Event(STORAGE_EVENT));
+}
+
+function subscribeStorage(onStoreChange: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.storageArea === sessionStorage && event.key === STORAGE_KEY) {
+      onStoreChange();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(STORAGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(STORAGE_EVENT, onStoreChange);
+  };
 }
 
 interface LibraryAuthState {
@@ -41,18 +64,18 @@ const LibraryAuthContext = createContext<LibraryAuthState>({
 });
 
 export function LibraryAuthProvider({ children }: { children: ReactNode }) {
-  const [isConnected, setIsConnected] = useState<boolean>(readStorage);
+  // useSyncExternalStore supplies the same `false` snapshot to SSR and the
+  // hydration pass, then reconciles the tab-scoped sessionStorage value.
+  const isConnected = useSyncExternalStore(subscribeStorage, readStorage, () => false);
   const [credentialRevision, setCredentialRevision] = useState(0);
   const queryClient = useQueryClient();
 
   const setConnected = useCallback((v: boolean) => {
     writeStorage(v);
-    setIsConnected(v);
   }, []);
 
   const markCredentialsRefreshed = useCallback(() => {
     writeStorage(true);
-    setIsConnected(true);
     setCredentialRevision((revision) => revision + 1);
   }, []);
 
@@ -63,7 +86,6 @@ export function LibraryAuthProvider({ children }: { children: ReactNode }) {
       console.warn("ssuAI library logout failed", error);
     }
     writeStorage(false);
-    setIsConnected(false);
     queryClient.removeQueries({ queryKey: ["library", "seats"] });
     queryClient.removeQueries({ queryKey: ["library", "loans"] });
   }, [queryClient]);

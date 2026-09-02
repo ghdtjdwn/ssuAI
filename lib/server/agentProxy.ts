@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 /**
  * Server-side proxy to ssuAgent's `/agent/*` SSE endpoints.
  *
@@ -32,6 +34,12 @@ const SSUMCP_BASE = (
 ).replace(/\/$/, "");
 
 const PRINCIPAL_VERIFICATION_TIMEOUT_MS = 3_000;
+export const AGENT_MAX_REQUEST_BYTES = 32_768;
+const AGENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+export function isValidAgentId(value: string): boolean {
+  return AGENT_ID_PATTERN.test(value);
+}
 
 class PrincipalVerificationError extends Error {
   constructor(
@@ -114,12 +122,80 @@ export function stripAndInjectPrincipal(rawBody: string, serverPrincipal: string
   return JSON.stringify(sanitized);
 }
 
+function invalidPayload(message: string, status = 422): Response {
+  return Response.json({ error: message }, { status });
+}
+
+export function validateAgentPayload(rawBody: string): Response | null {
+  if (new TextEncoder().encode(rawBody).byteLength > AGENT_MAX_REQUEST_BYTES) {
+    return invalidPayload("Request body too large", 413);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    return invalidPayload("Malformed JSON", 400);
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return invalidPayload("JSON object required");
+  }
+
+  const body = parsed as Record<string, unknown>;
+  const threadId = body.thread_id;
+  if (
+    threadId !== undefined &&
+    (typeof threadId !== "string" || (threadId !== "" && !isValidAgentId(threadId)))
+  ) {
+    return invalidPayload("Invalid thread_id");
+  }
+  const sessionId = body.mcp_session_id;
+  if (
+    sessionId !== undefined &&
+    sessionId !== null &&
+    (typeof sessionId !== "string" || !isValidAgentId(sessionId))
+  ) {
+    return invalidPayload("Invalid mcp_session_id");
+  }
+  return null;
+}
+
+function signedClientIdentity(
+  request: Request,
+  serverPrincipal: string | null,
+  key: string,
+): { id: string; signature: string } {
+  // Vercel overwrites its platform header at the trusted edge. Prefer it over
+  // the generic forwarding chain, which a direct client can conflict with.
+  const clientIp =
+    request.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown";
+  const source = serverPrincipal ? `principal:${serverPrincipal}` : `ip:${clientIp}`;
+  const id = createHmac("sha256", key).update(source).digest("hex");
+  const signature = createHmac("sha256", key).update(`v1:${id}`).digest("hex");
+  return { id, signature };
+}
+
 export async function proxyToAgent(path: string, request: Request): Promise<Response> {
-  const rawBody = await request.text();
   const key = process.env.AGENT_API_KEY?.trim();
   if (!key && process.env.VERCEL_ENV === "production") {
     return Response.json({ error: "Agent proxy authentication is unavailable" }, { status: 503 });
   }
+
+  const contentLength = request.headers.get("content-length");
+  if (contentLength) {
+    const declaredLength = Number(contentLength);
+    if (!Number.isSafeInteger(declaredLength) || declaredLength < 0) {
+      return invalidPayload("Invalid Content-Length", 400);
+    }
+    if (declaredLength > AGENT_MAX_REQUEST_BYTES) {
+      return invalidPayload("Request body too large", 413);
+    }
+  }
+  const rawBody = await request.text();
+  const payloadError = validateAgentPayload(rawBody);
+  if (payloadError) return payloadError;
 
   let serverPrincipal: string | null;
   try {
@@ -135,12 +211,15 @@ export async function proxyToAgent(path: string, request: Request): Promise<Resp
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) {
     headers["X-Agent-Key"] = key;
+    const clientIdentity = signedClientIdentity(request, serverPrincipal, key);
+    headers["X-Agent-Client-Id"] = clientIdentity.id;
+    headers["X-Agent-Client-Signature"] = clientIdentity.signature;
   }
 
   let upstream: Response;
   try {
     upstream = await fetch(`${SSUAGENT_BASE}${path}`, {
-      method: "POST",
+      method: request.method,
       headers,
       body,
     });
@@ -151,11 +230,15 @@ export async function proxyToAgent(path: string, request: Request): Promise<Resp
     });
   }
 
+  const responseHeaders: Record<string, string> = {
+    "Cache-Control": "no-cache, no-transform",
+  };
+  const contentType = upstream.headers.get("Content-Type");
+  if (contentType) responseHeaders["Content-Type"] = contentType;
+  else if (request.method === "POST") responseHeaders["Content-Type"] = "text/event-stream";
+
   return new Response(upstream.body, {
     status: upstream.status,
-    headers: {
-      "Content-Type": upstream.headers.get("Content-Type") ?? "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-    },
+    headers: responseHeaders,
   });
 }
