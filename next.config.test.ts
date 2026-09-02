@@ -19,4 +19,26 @@ describe("Next.js API routing", () => {
       },
     ]);
   });
+
+  it("sets baseline browser security headers without changing routing", async () => {
+    const headers = await nextConfig.headers?.();
+
+    expect(headers).toEqual([
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
+      },
+    ]);
+  });
 });
