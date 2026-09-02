@@ -101,9 +101,3 @@ API client를 두 갈래로 나눴다.
 - `lib/api/public-origin.test.ts`: 공개 helper는 backend origin, auth/library/session helper는
   same-origin path 유지.
 - `hooks/useLibrarySeatSse.test.ts`: SSE URL이 env 설정/미설정 모두에서 의도한 URL로 해석됨.
-
-## 예상 면접 질문
-
-1. **왜 공개 endpoint만 직접 origin으로 보내고 인증 endpoint는 프록시에 남겼나?**
-2. **`NEXT_PUBLIC_BACKEND_ORIGIN`과 `NEXT_PUBLIC_SSUAI_API_BASE`를 둘 다 지원한 이유는?**
-3. **SSE에서 `withCredentials: false`를 명시한 이유와 backend CORS `allowCredentials(false)`의 관계는?**

@@ -142,7 +142,7 @@ LCP 2.5초·CLS 0.1 예산을 검사한다. 학교 API
 
 이 검증은 로컬 production build의 회귀 게이트이지 실사용자 네트워크의 현장 RUM, 인증 여정 또는
 학교 시스템 가용성의 증거가 아니다. 서비스별 실험 조건과 운영 주장 한계는
-[`docs/portfolio-verification-boundary.md`](docs/portfolio-verification-boundary.md)에 기록했다.
+[`docs/verification-boundary.md`](docs/verification-boundary.md)에 기록했다.
 2026-07-27에 Next.js 16.2.12와 전이 의존성 패치 버전을 고정하고 확인한 `pnpm audit --prod` 0건도 당시 registry advisory
 스냅샷이며 런타임 침투 테스트를 뜻하지 않는다.
 
@@ -156,7 +156,7 @@ secret 변경은 Vercel 설정과 함께 검증해야 하며, localhost 기본�
 - [프론트엔드 아키텍처](docs/architecture.md)
 - [보안 경계](docs/security.md)
 - [실제 장애와 재발 방지 기록](docs/troubleshooting.md)
-- [검증 범위와 주장 한계](docs/portfolio-verification-boundary.md)
+- [검증 범위와 주장 한계](docs/verification-boundary.md)
 - [ADR 목록](docs/adr/)
 - [ssuMCP의 MCP 도구 계약](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md)
 

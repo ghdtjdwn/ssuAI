@@ -109,17 +109,6 @@ ssuAgent는 이 힌트를 사전 안내용 short-circuit에만 사용합니다. 
 
 ---
 
-## 3 Core Interview Questions (예상 면접 질문)
-
-### Q1. EventSource API를 사용하지 않고 `fetch`와 `ReadableStream`으로 SSE를 직접 파싱한 구체적인 이유는 무엇인가요?
-> **Answer**: `EventSource`는 표준 규격상 GET 요청만 전송 가능하며, 요청 본문(Body)을 가질 수 없고 HTTP 헤더에 Bearer 토큰 같은 인증 정보를 설정하는 기능이 부재합니다. 저희 서비스는 사용자의 입력 메시지뿐만 아니라 세션 유지를 위한 `thread_id`, 인증 연동을 위한 `mcp_session_id` 같은 JSON payload를 POST 메서드의 Body로 전달해야 했습니다. 이를 해결하기 위해 표준 `fetch` API로 POST 요청을 보내고, Response Body의 `ReadableStream`을 얻어 `TextDecoder`와 Custom SSE Buffer Parser를 구현해 비동기 제너레이터(Async Generator) 형태로 데이터를 받아 실시간 스트림 파싱을 직접 구축했습니다.
-
-### Q2. LangGraph에서 발생하는 Interrupt(HITL) 이벤트에 대해 클라이언트 측 상태 동기화 및 텍스트 렌더링을 어떻게 매끄럽게 처리하셨나요?
-> **Answer**: 백엔드 에이전트에서 승인이 필요한 액션(예: 도서관 예약)을 실행하기 전에 Interrupt가 발생하면, 서버는 스트림 응답을 의도적으로 종결(Close)시킵니다. 클라이언트는 이 종결을 통신 에러로 판단하지 않고 자연스러운 흐름의 중단 상태로 분기 처리하여, 그때까지 쌓인 버퍼 텍스트를 메시지 창에 최종 안착시키고 `pendingInterrupt` 상태를 갱신해 승인 UI(HitlCard)를 노출합니다. 사용자가 승인 또는 취소를 클릭하면 `/agent/resume` 엔드포인트로 다시 POST 요청을 보내고, 해당 요청이 반환하는 새로운 SSE 응답 스트림에 대해 동일한 파서 루프(`consumeStream`)를 재진입시킴으로써 대화 및 실행 상태를 매끄럽게 연속적으로 유지할 수 있었습니다.
-
-### Q3. 학생 인증 정보(JWT)가 어떻게 MCP 세션 ID(`mcp_session_id`)로 교환되고, 이를 통해 프론트엔드에서 보안 위협 없이 도구를 실행할 수 있나요?
-> **Answer**: 프론트엔드가 백엔드 에이전트와 직접 통신할 때 JWT 액세스 토큰을 백엔드에 그대로 노출하거나 세션에 장기 보관하면 탈취 시 권한 남용 위험이 있습니다. 대신 컴포넌트 마운트 시점에 기존에 이미 인증된 ssuMCP 서버의 `/api/mcp/auth/web-session`으로 JWT를 전송하여 해당 토큰의 소유주 정보와 바인딩된, 단기 만료일시를 갖는 고유 `mcp_session_id`를 발급받습니다. 이후 클라이언트는 오직 이 `mcp_session_id`만을 에이전트 요청에 실어 보냅니다. 백엔드 에이전트 측은 예약 도구 등을 실행할 때 이 세션 ID를 통해 MCP 서버와 안전하게 통신하므로, 클라이언트 측은 개인정보나 인증 토큰의 유출 걱정 없이 보안성이 담보된 도구 실행 세션을 유지할 수 있습니다.
-
 ## 2026-07-11 갱신 — mcp_session_id 발급 조건 변경 (ADR 0088)
 
 본문 "2. mcp_session_id 브릿징 연동"의 JWT-전용 발급 서술은 2026-07-11부로 구식이다.

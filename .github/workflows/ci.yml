@@ -23,6 +23,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Dependency audit
+        run: pnpm audit:dependencies
       - name: Lint
         run: pnpm lint
       - name: Typecheck
