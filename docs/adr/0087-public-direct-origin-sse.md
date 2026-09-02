@@ -15,7 +15,7 @@
 도서관 좌석 SSE는 홈 화면에서 기본으로 열리고 floor별 연결을 유지한다. 공개 SSE 연결까지
 Vercel을 경유하면 사용자 수에 비례해 함수 동시성·duration을 점유한다. 챗봇 stream route는
 `maxDuration = 60`으로 긴 응답이 절단될 수 있지만, 이 경로는 서버 전용 agent proxy와 세션
-경계가 있어 이번 유닛에서는 그대로 프록시에 남긴다.
+경계가 있어 이 결정에서는 그대로 프록시에 남긴다.
 
 참고한 공식 문서:
 
@@ -83,7 +83,7 @@ API client를 두 갈래로 나눴다.
 - **SSE credentials 비활성화**: `EventSource(getLibrarySeatEventsUrl(floor), { withCredentials: false })`.
   공개 SSE는 backend CORS no-credentials 경계와 맞춘다.
 - **chatbot stream은 문서화만**: `app/api/agent/stream/route.ts`는 이미 `maxDuration = 60`과
-  Pro 300초 주석이 있다. agent key/세션 경계가 있어 이번 유닛에서 origin 직접 호출로 옮기지 않는다.
+  Pro 300초 주석이 있다. agent key/세션 경계가 있어 이 결정에서 origin 직접 호출로 옮기지 않는다.
 
 ## 트레이드오프
 
