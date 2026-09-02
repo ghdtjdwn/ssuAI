@@ -74,6 +74,18 @@ for (const route of PUBLIC_ROUTES) {
   });
 }
 
+test("실행 중인 Next 응답은 기본 브라우저 보안 헤더를 보낸다", async ({ request }) => {
+  const response = await request.get("/");
+
+  expect(response.ok()).toBe(true);
+  expect(response.headers()).toMatchObject({
+    "x-frame-options": "DENY",
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "permissions-policy": "camera=(), microphone=(), geolocation=()",
+  });
+});
+
 test("모바일 첫 진입 스플래시는 종료 후 화면 이동 때 다시 표시되지 않는다", async ({
   page,
 }, testInfo) => {
