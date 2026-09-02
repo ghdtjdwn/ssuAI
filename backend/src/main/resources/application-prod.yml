@@ -1,0 +1,49 @@
+# This file is committed to the repository (see backend/.gitignore exception).
+# Per docs/security.md §3, it MUST NOT contain secrets — only non-sensitive
+# baseline settings or `${ENV_VAR}` references. DB passwords, JWT keys,
+# session cookies, API tokens etc. belong in environment variables and are
+# read via ${ENV_VAR:default} in this file or supplied at deploy time.
+ssuai:
+  connector:
+    meal: real
+    dorm-meal: real
+    chat: ${SSUAI_CONNECTOR_CHAT:mock}
+  chat:
+    llm:
+      gemini:
+        api-key: ${SSUAI_GEMINI_API_KEY:}
+      groq:
+        api-key: ${SSUAI_GROQ_API_KEY:}
+      cerebras:
+        api-key: ${SSUAI_CEREBRAS_API_KEY:}
+      deepinfra:
+        api-key: ${SSUAI_DEEPINFRA_API_KEY:}
+      sambanova:
+        api-key: ${SSUAI_SAMBANOVA_API_KEY:}
+      nscale:
+        api-key: ${SSUAI_NSCALE_API_KEY:}
+      fireworks:
+        api-key: ${SSUAI_FIREWORKS_API_KEY:}
+      huggingface:
+        api-key: ${SSUAI_HUGGINGFACE_API_KEY:}
+      mistral:
+        api-key: ${SSUAI_MISTRAL_API_KEY:}
+        training-opt-out-confirmed: ${SSUAI_MISTRAL_TRAINING_OPT_OUT_CONFIRMED:false}
+      openrouter:
+        api-key: ${SSUAI_OPENROUTER_API_KEY:}
+  # Production CORS allowlist — exactly one origin (the deployed Vercel
+  # project), wired into WebCorsProdConfig. The value is supplied at
+  # deploy time via the SSUAI_FRONTEND_ORIGIN env var (set on the
+  # ssuai-backend-config ConfigMap). Empty default makes the binding
+  # explicit; WebCorsProdConfig fails fast with a clear message if it
+  # ever resolves to blank, per docs/security.md §8.
+  frontend:
+    origin: ${SSUAI_FRONTEND_ORIGIN:}
+
+# JVM tuning: prefer setting JAVA_OPTS on the ConfigMap (e.g.
+# `-XX:+UseG1GC -XX:MaxRAMPercentage=75.0`) so it can be tweaked
+# without a rebuild. The Dockerfile applies JAVA_OPTS via ENTRYPOINT.
+
+springdoc:
+  swagger-ui:
+    enabled: false

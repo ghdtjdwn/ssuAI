@@ -1,0 +1,11 @@
+server:
+  port: 0
+
+logging:
+  level:
+    root: WARN
+    com.ssuai: DEBUG
+
+ssuai:
+  connector:
+    chat: mock

@@ -1,0 +1,8 @@
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    com.ssuai: DEBUG
+
