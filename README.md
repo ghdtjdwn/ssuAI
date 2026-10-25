@@ -10,7 +10,7 @@
 Next.js 애플리케이션이다. 브라우저에 비밀 값을 노출하지 않으면서 대시보드와 SSE 챗봇을 제공한다.
 
 [라이브 앱](https://ssuai.vercel.app) · [챗봇](https://ssuai.vercel.app/chat) ·
-[플랫폼 사례 연구](https://seongju.vercel.app/projects/ssu-platform/) · [문서 지도](docs/README.md)
+[문서 지도](docs/README.md)
 
 ![ssuAI 홈 — 오늘의 브리핑과 사용자가 구성할 수 있는 위젯 대시보드](docs/assets/dashboard.png)
 
