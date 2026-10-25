@@ -11,7 +11,7 @@ and approval-gated AI actions into one web experience. It provides dashboards an
 without exposing server credentials to the browser.
 
 [Live app](https://ssuai.vercel.app) · [Chat](https://ssuai.vercel.app/chat) ·
-[Platform case study](https://seongju.vercel.app/en/projects/ssu-platform/) · [Documentation map](docs/README.md)
+[Documentation map](docs/README.md)
 
 ![ssuAI home with a daily briefing and user-configurable dashboard widgets](docs/assets/dashboard.png)
 
