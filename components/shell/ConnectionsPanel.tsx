@@ -43,19 +43,16 @@ export function ConnectionBadge() {
         : unverified
           ? "상태 미확인"
           : "연결";
-  const ariaLabel = checking
-    ? "서비스 연결 상태 확인 중"
-    : conns.status === "stale"
-      ? `서비스 연결 상태 확인 불가, 마지막 확인 ${conns.lastKnownCount}/3`
-      : conns.status === "error"
-        ? "서비스 연결 세션 오류"
-        : `서비스 연결 ${conns.count}/3${
-            degraded
-              ? ", 일부 상태 확인 필요"
-              : unverified
-                ? ", 일부 상태 미확인"
-                : ""
-          }`;
+  // axe `label-content-name-mismatch`: the visible "N/3 <label>" text must be
+  // part of the accessible name, so the label starts from the badge text and
+  // adds context after it.
+  const ariaLabel = `서비스 연결 ${badgeCount}/3 ${badgeLabel}${
+    conns.status === "stale"
+      ? `, 마지막 확인 ${conns.lastKnownCount}/3`
+      : sessionError
+        ? ", 세션 오류"
+        : ""
+  }`;
 
   return (
     <>
@@ -80,7 +77,7 @@ export function ConnectionBadge() {
           {badgeCount}
         </span>
         <span>/3</span>
-        <span className="hidden sm:inline">{badgeLabel}</span>
+        <span className="hidden sm:inline"> {badgeLabel}</span>
       </button>
       <ConnectionsPanel open={open} onClose={() => setOpen(false)} />
     </>

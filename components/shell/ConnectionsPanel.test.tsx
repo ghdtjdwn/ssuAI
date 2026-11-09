@@ -60,7 +60,7 @@ describe("ConnectionBadge", () => {
     renderBadge();
 
     const badge = screen.getByRole("button", {
-      name: "서비스 연결 상태 확인 불가, 마지막 확인 3/3",
+      name: "서비스 연결 ?/3 확인 필요, 마지막 확인 3/3",
     });
     expect(badge).toHaveTextContent("?/3");
     fireEvent.click(badge);
@@ -85,7 +85,7 @@ describe("ConnectionBadge", () => {
     renderBadge();
 
     const badge = screen.getByRole("button", {
-      name: "서비스 연결 2/3, 일부 상태 확인 필요",
+      name: "서비스 연결 2/3 확인 필요",
     });
     expect(badge).toHaveTextContent("2/3");
     fireEvent.click(badge);
@@ -98,7 +98,7 @@ describe("ConnectionBadge", () => {
       screen.getByRole("button", { name: "도서관 연결 해제" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "서비스 연결 3/3" }),
+      screen.queryByRole("button", { name: "서비스 연결 3/3 연결" }),
     ).not.toBeInTheDocument();
   });
 
@@ -115,9 +115,9 @@ describe("ConnectionBadge", () => {
     renderBadge();
 
     const badge = screen.getByRole("button", {
-      name: "서비스 연결 3/3, 일부 상태 미확인",
+      name: "서비스 연결 3/3 상태 미확인",
     });
-    expect(badge).toHaveTextContent("3/3상태 미확인");
+    expect(badge).toHaveTextContent("3/3 상태 미확인");
     expect(badge).toHaveClass("text-primary");
     expect(badge).not.toHaveClass("text-warning");
     fireEvent.click(badge);
