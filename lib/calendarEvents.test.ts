@@ -49,6 +49,12 @@ describe("pickRelevantEvents", () => {
 
     expect(picked.map((e) => e.date)).toEqual(["2026-02-01", "2026-03-01"]);
   });
+
+  it("returns empty array when limit is zero or negative", () => {
+    const events = [event("2026-07-01"), event("2026-07-05")];
+    expect(pickRelevantEvents(events, 0, TODAY)).toEqual([]);
+    expect(pickRelevantEvents(events, -1, TODAY)).toEqual([]);
+  });
 });
 
 describe("isOngoing", () => {
