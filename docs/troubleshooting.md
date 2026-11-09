@@ -239,19 +239,19 @@ Vercel은 정확히 `8af59ef`에 대한 Production 배포 성공을 GitHub에 �
 
 ## 2026-07-18 — 3/3 연결 표시와 실제 provider 사용 가능성 불일치
 
-### Context and impact
+### 맥락과 영향
 
 운영 ssuAI에서 연결 패널은 u-SAINT·LMS·도서관을 `3/3 연결`로 표시했지만, 채팅의 졸업요건
 조회는 도구 실행 뒤 시스템 연결 오류로 끝났고 LMS 자료 요청은 연결 상태를 확인하지 못했다는
 응답을 반환했다. 사용자는 로그인이 성공했는데 다시 로그인해야 하는지 판단할 수 없었다.
 
-### Expected and actual behavior
+### 기대 행동과 실제 동작
 
 - 기대: `3/3 연결`은 세 provider가 현재 사용할 수 있다는 최신 server-confirmed 결과를 뜻한다.
 - 실제: 저장된 grant 또는 이전에 확인한 grant가 있으면 provider의 현재 건강 상태나 status 갱신
   성공 여부와 무관하게 연결됨으로 표시될 수 있었다.
 
-### Reproduction and evidence
+### 재현과 증거
 
 1. 세 provider를 연결해 상단 배지가 `3/3`인지 확인한다.
 2. 채팅에서 졸업요건 조회와 LMS 자료 요청을 실행한다.
@@ -263,7 +263,7 @@ Vercel은 정확히 `8af59ef`에 대한 Production 배포 성공을 GitHub에 �
 다시 `connected`로 설정했다. 기존 web-session 응답에는 저장된 grant와 provider의 현재
 `ERROR`·`EXPIRED` 상태를 함께 표현할 필드가 없었다.
 
-### Root cause
+### 원인
 
 문제는 로그인 자체가 아니라 서로 다른 세 상태를 하나로 표시한 것이었다.
 
@@ -274,7 +274,7 @@ Vercel은 정확히 `8af59ef`에 대한 Production 배포 성공을 GitHub에 �
 `linkedProviders` 스냅샷과 cached session ID는 두 번째와 세 번째 상태를 증명하지 못하지만 UI가 모두
 성공으로 해석했다.
 
-### Alternatives and resolution
+### 대안과 해결
 
 - 일시적 status 실패 때 session을 즉시 폐기: 복구 가능한 agent 요청까지 막고 새 세션을 불필요하게
   회전시키므로 제외했다.
@@ -295,7 +295,7 @@ operational 목록인 `availableProviders`를 우선하고, `linkedProviders`는
 바뀌면 이를 폐기한다. HITL interrupt는 원래 MCP session의 action 소유권을 고정하고 resume stream이
 끝나기 전에는 stream-triggered status 갱신을 하지 않는다.
 
-### Validation and regression prevention
+### 검증과 재발 방지
 
 - `ChatPanel`, `ConnectionsPanel`, `useConnections` 집중 테스트 35개 통과
 - 3/3, 부분 연결, 명시적 빈 `availableProviders`, health-only rollout, provider
@@ -311,7 +311,7 @@ operational 목록인 `availableProviders`를 우선하고, `linkedProviders`는
 운영 배포 뒤에는 실제 provider failure에서 연결 개수와 카드 상태가 함께 낮아지는지, status API의
 일시 장애에서는 `stale` 표시가 다음 성공한 자동 갱신 뒤 해제되는지 별도로 확인해야 한다.
 
-### Remaining risk
+### 남은 위험
 
 provider health는 마지막 probe 시점과 실제 도구 호출 사이에 다시 바뀔 수 있다. 따라서 UI 상태는
 권한 부여 수단이 아니며 각 도구는 서버에서 credential을 재검증해야 한다.
@@ -319,13 +319,13 @@ provider health는 마지막 probe 시점과 실제 도구 호출 사이에 다�
 
 ## 2026-07-17 — MCP 세션 focus 갱신 테스트의 간헐 실패
 
-### Context and impact
+### 맥락과 영향
 
 의존성 보안 패치를 반영한 main CI에서 175개 테스트 중 `ChatPanel`의 focus 갱신 테스트 하나가
 간헐적으로 실패했다. 같은 SHA의 PR 검증과 Vercel 배포는 성공했고 공개 화면의 이상은 관찰되지
 않았지만, main 품질 게이트가 실패해 배포 검증을 완료할 수 없는 상태였다.
 
-### Expected and actual behavior
+### 기대 행동과 실제 동작
 
 - 기대: 세션 생성 후 브라우저가 focus를 회복하면 현재 MCP provider grant를 다시 조회한다.
 - 실제: UI에는 세션이 표시됐지만 테스트가 보낸 focus 이벤트를 listener가 받지 못해
@@ -334,7 +334,7 @@ provider health는 마지막 probe 시점과 실제 도구 호출 사이에 다�
 실패 증거는 [GitHub Actions run 29584119568](https://github.com/ghdtjdwn/ssuAI/actions/runs/29584119568)이다.
 같은 SHA의 직전 PR run은 통과했고, 변경 범위에도 채팅 런타임이나 테스트 파일은 없었다.
 
-### Reproduction and hypotheses
+### 재현과 가설
 
 로컬에서 문제 테스트를 20회 반복했을 때 모두 통과해 결정적 기능 회귀는 재현되지 않았다. 대신
 focus 이벤트가 만든 React 상태 변경이 `act(...)`에 포함되지 않았다는 경고가 함께 관찰됐다.
@@ -344,14 +344,14 @@ focus 이벤트가 만든 React 상태 변경이 `act(...)`에 포함되지 않�
 - effect 타이밍 경합: DOM commit 뒤 passive effect가 focus listener를 등록하기 전에 테스트가
   이벤트를 보낼 수 있어 증거와 일치했다.
 
-### Root cause
+### 원인
 
 `McpSessionProvider`는 세션이 생긴 뒤 실행되는 effect 안에서 expiry timer, status timer, focus
 listener를 함께 등록했다. UI가 새 세션을 렌더링한 시점과 passive effect가 listener를 붙이는
 시점 사이에 짧은 이벤트 유실 구간이 있었다. 테스트가 그 구간을 드물게 밟았고, 직접 호출한
 `window.dispatchEvent`도 Testing Library의 React 동기화 경계를 우회했다.
 
-### Alternatives and resolution
+### 대안과 해결
 
 - 실패 job 재실행만 하기: 원인과 경고를 남기므로 제외했다.
 - 테스트에 임의 sleep 추가: 실행 환경에 따라 다시 흔들리고 제품의 이벤트 유실 구간을 남겨 제외했다.
@@ -361,7 +361,7 @@ focus listener를 Provider 마운트 동안 한 번 유지하고, 유효한 cach
 갱신하도록 변경했다. 세션별 expiry·interval timer는 기존 lifecycle을 유지한다. 테스트의 focus
 이벤트는 `fireEvent.focus(window)`로 보내 React 상태 변경을 `act` 경계 안에서 처리한다.
 
-### Validation and regression prevention
+### 검증과 재발 방지
 
 - 문제 테스트 50회 연속 통과
 - `ChatPanel.test.tsx` 전체 12회 연속 통과, `act` 경고 없음
