@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatCount, formatFixed, formatSeoulAcademicTermLabel } from "@/lib/utils";
+import { formatCount, formatFixed, formatKoreanDate, formatSeoulAcademicTermLabel } from "@/lib/utils";
 
 describe("formatSeoulAcademicTermLabel", () => {
   it("uses Seoul time for the date and academic term", () => {
@@ -37,5 +37,18 @@ describe("formatCount", () => {
   it("renders a dash for null/undefined instead of throwing", () => {
     expect(formatCount(null)).toBe("—");
     expect(formatCount(undefined)).toBe("—");
+  });
+});
+
+describe("formatKoreanDate", () => {
+  it("formats valid YYYY-MM-DD date string", () => {
+    expect(formatKoreanDate("2026-05-15")).toContain("5월 15일");
+  });
+
+  it("returns fallback for invalid/null date inputs instead of throwing RangeError", () => {
+    expect(formatKoreanDate(null)).toBe("—");
+    expect(formatKoreanDate(undefined)).toBe("—");
+    expect(formatKoreanDate("invalid-date")).toBe("—");
+    expect(formatKoreanDate("", "N/A")).toBe("N/A");
   });
 });

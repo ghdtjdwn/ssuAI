@@ -16,6 +16,7 @@ export function pickRelevantEvents(
   limit: number,
   today: string,
 ): AcademicCalendarEvent[] {
+  if (!Array.isArray(events) || limit <= 0) return [];
   const sorted = [...events].sort((a, b) => a.date.localeCompare(b.date));
   const relevant = sorted.filter((e) => lastDay(e) >= today);
   return (relevant.length > 0 ? relevant : sorted.slice(-limit)).slice(0, limit);

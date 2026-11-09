@@ -51,12 +51,16 @@ export function millisecondsUntilNextSeoulMidnight(now = new Date()) {
   return Math.max(nextSeoulMidnightUtc - now.getTime(), 60_000);
 }
 
-export function formatKoreanDate(date: string) {
-  return koreanLongDateFormatter.format(new Date(`${date}T00:00:00+09:00`));
+export function formatKoreanDate(date: string | null | undefined, fallback = "—") {
+  if (!date || typeof date !== "string") return fallback;
+  const d = new Date(`${date}T00:00:00+09:00`);
+  return Number.isNaN(d.getTime()) ? fallback : koreanLongDateFormatter.format(d);
 }
 
-export function formatShortKoreanDate(date: string) {
-  return koreanShortDateFormatter.format(new Date(`${date}T00:00:00+09:00`));
+export function formatShortKoreanDate(date: string | null | undefined, fallback = "—") {
+  if (!date || typeof date !== "string") return fallback;
+  const d = new Date(`${date}T00:00:00+09:00`);
+  return Number.isNaN(d.getTime()) ? fallback : koreanShortDateFormatter.format(d);
 }
 
 export function getSeoulDateString(now = new Date()) {
