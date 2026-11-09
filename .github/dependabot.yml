@@ -16,6 +16,11 @@ updates:
     commit-message:
       prefix: chore(deps)
       include: scope
+    ignore:
+      # Runtime is Node 20 (ci.yml, .nvmrc, engines); keep the type
+      # major aligned with it and bump both together.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
