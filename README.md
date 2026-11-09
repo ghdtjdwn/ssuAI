@@ -99,15 +99,15 @@ key가 필요한 요청과 `/api/agent/*`는 항상 same-origin 서버 경로를
 | 스트림 중단 뒤 HITL 상태 또는 최종 링크 유실 | thread-stable SSE, resume endpoint, 제한된 안전 링크 렌더링 — [chat tests](components/chat/ChatPanel.test.tsx) · [message tests](components/chat/MessageBubble.test.tsx) |
 | 브라우저가 agent key, principal, limiter identity를 조작할 위험 | server route가 bearer를 검증하고 pseudonymous client identity를 서명 — [ADR 0086](docs/adr/0086-server-side-principal.md) · [proxy tests](lib/server/agentProxy.test.ts) |
 | 대화 capability의 장기 저장과 삭제 부재 | proxy가 strict body/ID 경계를 적용하고 owner 검증 DELETE API를 중계 — [agent client](lib/api/agent.ts) |
-| 변경이 UI에서만 우연히 동작하는 문제 | lint, TypeScript, Vitest, production build를 모두 요구 — [CI workflow](.github/workflows/ci.yml) |
+| 변경이 UI에서만 우연히 동작하는 문제 | 의존성 audit, lint, TypeScript, Vitest, production build, Playwright 브라우저 게이트를 모두 요구 — [CI workflow](.github/workflows/ci.yml) |
 | 정적 보안 회귀와 stale dependency | CodeQL v4 JS/TS 분석, npm·GitHub Actions Dependabot — [CodeQL](.github/workflows/codeql.yml) · [Dependabot](.github/dependabot.yml) |
 
-주요 스택은 Next.js 16.2.12, React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
+주요 스택은 Next.js 16(App Router), React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
 Vitest, Testing Library, Playwright, axe-core와 Vercel이다.
 
 ## 로컬 실행과 검증
 
-Node.js 20과 pnpm 10을 사용한다. 로컬 backend 없이 공개 ssuMCP를 대상으로 실행할 수도 있다.
+Node.js 20(`.nvmrc`)과 pnpm 10을 사용한다. 로컬 backend 없이 공개 ssuMCP를 대상으로 실행할 수도 있다.
 
 ```bash
 git clone https://github.com/ghdtjdwn/ssuAI.git
@@ -145,6 +145,10 @@ LCP 2.5초·CLS 0.1 예산을 검사한다. 학교 API
 [`docs/verification-boundary.md`](docs/verification-boundary.md)에 기록했다.
 2026-07-27에 Next.js 16.2.12와 전이 의존성 패치 버전을 고정하고 확인한 `pnpm audit --prod` 0건도 당시 registry advisory
 스냅샷이며 런타임 침투 테스트를 뜻하지 않는다.
+
+커밋 전 비밀 값 스캔을 로컬에서도 돌리려면 [gitleaks](https://github.com/gitleaks/gitleaks)를 설치한 뒤
+`pnpm lefthook install`로 pre-commit 훅을 등록한다(`lefthook.yml`, `.gitleaks.toml`). 선택 사항이며 CI의
+gitleaks 워크플로는 이와 무관하게 실행된다.
 
 환경 변수와 server-only/public 구분은 [`.env.example`](.env.example)에 있다. 운영 proxy target과
 secret 변경은 Vercel 설정과 함께 검증해야 하며, localhost 기본값으로 운영 구성을 추정하지 않는다.

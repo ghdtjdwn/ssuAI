@@ -1,122 +1,87 @@
-# ssuAI Product Document
+# ssuAI 제품 범위
 
-## 2026-07-02 추가: 전면 UI 리디자인 (5탭 IA)
-
-디자인 핸드오프 기반 전면 리디자인이 prod에 배포됐다(PR #210, [ADR 0010](adr/0010-ui-redesign.md)).
-
-- **IA**: 단일 대시보드 → 5개 라우트(홈 `/` · 챗봇 `/chat` · 학사 `/academics` · 도서관 `/library` · 캠퍼스 `/campus`). 데스크톱 사이드바+멀티컬럼, 모바일 하단 탭바+단일 컬럼.
-- **홈**: AI 오늘의 브리핑 히어로(연동된 데이터만으로 규칙 기반 요약 + "오늘은 ~부터 해보는 건 어때요?" 실행 추천 1건 — 마감 임박 과제/채플/여유 좌석 중 최우선 행동을 제안, 미연동 소스는 조용히 생략) + 우선순위 카드 3(마감 임박/지금이 적기/잊지 마세요) + 위젯 14종 커스터마이즈 그리드(순서·1/2칸·on/off·밀도, `localStorage` 영속). 학사일정 위젯 포함 — 백엔드 `GET /api/academic-calendar` 기반, 기간 일정은 시작~종료 범위 인지(진행중 표시).
-- **디자인 시스템**: 숭실 블루/민트 토큰, Pretendard + JetBrains Mono(수치 전용), 시스템 추종 다크모드(next-themes), 스프링 모션(HITL 승인 체크·토스트·바텀시트), `prefers-reduced-motion` 존중.
-- **도서관**: 실시간 좌석 3-뷰(도넛 오버뷰/공간/전체) — prod 데이터가 좌석 단위 목록을 제공하지 않으므로 dot 그리드는 데이터가 있을 때만 렌더(가짜 좌석 금지), 예약은 기존 추천→prepare→confirm 경로 유지. 층 단위 대기 등록 추가.
-- **데이터·API·인증·예약 계약 무변경**. 단, 좌석 추천 응답이 envelope(`recommendations` 래핑)인데 프론트가 bare 배열로 타이핑해 추천 패널이 조용히 빈 상태만 그리던 실계약 버그를 발견·수정(ADR 0010 §5).
-
-## 2026-06-13 추가: 웹 예약 UX
-
-### 배경
-
-도서관 좌석 예약은 백엔드의 `prepare`/`confirm` 계약이 먼저 있어야 안전하게 제품 화면에 올릴 수 있다.
-PR-C1에서 웹 REST 경로가 `main`에 들어왔으므로, 이번 범위는 대시보드에서 추천 좌석을 보고 직접 예약을 확정하는 최소 UX를 제공한다.
-
-### 구현 범위
-
-- `SeatRecommendationPanel`: 현재 선택한 층의 추천 좌석 5개를 보여주고 각 좌석에 예약 버튼을 제공한다.
-- `ReservationConfirmModal`: `prepare` 결과의 요약과 만료 시간을 보여준 뒤 사용자가 한 번 더 확정해야 `confirm`을 호출한다. `confirm` 응답 `status`는 세 갈래로 처리한다 — `SUCCESS`는 "예약이 완료되었습니다", `PROCESSING`은 동기 confirm이 타임아웃됐지만 백엔드 워커가 백그라운드에서 예약을 이어 처리해 보통 성공하므로 실패가 아닌 진행 중("백그라운드에서 처리 중") 으로 안내하고 좌석 상태를 재조회하며, 그 외(`FAILED_RACE`·`TIMEOUT`·`FAILED_AUTH`·`FAILED_UPSTREAM`)는 "예약 실패" 메시지로 안내한다.
-- `WaitStatusCard`: 활성 대기 intent가 있으면 상태, 시도 횟수, 만료 시간, 취소 버튼을 대시보드에 표시한다.
-
-### 선택 이유와 기각안
-
-- 선택: 기존 `fetchJson` + React Query 패턴을 그대로 사용한다. API envelope, 쿠키 포함 요청, 캐시 무효화 방식이 이미 좌석/대출 카드와 맞기 때문에 새 client 계층을 만들 필요가 없다.
-- 기각: 추천 카드에서 바로 예약 POST를 호출하는 방식은 실수 클릭과 좌석 경합 시 사용자 설명이 약하다.
-- 기각: 챗봇 전용 예약 UX는 예약 상태와 승인 단계를 화면에서 확인하기 어려워, 사용자가 직접 예약을 관리하는 흐름에 맞지 않는다.
-
-### human-approval 의미
-
-예약은 `prepare -> confirm` 2단계로 나눈다. `prepare`는 서버가 실행할 액션을 요약하고 짧은 만료 시간을 부여하며, `confirm`은 사용자가 화면에서 명시적으로 승인한 뒤에만 실행된다.
-이 구조는 실수 예약을 줄이고, 민감한 write action이 사용자 승인 뒤에만 실행되도록 보장한다.
-
-> 현재 구현 범위 문서. 기준일: 2026-07-02. 장기 방향은
-> [vision.md](vision.md), 서버 도구 계약은
-> [ssuMCP MCP tools](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md)를 따른다.
+> 현재 배포된 제품 표면과 신뢰 경계를 기록한다. 기준일: 2026-11-09. 장기 방향의 역사 기록은
+> [vision.md](vision.md), 프론트엔드 런타임 경계는 [architecture.md](architecture.md), 서버 도구
+> 계약은 [ssuMCP MCP tools](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/mcp-tools.md)를 따른다.
 
 ## 1. 제품 구성
 
-ssuAI는 숭실대학교 데이터를 한 화면과 챗봇에서 조회하는 웹 애플리케이션이다.
-런타임은 두 저장소로 분리되어 있다.
+ssuAI는 숭실대학교 공개 정보와 개인 학사·LMS·도서관 데이터를 한 화면과 챗봇에서 다루는 웹
+애플리케이션이다. 런타임은 네 서비스로 나뉘며 이 저장소는 프론트엔드와 same-origin BFF 경계만
+소유한다.
 
-| 저장소 | 책임 | 주요 위치 |
+| 서비스 | 책임 | 저장소 |
 | --- | --- | --- |
-| `ssuAI` | Next.js 웹 UI, 인증 UX, 챗봇 화면, 제품 문서 | `app/`, `components/`, `hooks/`, `lib/`, `docs/` |
-| `ssuMCP` | REST API, MCP Streamable HTTP 서버, 학교 시스템 커넥터, 배포 | `src/`, `docs/`, `deploy/` |
+| ssuAI | Next.js 화면, 인증 UX, 챗봇 UI, `/api/*` rewrite와 `/api/agent/*` Route Handler | 현재 저장소 |
+| ssuAgent | LangGraph 라우팅, 대화 상태, HITL 오케스트레이션 | [ghdtjdwn/ssuAgent](https://github.com/ghdtjdwn/ssuAgent) |
+| ssuMCP | 캠퍼스 도메인 로직, REST/MCP 계약, 인증과 상태 변경 | [ghdtjdwn/ssuMCP](https://github.com/ghdtjdwn/ssuMCP) |
+| ssu-ai-service | 격리된 임베딩 요청 게이트웨이 | [ghdtjdwn/ssu-ai-service](https://github.com/ghdtjdwn/ssu-ai-service) |
 
-웹은 동일 origin `/api/*`를 사용하고 Next rewrite가 ssuMCP로 요청을
-전달한다. 외부 MCP 클라이언트는 `https://ssumcp.duckdns.org/mcp`에 직접
-연결한다.
+화면은 홈 `/`, 챗봇 `/chat`, 학사 `/academics`, 도서관 `/library`, 캠퍼스 `/campus` 다섯 라우트이며
+데스크톱 사이드바와 모바일 하단 탭을 공유한다([ADR 0010](adr/0010-ui-redesign.md)). 홈은 14종 위젯의
+순서·폭·표시 여부를 `localStorage`에 저장하는 커스터마이즈 그리드다(`components/home/widgets/registry.ts`).
+`/admin`은 로그인한 관리자만 ssuMCP resilience 상태를 조회한다([ADR 0090](adr/0090-admin-resilience-auth.md)).
 
 ## 2. 현재 제공 범위
 
 ### 공개 조회
 
-- 학생식당 오늘/날짜별 메뉴와 기숙사 주간 식단
-- 캠퍼스 시설 검색
-- 중앙도서관 소장 도서 검색
-- 학교 공지사항 목록, 검색, 상세, 진행 중 공지, 학과/부서 공지
+credential 없이 호출하는 경로다. 코드 기준은 `lib/api/*.ts`에서 `fetchPublicJson*`을 쓰는 함수와
+`hooks/useLibrarySeatSse.ts`의 EventSource다.
 
-### 연동 후 조회
+- 학생식당 오늘·주간 메뉴, 기숙사 주간 식단 (`meal.ts`, `dorm.ts`)
+- 캠퍼스 시설 검색 (`facility.ts`)
+- 학교 공지사항 목록 (`notice.ts`)
+- 학사일정 (`calendar.ts`)
+- 중앙도서관 도서 검색, 층별 좌석 현황과 좌석 변경 SSE (`library.ts`, `useLibrarySeatSse.ts`)
 
-| Provider | 조회 기능 | 비고 |
+### 연동 후 조회와 실행
+
+| Provider | 기능 | 연동 방식 |
 | --- | --- | --- |
-| `LIBRARY` | 중앙도서관 좌석 현황, 내 대출 현황 | 좌석도 운영 upstream이 토큰을 요구하므로 연동 필요 |
-| `SAINT` | 시간표, 성적, 채플, 졸업요건, 장학금 | SmartID 기반 연동 |
-| `LMS` | 과제 및 퀴즈 목록 | LMS 세션 연동 |
+| `SAINT` | 시간표, 성적, 채플, 졸업요건, 장학금 | SmartID SSO. callback의 1회용 code를 same-origin에서 교환한다([ADR 0089](adr/0089-sso-code-exchange.md)) |
+| `LMS` | 과제 목록, 챗봇에서 강의자료 일괄 내보내기 | u-SAINT 로그인을 공유하는 LMS SSO(`/api/auth/lms/sso-init`) |
+| `LIBRARY` | 내 대출 현황, 추천 좌석, 예약 `prepare → confirm`, 층 단위 대기 등록 | 도서관 계정 로그인. 도서관만 연결해도 MCP 채팅 세션을 발급한다([ADR 0088](adr/0088-library-only-mcp-session.md)) |
 
-### 사용자 표면
+### 챗봇
 
-- 대시보드 카드에서 공개 데이터와 연동 데이터를 조회한다.
-- `/chat`에서 같은 데이터 범위에 대해 자연어로 질문한다.
-- ssuMCP는 현재 52개 MCP 도구를 Streamable HTTP `/mcp`로 노출한다.
-- 외부 MCP 개인 도구는 `start_auth`로 발급받은 `mcp_session_id`와 provider
-  연동이 있어야 한다.
-- 도서관 좌석 예약/이석/반납 backend MCP action은 배포되어 있다. 웹 대시보드
-  전용 예약 UX(`SeatRecommendationPanel` + `ReservationConfirmModal` + `WaitStatusCard`)도 2026-06-06 PR #189로 shipped.
+`/chat`은 same-origin `/api/agent/{stream,resume}`를 통해 ssuAgent의 SSE를 받는다. 도메인
+handoff, 도구 진행 상태, 스트리밍 답변을 표시하고, 좌석 예약이나 LMS 내보내기처럼 상태를 바꾸는
+요청은 `prepare` 결과를 카드로 보여준 뒤 사용자가 승인해야 `resume/confirm`을 실행한다
+([ADR 0001](adr/0001-agent-sse-chat-hitl.md)). 연결 상태 표시는 backend의 provider grant를 단일
+근거로 삼는다([ADR 0099](adr/0099-authoritative-web-session-grants.md)).
 
 ## 3. 신뢰 경계
 
-- 도서관 좌석과 대출은 `LIBRARY` 세션이 있는 호출만 실데이터를 조회한다.
-  인증된 응답을 익명 호출이 캐시로 재사용하지 않도록 서버가 인증 경계를
-  분리한다.
-- 시간표, 성적, LMS 과제 같은 개인 데이터는 로그에 원문을 남기지 않으며,
-  챗봇에서 개인 도구 결과를 다루는 턴과 이후 히스토리는 private LLM
-  provider 정책으로 처리한다.
-- 비밀번호, upstream 쿠키, 토큰, `mcp_session_id`, JWT, API key는 저장소나
-  로그에 기록하지 않는다.
-- 상태를 바꾸는 도서관 좌석 예약/이석/반납은 `prepare_*` + `confirm_action`
-  2단계 확인으로만 실행한다. 웹 대시보드도 이 2단계 확인 UX(추천 좌석 →
-  `ReservationConfirmModal` 확정)를 제공하며, 확인 없이 한 번에 실행하는
-  표면은 제공하지 않는다.
+- 공개 GET/SSE만 backend origin을 직접 호출할 수 있고, 쿠키·Bearer·API key가 필요한 요청은 항상
+  same-origin `/api/*`를 지난다([ADR 0087](adr/0087-public-direct-origin-sse.md)).
+- access token은 메모리에, refresh token은 HttpOnly cookie에 둔다.
+- `/api/agent/*` Route Handler는 브라우저가 보낸 `principal`을 제거하고 Bearer 검증 결과만 다시
+  주입하며, server-only agent key와 HMAC 서명 identity를 더한다([ADR 0086](adr/0086-server-side-principal.md)).
+- 상태를 바꾸는 작업은 `prepare → confirm` 2단계로만 실행한다. 확인 없이 한 번에 실행하는 표면은
+  대시보드에도 챗봇에도 없다.
+- 비밀번호, upstream 쿠키, 토큰, `mcp_session_id`, JWT, API key는 저장소나 로그에 기록하지 않는다.
+  서버 측 정책의 기준 문서는 [ssuMCP security](https://github.com/ghdtjdwn/ssuMCP/blob/main/docs/security.md)다.
 
-## 4. 후속 범위
+## 4. 제공하지 않는 것
 
-도서관 좌석 예약은 backend MCP write tool + 웹 확인 UX(추천 좌석 → 확정 모달 →
-SUCCESS/PROCESSING/실패 분기) + 실시간 대기 SSE까지 구현·배포했고 실계정으로
-검증했다. 남은 것은 현장 체크인 상태에서만 재현 가능한 일부 엣지 경로(이석·취소,
-운영시간 외 예약)의 E2E 재검증이다.
-
-다음 항목은 아직 shipped 기능으로 표현하지 않는다.
-
-- 웹 대시보드/챗봇 UI에서 버튼으로 수행하는 도서관 좌석 자동 예약 또는 취소
-- 수강신청 같은 학교 상태 변경
+- 사용자 승인 없이 실행되는 좌석 자동 예약·취소
+- 수강신청처럼 학교 상태를 바꾸는 다른 작업
 - 자동 LMS 제출
-- 모바일 앱과 알림 전달
+- 네이티브 앱과 푸시 알림 (반응형 웹 하나로 데스크톱과 모바일을 제공한다)
 
 ## 5. 검증 기준
 
-프론트엔드 변경은 저장소 루트에서 `pnpm lint`, `pnpm typecheck`,
-`pnpm test`, `pnpm build`로 검증한다. 서버 계약 변경은 ssuMCP에서
-`.\gradlew.bat test`로 검증하고, 라이브 동작은 배포 후 health endpoint와
-MCP Inspector로 별도 확인한다.
+프론트엔드 변경은 CI와 같은 순서로 `pnpm audit:dependencies`, `pnpm lint`, `pnpm typecheck`,
+`pnpm test`, `pnpm build`, `pnpm test:e2e`를 통과해야 한다. 이 검증이 증명하는 범위와 한계는
+[verification-boundary.md](verification-boundary.md)에 있다. 서버 계약 변경은 ssuMCP 저장소에서
+검증한다.
 
-## 6. 문서 관리
+## 6. 변경 이력
 
-프론트엔드 설계 결정은 `docs/adr/`에, 장기 방향은 `docs/vision.md`에 기록한다.
-서버 구현 계약·운영 자료의 기준은 ssuMCP 저장소(`../ssuMCP/docs/`)다.
-현재 범위 판단은 이 문서와 서버의 활성 문서를 우선한다.
+- 2026-07-02 — 전면 UI 리디자인: 디자인 토큰, 5탭 IA, 커스터마이즈 홈, 시스템 추종 다크모드
+  ([ADR 0010](adr/0010-ui-redesign.md)). 데이터·인증·예약 계약은 바꾸지 않았고, 좌석 추천 응답
+  envelope를 bare 배열로 타이핑하던 계약 버그를 함께 고쳤다.
+- 2026-06-14 — ssuAgent SSE 챗봇과 HITL 승인 UI([ADR 0001](adr/0001-agent-sse-chat-hitl.md)).
+- 2026-06 — 웹 대시보드 좌석 예약 UX: 추천 좌석 → `prepare` 요약과 만료 시간을 보여주는 확정 모달 →
+  `confirm` 결과를 `SUCCESS`·`PROCESSING`(백그라운드 처리 중)·실패로 분기, 대기 등록 상태 카드.

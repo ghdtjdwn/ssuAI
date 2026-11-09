@@ -27,6 +27,6 @@ ssuAI는 요청의 자격증명 요구 여부에 따라 세 경로를 사용한�
 
 ## 배포와 검증
 
-애플리케이션은 Vercel에 배포한다. GitHub Actions는 Node 20에서 `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`를 실행하고 CodeQL v4가 JavaScript/TypeScript를 분석한다. Dependabot은 npm과 GitHub Actions만 추적한다. 운영 프록시 대상과 `AGENT_API_KEY`는 Vercel의 server-only 환경 변수로 주입하며 브라우저 공개 변수로 복제하지 않는다.
+애플리케이션은 Vercel에 배포한다. GitHub Actions는 Node 20에서 frozen install, 의존성 audit(`pnpm audit --audit-level moderate`), `pnpm lint`, `pnpm typecheck`, Vitest, production build, Chromium Playwright(핵심 5개 화면 탐색·접근성·Web Vitals 예산·보안 헤더)를 순서대로 실행한다. CodeQL과 gitleaks는 별도 워크플로로 돌고, Dependabot은 npm과 GitHub Actions만 추적한다. 운영 프록시 대상과 `AGENT_API_KEY`는 Vercel의 server-only 환경 변수로 주입하며 브라우저 공개 변수로 복제하지 않는다.
 
 프론트엔드 CI는 코드 품질과 build를 검증한다. 실제 운영 배선은 Vercel 환경 변수, ssuMCP 공개 CORS, ssuAgent API key가 서로 일치해야 완성된다.
