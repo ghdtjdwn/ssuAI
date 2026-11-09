@@ -9,7 +9,7 @@ import { SaintLoginButton } from "@/components/auth/SaintLoginButton";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "SmartID 로그인 · ssuAI",
+  title: "SmartID 로그인",
 };
 
 export default function AuthLoginPage() {
