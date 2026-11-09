@@ -2,7 +2,13 @@
 // latest JS bundles rather than a stale cached HTML shell.
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
+
 import { ChatPanel } from "@/components/chat/ChatPanel";
+
+export const metadata: Metadata = {
+  title: "챗봇",
+};
 
 export default function ChatPage() {
   // AppShell owns the chrome around the mobile tab bar. Include the device
