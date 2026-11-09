@@ -42,14 +42,8 @@ exports/
 *.key
 secrets/
 
-# Personal scratch files (never share)
-/myInfo.txt
-/내가모은정보들.txt
-/내가모은정보들_2.txt
+# Local scratch directory
 /scratch/
-/rusaint/
-/ssugrade/
-/.antigravitycli/
 
 # lefthook installs this locally (machine-specific path); managed via `pnpm lefthook install`
 .githooks/pre-commit
