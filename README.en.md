@@ -103,7 +103,7 @@ reducing latency for public data. See the [frontend architecture](docs/architect
 | Browser control of the agent key, principal, or limiter identity | Server route verifies the bearer and signs a pseudonymous client identity — [ADR 0086](docs/adr/0086-server-side-principal.md) · [proxy tests](lib/server/agentProxy.test.ts) |
 | Long-lived conversation capabilities with no deletion path | Strict proxy body/ID boundaries and an ownership-checked delete relay — [agent client](lib/api/agent.ts) |
 | UI behavior that only works by accident locally | Dependency audit, lint, TypeScript, Vitest, production build, and the Playwright browser gate are all required — [CI workflow](.github/workflows/ci.yml) |
-| Static security regressions and stale dependencies | CodeQL v4 JS/TS analysis plus npm and GitHub Actions Dependabot — [CodeQL](.github/workflows/codeql.yml) · [Dependabot](.github/dependabot.yml) |
+| Static security regressions and stale dependencies | CodeQL v4 JS/TS analysis — [CodeQL](.github/workflows/codeql.yml) |
 
 The main stack is Next.js 16 (App Router), React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
 Vitest, Testing Library, Playwright, axe-core, and Vercel.
