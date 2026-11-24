@@ -100,7 +100,7 @@ key가 필요한 요청과 `/api/agent/*`는 항상 same-origin 서버 경로를
 | 브라우저가 agent key, principal, limiter identity를 조작할 위험 | server route가 bearer를 검증하고 pseudonymous client identity를 서명 — [ADR 0086](docs/adr/0086-server-side-principal.md) · [proxy tests](lib/server/agentProxy.test.ts) |
 | 대화 capability의 장기 저장과 삭제 부재 | proxy가 strict body/ID 경계를 적용하고 owner 검증 DELETE API를 중계 — [agent client](lib/api/agent.ts) |
 | 변경이 UI에서만 우연히 동작하는 문제 | 의존성 audit, lint, TypeScript, Vitest, production build, Playwright 브라우저 게이트를 모두 요구 — [CI workflow](.github/workflows/ci.yml) |
-| 정적 보안 회귀와 stale dependency | CodeQL v4 JS/TS 분석, npm·GitHub Actions Dependabot — [CodeQL](.github/workflows/codeql.yml) · [Dependabot](.github/dependabot.yml) |
+| 정적 보안 회귀와 stale dependency | CodeQL v4 JS/TS 분석 — [CodeQL](.github/workflows/codeql.yml) |
 
 주요 스택은 Next.js 16(App Router), React 19, TypeScript 6, TanStack Query, Tailwind CSS, Radix UI,
 Vitest, Testing Library, Playwright, axe-core와 Vercel이다.
